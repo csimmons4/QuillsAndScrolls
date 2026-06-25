@@ -1,0 +1,2284 @@
+[
+  {
+    "slug": "acolyte",
+    "name": "Acolyte",
+    "book": "Player's Handbook",
+    "skillProficiencies": [
+      "insight",
+      "religion"
+    ],
+    "toolProficiencies": [
+      "None"
+    ],
+    "languages": 2,
+    "startingEquipment": [
+      "A holy symbol (a gift to you when you entered the priesthood)",
+      "a prayer book or prayer wheel",
+      "5 sticks of incense",
+      "vestmentsValue:0 Weight:0",
+      "a set of common clothesValue:5sp Weight:3lbs",
+      "you command the respect of those who share your faith",
+      "shrine",
+      "or other established presence of your faith"
+    ],
+    "feature": {
+      "name": "Acolyte Feature",
+      "description": ""
+    },
+    "personalityTraits": [],
+    "ideals": [],
+    "bonds": [],
+    "flaws": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/background:acolyte"
+    }
+  },
+  {
+    "slug": "charlatan",
+    "name": "Charlatan",
+    "book": "Player's Handbook",
+    "skillProficiencies": [
+      "deception"
+    ],
+    "toolProficiencies": [
+      "Disguise kit",
+      "forgery kit"
+    ],
+    "languages": 1,
+    "startingEquipment": [
+      "A set of fine clothesValue:15gp Weight:6lbs",
+      "a disguise kitValue:25gp Weight:3lbs",
+      "a set of weighted diceValue:1sp Weight:0",
+      "a deck of marked cardsValue:5sp Weight:0",
+      "or a signet ringValue:5gp Weight:0 of an imaginary duke)"
+    ],
+    "feature": {
+      "name": "Charlatan Feature",
+      "description": ""
+    },
+    "personalityTraits": [],
+    "ideals": [],
+    "bonds": [],
+    "flaws": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/background:charlatan"
+    }
+  },
+  {
+    "slug": "criminal",
+    "name": "Criminal",
+    "book": "Player's Handbook",
+    "skillProficiencies": [
+      "deception",
+      "stealth"
+    ],
+    "toolProficiencies": [
+      "One type of gaming set",
+      "thieves' tools"
+    ],
+    "languages": 1,
+    "startingEquipment": [
+      "A crowbarValue:2gp Weight:5lbs",
+      "a set of dark common clothesValue:5sp Weight:3lbs including a hood",
+      "and within a thieves' guild or similar criminal organization",
+      "or roll on the table below."
+    ],
+    "feature": {
+      "name": "Criminal Feature",
+      "description": ""
+    },
+    "personalityTraits": [],
+    "ideals": [],
+    "bonds": [],
+    "flaws": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/background:criminal"
+    }
+  },
+  {
+    "slug": "entertainer",
+    "name": "Entertainer",
+    "book": "Player's Handbook",
+    "skillProficiencies": [
+      "acrobatics",
+      "performance"
+    ],
+    "toolProficiencies": [
+      "Disguise kit",
+      "one type of musical instrument"
+    ],
+    "languages": 1,
+    "startingEquipment": [
+      "A musical instrument (one of your choice)",
+      "the favor of an admirer (love letter",
+      "lock of hair",
+      "or trinket)",
+      "a costumeValue:5gp Weight:4lbs"
+    ],
+    "feature": {
+      "name": "Entertainer Feature",
+      "description": ""
+    },
+    "personalityTraits": [],
+    "ideals": [],
+    "bonds": [],
+    "flaws": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/background:entertainer"
+    }
+  },
+  {
+    "slug": "folk-hero",
+    "name": "Folk Hero",
+    "book": "Player's Handbook",
+    "skillProficiencies": [
+      "survival"
+    ],
+    "toolProficiencies": [
+      "One type of artisan's tools",
+      "vehicles (land)"
+    ],
+    "languages": 1,
+    "startingEquipment": [
+      "A set of artisan's tools (one of your choice)",
+      "a shovelValue:2gp Weight:5lbs",
+      "an iron potValue:2gp Weight:10lbs",
+      "a set of common clothesValue:5sp Weight:3lbs",
+      "perhaps as a farmer",
+      "miner",
+      "servant",
+      "shepherd"
+    ],
+    "feature": {
+      "name": "Folk Hero Feature",
+      "description": ""
+    },
+    "personalityTraits": [],
+    "ideals": [],
+    "bonds": [],
+    "flaws": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/background:folk-hero"
+    }
+  },
+  {
+    "slug": "guild-artisan",
+    "name": "Guild Artisan",
+    "book": "Player's Handbook",
+    "skillProficiencies": [
+      "insight",
+      "persuasion"
+    ],
+    "toolProficiencies": [
+      "One type of artisan's tools"
+    ],
+    "languages": 1,
+    "startingEquipment": [
+      "A set of artisan's tools (one of your choice)",
+      "a letter of introduction from your guild",
+      "a set of traveler's clothesValue:2gp Weight:4lbs",
+      "you might belong to a guild of traders",
+      "caravan masters",
+      "by ship",
+      "wagon",
+      "or caravan"
+    ],
+    "feature": {
+      "name": "Guild Artisan Feature",
+      "description": ""
+    },
+    "personalityTraits": [],
+    "ideals": [],
+    "bonds": [],
+    "flaws": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/background:guild-artisan"
+    }
+  },
+  {
+    "slug": "hermit",
+    "name": "Hermit",
+    "book": "Player's Handbook",
+    "skillProficiencies": [
+      "medicine",
+      "religion"
+    ],
+    "toolProficiencies": [
+      "Herbalism kit"
+    ],
+    "languages": 1,
+    "startingEquipment": [
+      "a winter blanketValue:5sp Weight:3lbs",
+      "a set of common clothesValue:5sp Weight:3lbs",
+      "an herbalism kitValue:5gp Weight:3lbs",
+      "and 5gp\nFeatures\nLife of Seclusion\nWhat was the reason for your isolation"
+    ],
+    "feature": {
+      "name": "Hermit Feature",
+      "description": ""
+    },
+    "personalityTraits": [],
+    "ideals": [],
+    "bonds": [],
+    "flaws": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/background:hermit"
+    }
+  },
+  {
+    "slug": "noble",
+    "name": "Noble",
+    "book": "Player's Handbook",
+    "skillProficiencies": [
+      "history",
+      "persuasion"
+    ],
+    "toolProficiencies": [
+      "One type of gaming set"
+    ],
+    "languages": 1,
+    "startingEquipment": [
+      "A set of fine clothesValue:15gp Weight:6lbs",
+      "a signet ringValue:5gp Weight:0",
+      "a scroll of pedigree",
+      "but it can be a path to higher status. If you wish to be a knight",
+      "but they do not fight for you",
+      "will not follow you into obviously dangerous areas (such as dungeons)",
+      "people are inclined to think the best of you. You are welcome in high society",
+      "to other nobles (including the sovereign)"
+    ],
+    "feature": {
+      "name": "Noble Feature",
+      "description": ""
+    },
+    "personalityTraits": [],
+    "ideals": [],
+    "bonds": [],
+    "flaws": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/background:noble"
+    }
+  },
+  {
+    "slug": "outlander",
+    "name": "Outlander",
+    "book": "Player's Handbook",
+    "skillProficiencies": [
+      "athletics",
+      "survival"
+    ],
+    "toolProficiencies": [
+      "One type of musical instrument"
+    ],
+    "languages": 1,
+    "startingEquipment": [
+      "A staffValue:2sp Weight:4lbs",
+      "a hunting trapValue:5gp Weight:25lbs",
+      "a trophy from an animal you killed",
+      "a set of traveler's clothesValue:2gp Weight:4lbs",
+      "or choose one that best fits your character."
+    ],
+    "feature": {
+      "name": "Outlander Feature",
+      "description": ""
+    },
+    "personalityTraits": [],
+    "ideals": [],
+    "bonds": [],
+    "flaws": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/background:outlander"
+    }
+  },
+  {
+    "slug": "sage",
+    "name": "Sage",
+    "book": "Player's Handbook",
+    "skillProficiencies": [
+      "arcana",
+      "history"
+    ],
+    "toolProficiencies": [
+      "None"
+    ],
+    "languages": 2,
+    "startingEquipment": [
+      "A bottle of inkValue:10gp Weight:0.0625lb",
+      "a quillValue:2cp Weight:0",
+      "a small knifeValue:0 Weight:0",
+      "a set of common clothesValue:5sp Weight:3lbs",
+      "roll a d8 or choose from the options in the table below."
+    ],
+    "feature": {
+      "name": "Sage Feature",
+      "description": ""
+    },
+    "personalityTraits": [],
+    "ideals": [],
+    "bonds": [],
+    "flaws": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/background:sage"
+    }
+  },
+  {
+    "slug": "sailor",
+    "name": "Sailor",
+    "book": "Player's Handbook",
+    "skillProficiencies": [
+      "athletics",
+      "perception"
+    ],
+    "toolProficiencies": [
+      "Navigator's tools",
+      "vehicles (water)"
+    ],
+    "languages": 1,
+    "startingEquipment": [
+      "A belaying pin (clubValue:1sp Weight:2lbs)",
+      "50 feet of silk ropeValue:10gp Weight:5lbs",
+      "a set of common clothesValue:5sp Weight:3lbs",
+      "you can get away with minor criminal offenses"
+    ],
+    "feature": {
+      "name": "Sailor Feature",
+      "description": ""
+    },
+    "personalityTraits": [],
+    "ideals": [],
+    "bonds": [],
+    "flaws": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/background:sailor"
+    }
+  },
+  {
+    "slug": "soldier",
+    "name": "Soldier",
+    "book": "Player's Handbook",
+    "skillProficiencies": [
+      "athletics",
+      "intimidation"
+    ],
+    "toolProficiencies": [
+      "One type of gaming set",
+      "vehicles (land)"
+    ],
+    "languages": 1,
+    "startingEquipment": [
+      "An insignia of rank",
+      "a trophy taken from a fallen enemy (a daggerValue:2gp Weight:1lb",
+      "broken blade",
+      "or piece of a banner)",
+      "a set of bone diceValue:1sp Weight:0 or a deck of cardsValue:5sp Weight:0",
+      "a set of common clothesValue:5sp Weight:3lbs"
+    ],
+    "feature": {
+      "name": "Soldier Feature",
+      "description": ""
+    },
+    "personalityTraits": [],
+    "ideals": [],
+    "bonds": [],
+    "flaws": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/background:soldier"
+    }
+  },
+  {
+    "slug": "urchin",
+    "name": "Urchin",
+    "book": "Player's Handbook",
+    "skillProficiencies": [
+      "stealth"
+    ],
+    "toolProficiencies": [
+      "Disguise kit",
+      "thieves' tools"
+    ],
+    "languages": 1,
+    "startingEquipment": [
+      "A small knifeValue:0 Weight:0",
+      "a map of the city you grew up in",
+      "a pet mouse",
+      "a token to remember your parents by",
+      "a set of common clothesValue:5sp Weight:3lbs"
+    ],
+    "feature": {
+      "name": "Urchin Feature",
+      "description": ""
+    },
+    "personalityTraits": [],
+    "ideals": [],
+    "bonds": [],
+    "flaws": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/background:urchin"
+    }
+  },
+  {
+    "slug": "city-watch",
+    "name": "City Watch",
+    "book": "Sword Coast Adventurer's Guide",
+    "skillProficiencies": [
+      "athletics",
+      "insight"
+    ],
+    "toolProficiencies": [
+      "None"
+    ],
+    "languages": 2,
+    "startingEquipment": [
+      "A uniform in the style of your unit and indicative of your rank",
+      "a hornValue:3gp Weight:2lbs with which to summon help",
+      "a set of manaclesValue:2gp Weight:6lbs",
+      "and dealing with lawbreakers",
+      "and just as easily pick out the dens of criminal activity in a community"
+    ],
+    "feature": {
+      "name": "City Watch Feature",
+      "description": ""
+    },
+    "personalityTraits": [],
+    "ideals": [],
+    "bonds": [],
+    "flaws": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/background:city-watch"
+    }
+  },
+  {
+    "slug": "clan-crafter",
+    "name": "Clan Crafter",
+    "book": "Sword Coast Adventurer's Guide",
+    "skillProficiencies": [
+      "history",
+      "insight"
+    ],
+    "toolProficiencies": [
+      "One type of artisan's tools"
+    ],
+    "languages": 1,
+    "startingEquipment": [
+      "A set of artisan's tools with which you are proficient",
+      "a set of traveler's clothesValue:2gp Weight:4lbs",
+      "modifying the entries when appropriate to suit your identity. (For instance"
+    ],
+    "feature": {
+      "name": "Clan Crafter Feature",
+      "description": ""
+    },
+    "personalityTraits": [],
+    "ideals": [],
+    "bonds": [],
+    "flaws": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/background:clan-crafter"
+    }
+  },
+  {
+    "slug": "cloistered-scholar",
+    "name": "Cloistered Scholar",
+    "book": "Sword Coast Adventurer's Guide",
+    "skillProficiencies": [
+      "history",
+      "nature",
+      "religion"
+    ],
+    "toolProficiencies": [
+      "None"
+    ],
+    "languages": 2,
+    "startingEquipment": [
+      "The scholar's robesValue:1gp Weight:4lbs of your cloister",
+      "a writing kit (small pouchValue:5sp Weight:1lb with a quillValue:2cp Weight:0",
+      "a bottle of inkValue:10gp Weight:0.0625lb",
+      "folded parchmentValue:1sp Weight:0",
+      "and a small penknifeValue:0 Weight:0)",
+      "a borrowed bookValue:25gp Weight:5lbs on the subject of your current study",
+      "you have free and easy access to the majority of the library",
+      "though it might also have repositories of lore that are too valuable"
+    ],
+    "feature": {
+      "name": "Cloistered Scholar Feature",
+      "description": ""
+    },
+    "personalityTraits": [],
+    "ideals": [],
+    "bonds": [],
+    "flaws": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/background:cloistered-scholar"
+    }
+  },
+  {
+    "slug": "courtier",
+    "name": "Courtier",
+    "book": "Sword Coast Adventurer's Guide",
+    "skillProficiencies": [
+      "insight",
+      "persuasion"
+    ],
+    "toolProficiencies": [
+      "None"
+    ],
+    "languages": 2,
+    "startingEquipment": [
+      "whom to go to for the favors you seek"
+    ],
+    "feature": {
+      "name": "Courtier Feature",
+      "description": ""
+    },
+    "personalityTraits": [],
+    "ideals": [],
+    "bonds": [],
+    "flaws": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/background:courtier"
+    }
+  },
+  {
+    "slug": "faction-agent",
+    "name": "Faction Agent",
+    "book": "Sword Coast Adventurer's Guide",
+    "skillProficiencies": [
+      "insight"
+    ],
+    "toolProficiencies": [
+      "None"
+    ],
+    "languages": 2,
+    "startingEquipment": [
+      "The badge or emblemValue:5gp Weight:0 of your faction",
+      "a copy of a seminal faction text (or a code-book for a covert faction)",
+      "a set of common clothesValue:5sp Weight:3lbs",
+      "here are some possibilities.\nThe Harpers\nFounded more than a millennium ago",
+      "disbanded and reorganized several times",
+      "the Harpers remain a powerful",
+      "behind-the-scenes agency",
+      "which acts to thwart evil and promote fairness through knowledge"
+    ],
+    "feature": {
+      "name": "Faction Agent Feature",
+      "description": ""
+    },
+    "personalityTraits": [],
+    "ideals": [],
+    "bonds": [],
+    "flaws": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/background:faction-agent"
+    }
+  },
+  {
+    "slug": "far-traveler",
+    "name": "Far Traveler",
+    "book": "Sword Coast Adventurer's Guide",
+    "skillProficiencies": [
+      "insight",
+      "perception"
+    ],
+    "toolProficiencies": [
+      "Any one musical instrument or gaming set of your choice",
+      "likely something native to your homeland"
+    ],
+    "languages": 1,
+    "startingEquipment": [
+      "One set of traveler's clothesValue:2gp Weight:4lbs",
+      "any one musical instrument or gaming set you are proficient with",
+      "poorly wrought maps from your homeland that depict where you are in Faerûn",
+      "discussing possible homelands",
+      "includes some suggested reasons that are appropriate for each location."
+    ],
+    "feature": {
+      "name": "Far Traveler Feature",
+      "description": ""
+    },
+    "personalityTraits": [],
+    "ideals": [],
+    "bonds": [],
+    "flaws": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/background:far-traveler"
+    }
+  },
+  {
+    "slug": "inheritor",
+    "name": "Inheritor",
+    "book": "Sword Coast Adventurer's Guide",
+    "skillProficiencies": [
+      "survival",
+      "history",
+      "religion"
+    ],
+    "toolProficiencies": [
+      "Your choice of a gaming set or a musical instrument"
+    ],
+    "languages": 1,
+    "startingEquipment": [
+      "Your inheritance",
+      "a set of traveler's clothesValue:2gp Weight:4lbs",
+      "the tool you choose for this background’s tool proficiency",
+      "sending you on quests to learn more about its history or true nature",
+      "the object might be a minor magic item"
+    ],
+    "feature": {
+      "name": "Inheritor Feature",
+      "description": ""
+    },
+    "personalityTraits": [],
+    "ideals": [],
+    "bonds": [],
+    "flaws": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/background:inheritor"
+    }
+  },
+  {
+    "slug": "knight-of-the-order",
+    "name": "Knight Of The Order",
+    "book": "Sword Coast Adventurer's Guide",
+    "skillProficiencies": [
+      "persuasion",
+      "history",
+      "nature",
+      "religion"
+    ],
+    "toolProficiencies": [
+      "One type of gaming set or musical instrument"
+    ],
+    "languages": 1,
+    "startingEquipment": [
+      "A set of traveler's clothesValue:2gp Weight:4lbs",
+      "a signet",
+      "banner",
+      "or seal representing your place or rank in the order",
+      "royal family",
+      "or are the elite military of a feudal state",
+      "or consider themselves a kind of extended family",
+      "similar to an order of monks. Although there are organizations"
+    ],
+    "feature": {
+      "name": "Knight Of The Order Feature",
+      "description": ""
+    },
+    "personalityTraits": [],
+    "ideals": [],
+    "bonds": [],
+    "flaws": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/background:knight-of-the-order"
+    }
+  },
+  {
+    "slug": "mercenary-veteran",
+    "name": "Mercenary Veteran",
+    "book": "Sword Coast Adventurer's Guide",
+    "skillProficiencies": [
+      "athletics",
+      "persuasion"
+    ],
+    "toolProficiencies": [
+      "One type of gaming set",
+      "vehicles (land)"
+    ],
+    "languages": 1,
+    "startingEquipment": [
+      "A uniform of your company (traveler's clothesValue:2gp Weight:4lbs in quality)",
+      "an insignia of your rank",
+      "a gaming set of your choice",
+      "hunt monsters and brigands",
+      "or go to war in exchange for gold. Some organizations",
+      "such as the Zhentarim",
+      "Flaming Fist",
+      "but several are happy to quietly pay the Chill to battle the Uthgardt"
+    ],
+    "feature": {
+      "name": "Mercenary Veteran Feature",
+      "description": ""
+    },
+    "personalityTraits": [],
+    "ideals": [],
+    "bonds": [],
+    "flaws": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/background:mercenary-veteran"
+    }
+  },
+  {
+    "slug": "urban-bounty-hunter",
+    "name": "Urban Bounty Hunter",
+    "book": "Sword Coast Adventurer's Guide",
+    "skillProficiencies": [
+      "insight",
+      "persuasion",
+      "stealth"
+    ],
+    "toolProficiencies": [
+      "Choose two from among one type of gaming set",
+      "one musical instrument",
+      "and thieves' tools"
+    ],
+    "languages": 1,
+    "startingEquipment": [
+      "the rough-and-tumble folk of the streets",
+      "modifying the entries when appropriate to suit your identity.\nFor instance"
+    ],
+    "feature": {
+      "name": "Urban Bounty Hunter Feature",
+      "description": ""
+    },
+    "personalityTraits": [],
+    "ideals": [],
+    "bonds": [],
+    "flaws": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/background:urban-bounty-hunter"
+    }
+  },
+  {
+    "slug": "uthgardt-tribe-member",
+    "name": "Uthgardt Tribe Member",
+    "book": "Sword Coast Adventurer's Guide",
+    "skillProficiencies": [
+      "athletics",
+      "survival"
+    ],
+    "toolProficiencies": [
+      "One type of musical instrument or artisan's tools"
+    ],
+    "languages": 1,
+    "startingEquipment": [
+      "A hunting trapValue:5gp Weight:25lbs",
+      "a set of traveler's clothesValue:2gp Weight:4lbs",
+      "though they don't venture near Hellgate Keep",
+      "in the Glimmering Wood",
+      "is Beorunna's Well",
+      "they consider Beorunna's Well their holy site",
+      "so they launch raids on the settlement",
+      "burning as much of it as they can and then escaping"
+    ],
+    "feature": {
+      "name": "Uthgardt Tribe Member Feature",
+      "description": ""
+    },
+    "personalityTraits": [],
+    "ideals": [],
+    "bonds": [],
+    "flaws": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/background:uthgardt-tribe-member"
+    }
+  },
+  {
+    "slug": "waterdhavian-noble",
+    "name": "Waterdhavian Noble",
+    "book": "Sword Coast Adventurer's Guide",
+    "skillProficiencies": [
+      "history",
+      "persuasion"
+    ],
+    "toolProficiencies": [
+      "One type of gaming set or one musical instrument"
+    ],
+    "languages": 1,
+    "startingEquipment": [
+      "A set of fine clothesValue:15gp Weight:6lbs",
+      "a signet ringValue:5gp Weight:0 or brooch",
+      "a scroll of pedigree",
+      "a skinValue:2sp Weight:1lb (for the empty skin itself) of fine zzar or wine",
+      "taverns",
+      "modifying the entries when appropriate to suit your identity.\nLike other nobles"
+    ],
+    "feature": {
+      "name": "Waterdhavian Noble Feature",
+      "description": ""
+    },
+    "personalityTraits": [],
+    "ideals": [],
+    "bonds": [],
+    "flaws": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/background:waterdhavian-noble"
+    }
+  },
+  {
+    "slug": "lorehold-student",
+    "name": "Lorehold Student",
+    "book": "Strixhaven: A Curriculum of Chaos",
+    "skillProficiencies": [
+      "history",
+      "religion"
+    ],
+    "toolProficiencies": [],
+    "languages": 2,
+    "startingEquipment": [
+      "A bottle of black inkValue: 10gp Weight: 0",
+      "an ink penValue: 2cp Weight: 0",
+      "a hammerValue: 1gp Weight: 3lbs",
+      "a hooded lanternValue: 5gp Weight: 2lb",
+      "a tinderboxValue: 5cp Weight: 1lb",
+      "a tome of history",
+      "a school uniform",
+      "if you have the Spellcasting or Pact Magic feature"
+    ],
+    "feature": {
+      "name": "Lorehold Student Feature",
+      "description": ""
+    },
+    "personalityTraits": [],
+    "ideals": [],
+    "bonds": [],
+    "flaws": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/background:lorehold-student"
+    }
+  },
+  {
+    "slug": "prismari-student",
+    "name": "Prismari Student",
+    "book": "Strixhaven: A Curriculum of Chaos",
+    "skillProficiencies": [
+      "acrobatics",
+      "performance"
+    ],
+    "toolProficiencies": [
+      "One type of musical instrument or artisan's tools"
+    ],
+    "languages": 1,
+    "startingEquipment": [
+      "A bottle of black inkValue: 10gp Weight: 0",
+      "an ink penValue: 2cp Weight: 0",
+      "a set of artisan's tools or a musical instrument (one of your choice)",
+      "a school uniform",
+      "if you have the Spellcasting or Pact Magic feature",
+      "these spells are added to all of them.)"
+    ],
+    "feature": {
+      "name": "Prismari Student Feature",
+      "description": ""
+    },
+    "personalityTraits": [],
+    "ideals": [],
+    "bonds": [],
+    "flaws": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/background:prismari-student"
+    }
+  },
+  {
+    "slug": "quandrix-student",
+    "name": "Quandrix Student",
+    "book": "Strixhaven: A Curriculum of Chaos",
+    "skillProficiencies": [
+      "arcana",
+      "nature"
+    ],
+    "toolProficiencies": [
+      "One type of artisan's tools"
+    ],
+    "languages": 1,
+    "startingEquipment": [
+      "A bottle of black inkValue: 10gp Weight: 0",
+      "an ink penValue: 2cp Weight: 0",
+      "an abacusValue: 2gp Weight: 2lb",
+      "a book of arcane theory",
+      "a school uniform",
+      "if you have the Spellcasting or Pact Magic feature",
+      "these spells are added to all of them.)"
+    ],
+    "feature": {
+      "name": "Quandrix Student Feature",
+      "description": ""
+    },
+    "personalityTraits": [],
+    "ideals": [],
+    "bonds": [],
+    "flaws": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/background:quandrix-student"
+    }
+  },
+  {
+    "slug": "silverquill-student",
+    "name": "Silverquill Student",
+    "book": "Strixhaven: A Curriculum of Chaos",
+    "skillProficiencies": [
+      "intimidation",
+      "persuasion"
+    ],
+    "toolProficiencies": [],
+    "languages": 2,
+    "startingEquipment": [
+      "A bottle of black inkValue: 10gp Weight: 0",
+      "an ink penValue: 2cp Weight: 0",
+      "a book of poetry",
+      "a school uniform",
+      "if you have the Spellcasting or Pact Magic feature",
+      "these spells are added to all of them.)"
+    ],
+    "feature": {
+      "name": "Silverquill Student Feature",
+      "description": ""
+    },
+    "personalityTraits": [],
+    "ideals": [],
+    "bonds": [],
+    "flaws": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/background:silverquill-student"
+    }
+  },
+  {
+    "slug": "witherbloom-student",
+    "name": "Witherbloom Student",
+    "book": "Strixhaven: A Curriculum of Chaos",
+    "skillProficiencies": [
+      "nature",
+      "survival"
+    ],
+    "toolProficiencies": [
+      "Herbalism Kit"
+    ],
+    "languages": 1,
+    "startingEquipment": [
+      "A bottle of black inkValue: 10gp Weight: 0",
+      "an ink penValue: 2cp Weight: 0",
+      "a book about plant identification",
+      "an iron potValue: 2gp Weight: 10lbs",
+      "a herbalism kitValue: 5gp Weight: 3lbs",
+      "a school uniform",
+      "if you have the Spellcasting or Pact Magic feature",
+      "these spells are added to all of them.)"
+    ],
+    "feature": {
+      "name": "Witherbloom Student Feature",
+      "description": ""
+    },
+    "personalityTraits": [],
+    "ideals": [],
+    "bonds": [],
+    "flaws": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/background:witherbloom-student"
+    }
+  },
+  {
+    "slug": "azorius-functionary",
+    "name": "Azorius Functionary",
+    "book": "Guildmasters' Guide to Ravnica",
+    "skillProficiencies": [
+      "insight",
+      "intimidation"
+    ],
+    "toolProficiencies": [],
+    "languages": 2,
+    "startingEquipment": [
+      "An Azorius insignia",
+      "a scroll containing the text of a law important to you",
+      "a bottle of blue inkValue:10gp Weight:0.0625lb",
+      "an ink penValue:2cp Weight:0",
+      "a set of fine clothesValue:15gp Weight:6lbs",
+      "though",
+      "these spells are added to all of them.)\nAzorius Guild Spells"
+    ],
+    "feature": {
+      "name": "Azorius Functionary Feature",
+      "description": ""
+    },
+    "personalityTraits": [],
+    "ideals": [],
+    "bonds": [],
+    "flaws": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/background:azorius-functionary"
+    }
+  },
+  {
+    "slug": "boros-legionnaire",
+    "name": "Boros Legionnaire",
+    "book": "Guildmasters' Guide to Ravnica",
+    "skillProficiencies": [
+      "athletics",
+      "intimidation"
+    ],
+    "toolProficiencies": [
+      "One type of gaming set"
+    ],
+    "languages": 1,
+    "startingEquipment": [
+      "A Boros insignia",
+      "a feather from an angel's wing",
+      "a tattered piece of a Boros banner (a souvenir from a famous battle)",
+      "a set of common clothesValue:5sp Weight:3lbs",
+      "and you can gain access to any Boros garrison in Ravnica",
+      "these spells are added to all of them.)\nBoros Guild Spells"
+    ],
+    "feature": {
+      "name": "Boros Legionnaire Feature",
+      "description": ""
+    },
+    "personalityTraits": [],
+    "ideals": [],
+    "bonds": [],
+    "flaws": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/background:boros-legionnaire"
+    }
+  },
+  {
+    "slug": "dimir-operative",
+    "name": "Dimir Operative",
+    "book": "Guildmasters' Guide to Ravnica",
+    "skillProficiencies": [
+      "deception",
+      "stealth"
+    ],
+    "toolProficiencies": [
+      "Disguise kit"
+    ],
+    "languages": 1,
+    "startingEquipment": [
+      "A Dimir insignia",
+      "three small knivesValue:0 Weight:0 (individually)",
+      "a set of dark-colored common clothesValue:5sp Weight:3lbs",
+      "established acquaintances",
+      "inspired by rolling on the following table or choosing a reason that suits you."
+    ],
+    "feature": {
+      "name": "Dimir Operative Feature",
+      "description": ""
+    },
+    "personalityTraits": [],
+    "ideals": [],
+    "bonds": [],
+    "flaws": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/background:dimir-operative"
+    }
+  },
+  {
+    "slug": "golgari-agent",
+    "name": "Golgari Agent",
+    "book": "Guildmasters' Guide to Ravnica",
+    "skillProficiencies": [
+      "nature",
+      "survival"
+    ],
+    "toolProficiencies": [
+      "Poisoner's Kit"
+    ],
+    "languages": 1,
+    "startingEquipment": [
+      "A Golgari insignia",
+      "a poisoner's kitValue:50gp Weight:2lbs",
+      "a pet beetle or spider",
+      "a set of common clothesValue:5sp Weight:3lbs",
+      "underground pathways that you can use to bypass crowds",
+      "obstacles",
+      "and observation as you move through the city. When you aren't in combat",
+      "these spells are added to all of them.)\nGolgari Guild Spells"
+    ],
+    "feature": {
+      "name": "Golgari Agent Feature",
+      "description": ""
+    },
+    "personalityTraits": [],
+    "ideals": [],
+    "bonds": [],
+    "flaws": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/background:golgari-agent"
+    }
+  },
+  {
+    "slug": "gruul-anarch",
+    "name": "Gruul Anarch",
+    "book": "Guildmasters' Guide to Ravnica",
+    "skillProficiencies": [
+      "athletics"
+    ],
+    "toolProficiencies": [
+      "Herbalism Kit"
+    ],
+    "languages": 1,
+    "startingEquipment": [
+      "A Gruul insignia",
+      "a hunting trapValue:5gp Weight:25lbs",
+      "an herbalism kitValue:5gp Weight:3lbs",
+      "the skull of a boar",
+      "a beast-hide cloak",
+      "a set of traveler's clothesValue:2gp Weight:4lbs",
+      "overgrown parks that no hand has tended in decades",
+      "and the vast"
+    ],
+    "feature": {
+      "name": "Gruul Anarch Feature",
+      "description": ""
+    },
+    "personalityTraits": [],
+    "ideals": [],
+    "bonds": [],
+    "flaws": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/background:gruul-anarch"
+    }
+  },
+  {
+    "slug": "izzet-engineer",
+    "name": "Izzet Engineer",
+    "book": "Guildmasters' Guide to Ravnica",
+    "skillProficiencies": [
+      "arcana",
+      "investigation"
+    ],
+    "toolProficiencies": [
+      "One type of artisan's tools"
+    ],
+    "languages": 1,
+    "startingEquipment": [
+      "An Izzet insignia",
+      "one set of artisan's tools",
+      "the charred and twisted remains of a failed experiment",
+      "a hammerValue:1gp Weight:3lbs",
+      "a block and tackleValue:1gp Weight:5lbs",
+      "a set of common clothesValue:5sp Weight:3lbs",
+      "dangerous experiments",
+      "and explosive blasts. Much of that perception is accurate"
+    ],
+    "feature": {
+      "name": "Izzet Engineer Feature",
+      "description": ""
+    },
+    "personalityTraits": [],
+    "ideals": [],
+    "bonds": [],
+    "flaws": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/background:izzet-engineer"
+    }
+  },
+  {
+    "slug": "orzhov-representative",
+    "name": "Orzhov Representative",
+    "book": "Guildmasters' Guide to Ravnica",
+    "skillProficiencies": [
+      "intimidation",
+      "religion"
+    ],
+    "toolProficiencies": [],
+    "languages": 2,
+    "startingEquipment": [
+      "An Orzhov insignia",
+      "a foot-long chain made of ten gold coins",
+      "vestmentsValue:0 Weight:0",
+      "a set of fine clothesValue:15gp Weight:6lbs",
+      "you can have a message carried across a neighborhood",
+      "procure a short carriage ride without paying",
+      "you gain influence over more people",
+      "these spells are added to all of them.)\nOrzhov Guild Spells"
+    ],
+    "feature": {
+      "name": "Orzhov Representative Feature",
+      "description": ""
+    },
+    "personalityTraits": [],
+    "ideals": [],
+    "bonds": [],
+    "flaws": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/background:orzhov-representative"
+    }
+  },
+  {
+    "slug": "rakdos-cultist",
+    "name": "Rakdos Cultist",
+    "book": "Guildmasters' Guide to Ravnica",
+    "skillProficiencies": [
+      "acrobatics",
+      "performance"
+    ],
+    "toolProficiencies": [
+      "One type of musical instrument"
+    ],
+    "languages": 1,
+    "startingEquipment": [
+      "A Rakdos insignia",
+      "a musical instrument (one of your choice)",
+      "a costumeValue:5gp Weight:4lbs",
+      "a hooded lanternValue:5gp Weight:2lbs made of wrought iron",
+      "a 10-foot length of chain with sharply spiked links",
+      "a tinderboxValue:5sp Weight:1lb",
+      "10 torchesValue:1cp Weight:1lb (individually)",
+      "a set of common clothesValue:5sp Weight:3lbs"
+    ],
+    "feature": {
+      "name": "Rakdos Cultist Feature",
+      "description": ""
+    },
+    "personalityTraits": [],
+    "ideals": [],
+    "bonds": [],
+    "flaws": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/background:rakdos-cultist"
+    }
+  },
+  {
+    "slug": "selesnya-initiate",
+    "name": "Selesnya Initiate",
+    "book": "Guildmasters' Guide to Ravnica",
+    "skillProficiencies": [
+      "nature",
+      "persuasion"
+    ],
+    "toolProficiencies": [
+      "One type of artisan's tools or one musical instrument"
+    ],
+    "languages": 1,
+    "startingEquipment": [
+      "A Selesnya insignia",
+      "a healer's kitValue:5gp Weight:3lbs",
+      "robesValue:1gp Weight:4lbs",
+      "a set of common clothesValue:5sp Weight:3lbs",
+      "though they will not risk their lives in this effort.\nIn addition",
+      "as a guild member you can receive free healing and care at a Selesnya enclave",
+      "these spells are added to all of them.)\nSelesnya Guild Spells"
+    ],
+    "feature": {
+      "name": "Selesnya Initiate Feature",
+      "description": ""
+    },
+    "personalityTraits": [],
+    "ideals": [],
+    "bonds": [],
+    "flaws": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/background:selesnya-initiate"
+    }
+  },
+  {
+    "slug": "simic-scientist",
+    "name": "Simic Scientist",
+    "book": "Guildmasters' Guide to Ravnica",
+    "skillProficiencies": [
+      "arcana",
+      "medicine"
+    ],
+    "toolProficiencies": [],
+    "languages": 2,
+    "startingEquipment": [
+      "A Simic insignia",
+      "a set of commoner's clothesValue:5sp Weight:3lbs",
+      "a bookValue:25gp Weight:5lbs of research notes",
+      "an ink penValue:2cp Weight:0",
+      "a bottle of squid inkValue:10gp Weight:0",
+      "a flask of oilValue:1sp Weight:1lb (made from blubber)",
+      "a vial of acidValue:25gp Weight:1lb (derived from digestive juices)",
+      "a vial of fish scales"
+    ],
+    "feature": {
+      "name": "Simic Scientist Feature",
+      "description": ""
+    },
+    "personalityTraits": [],
+    "ideals": [],
+    "bonds": [],
+    "flaws": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/background:simic-scientist"
+    }
+  },
+  {
+    "slug": "feylost",
+    "name": "Feylost",
+    "book": "The Wild Beyond the Witchlight",
+    "skillProficiencies": [
+      "deception",
+      "survival"
+    ],
+    "toolProficiencies": [
+      "One type of musical instrument"
+    ],
+    "languages": 1,
+    "startingEquipment": [
+      "A musical instrument (one of your choice)",
+      "a set of traveler's clothesValue:2gp Weight:4lbs",
+      "three trinkets (each determind by rolling on the Feywild Trinkets table)",
+      "determined by rolling on the Fey Mark table."
+    ],
+    "feature": {
+      "name": "Feylost Feature",
+      "description": ""
+    },
+    "personalityTraits": [],
+    "ideals": [],
+    "bonds": [],
+    "flaws": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/background:feylost"
+    }
+  },
+  {
+    "slug": "witchlight-hand",
+    "name": "Witchlight Hand",
+    "book": "The Wild Beyond the Witchlight",
+    "skillProficiencies": [
+      "performance"
+    ],
+    "toolProficiencies": [
+      "Disguise kit or one type of musical instrument"
+    ],
+    "languages": 1,
+    "startingEquipment": [
+      "A disguise kitValue: 25gp Weight: 3lbs or a musical instrument of your choice",
+      "a deck of cardsValue: 5sp Weight: 0",
+      "a carnival uniform or costumeValue: 5gp Weight: 4lbs",
+      "one trinket (determind by rolling on the Feywild Trinkets table)",
+      "performers"
+    ],
+    "feature": {
+      "name": "Witchlight Hand Feature",
+      "description": ""
+    },
+    "personalityTraits": [],
+    "ideals": [],
+    "bonds": [],
+    "flaws": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/background:witchlight-hand"
+    }
+  },
+  {
+    "slug": "ruined",
+    "name": "Ruined",
+    "book": "The Wild Beyond the Witchlight",
+    "skillProficiencies": [
+      "stealth",
+      "survival"
+    ],
+    "toolProficiencies": [],
+    "languages": 1,
+    "startingEquipment": [
+      "A cracked hourglass",
+      "a set of rusty manacles",
+      "a half-empty bottle",
+      "a hunting trap",
+      "a gaming set (matching your chosen proficiency)",
+      "a set of traveler’s clothes",
+      "and you possess hidden reserves others don’t expect. You gain the Alert",
+      "Skilled"
+    ],
+    "feature": {
+      "name": "Ruined Feature",
+      "description": ""
+    },
+    "personalityTraits": [],
+    "ideals": [],
+    "bonds": [],
+    "flaws": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/background:ruined"
+    }
+  },
+  {
+    "slug": "fisher",
+    "name": "Fisher",
+    "book": "Ghosts of Saltmarsh",
+    "skillProficiencies": [
+      "history",
+      "survival"
+    ],
+    "toolProficiencies": [],
+    "languages": 1,
+    "startingEquipment": [
+      "Fishing tackle",
+      "a net",
+      "a favorite fishing lure or oiled leather wading boots",
+      "a set of traveler's clothes",
+      "you can maintain a moderate lifestyle while working as a fisher",
+      "whether tall or true",
+      "to impress and entertain others. Once a day",
+      "you can tell your story to willing listeners. At the DM's discretion"
+    ],
+    "feature": {
+      "name": "Fisher Feature",
+      "description": ""
+    },
+    "personalityTraits": [],
+    "ideals": [],
+    "bonds": [],
+    "flaws": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/background:fisher"
+    }
+  },
+  {
+    "slug": "marine",
+    "name": "Marine",
+    "book": "Ghosts of Saltmarsh",
+    "skillProficiencies": [
+      "athletics",
+      "survival"
+    ],
+    "toolProficiencies": [
+      "Vehicles (land & water)"
+    ],
+    "languages": 1,
+    "startingEquipment": [
+      "A daggerValue:2gp Weight:1lb that belonged to a fallen comrade",
+      "a folded rag emblazoned with the symbol of your ship or company",
+      "a set of traveler's clothesValue:2gp Weight:4lbs"
+    ],
+    "feature": {
+      "name": "Marine Feature",
+      "description": ""
+    },
+    "personalityTraits": [],
+    "ideals": [],
+    "bonds": [],
+    "flaws": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/background:marine"
+    }
+  },
+  {
+    "slug": "shipwright",
+    "name": "Shipwright",
+    "book": "Ghosts of Saltmarsh",
+    "skillProficiencies": [
+      "history",
+      "perception"
+    ],
+    "toolProficiencies": [
+      "Carpenter's tools",
+      "Vehicles (water)"
+    ],
+    "languages": 0,
+    "startingEquipment": [
+      "A set of well-loved carpenter's tools",
+      "a blank book",
+      "1 ounce of ink",
+      "an ink pen",
+      "a set of traveler's clothes",
+      "you can perform repairs on a water vehicle. When you use this ability"
+    ],
+    "feature": {
+      "name": "I'll patch it!",
+      "description": "Provided you have carpenter's tools and wood, you can perform repairs on a water vehicle. When you use this ability, you restore a number of hit points to the hull of a water vehicle equal to 5 × your proficiency modifier. A vehicle cannot be patched by you in this way again until after it has been pulled ashore and fully repaired."
+    },
+    "personalityTraits": [],
+    "ideals": [],
+    "bonds": [],
+    "flaws": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/background:shipwright"
+    }
+  },
+  {
+    "slug": "smuggler",
+    "name": "Smuggler",
+    "book": "Ghosts of Saltmarsh",
+    "skillProficiencies": [
+      "athletics",
+      "deception"
+    ],
+    "toolProficiencies": [
+      "Vehicles (water)"
+    ],
+    "languages": 0,
+    "startingEquipment": [
+      "A fancy leather vest or a pair of leather boots",
+      "a set of common clothes",
+      "city",
+      "or other similarly sized community (DM's discretion)",
+      "sailing skill",
+      "or a silver tongue"
+    ],
+    "feature": {
+      "name": "Down Low",
+      "description": "You are acquainted with a network of smugglers who are willing to help you out of tight situations. While in a particular town, city, or other similarly sized community (DM's discretion), you and your companions can stay for free in safe houses. Safe houses provide a poor lifestyle. While staying at a safe house, you can choose to keep your presence (and that of your companions) a secret."
+    },
+    "personalityTraits": [],
+    "ideals": [],
+    "bonds": [],
+    "flaws": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/background:smuggler"
+    }
+  },
+  {
+    "slug": "grinner",
+    "name": "Grinner",
+    "book": "Explorer's Guide to Wildemount",
+    "skillProficiencies": [
+      "deception",
+      "performance"
+    ],
+    "toolProficiencies": [
+      "One type of musical instrument",
+      "thieves' tools"
+    ],
+    "languages": 1,
+    "startingEquipment": [
+      "A set of fine clothesValue:15gp Weight:6lbs",
+      "a disguise kitValue:25gp Weight:3lbs",
+      "a musical instrument of your choice",
+      "a gold-plated ring depicting a smiling face"
+    ],
+    "feature": {
+      "name": "Grinner Feature",
+      "description": ""
+    },
+    "personalityTraits": [],
+    "ideals": [],
+    "bonds": [],
+    "flaws": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/background:grinner"
+    }
+  },
+  {
+    "slug": "volstrucker-agent",
+    "name": "Volstrucker Agent",
+    "book": "Explorer's Guide to Wildemount",
+    "skillProficiencies": [
+      "deception",
+      "stealth"
+    ],
+    "toolProficiencies": [
+      "Poisoner's Kit"
+    ],
+    "languages": 1,
+    "startingEquipment": [
+      "A set of common clothesValue:5sp Weight:3lbs",
+      "a black cloak with a hood",
+      "a poisoner's kitValue:50gp Weight:2lbs",
+      "or roll on the Tragedies table."
+    ],
+    "feature": {
+      "name": "Volstrucker Agent Feature",
+      "description": ""
+    },
+    "personalityTraits": [],
+    "ideals": [],
+    "bonds": [],
+    "flaws": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/background:volstrucker-agent"
+    }
+  },
+  {
+    "slug": "athlete",
+    "name": "Athlete",
+    "book": "Mythic Odysseys of Theros",
+    "skillProficiencies": [
+      "acrobatics",
+      "athletics"
+    ],
+    "toolProficiencies": [
+      "Vehicles (Land)"
+    ],
+    "languages": 1,
+    "startingEquipment": [
+      "A bronze discus or leather ball",
+      "a lucky charm or past trophy",
+      "a set of traveler's clothes"
+    ],
+    "feature": {
+      "name": "Echoes of Victory",
+      "description": "You have attracted admiration among spectators, fellow athletes, and trainers in the region that hosted your past athletic victories. When visiting any settlement within 100 miles of where you grew up, there is a 50 percent chance you can find someone there who admires you and is willing to provide information and temporary shelter. Between adventures, you might compete in athletic events sufficient enough to maintain a comfortable lifestyle, as per the \"Practicing a Profession\" downtime activit"
+    },
+    "personalityTraits": [],
+    "ideals": [],
+    "bonds": [],
+    "flaws": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/background:athlete"
+    }
+  },
+  {
+    "slug": "house-agent",
+    "name": "House Agent",
+    "book": "Eberron: Rising from the Last War",
+    "skillProficiencies": [
+      "investigation",
+      "persuasion"
+    ],
+    "toolProficiencies": [
+      "Two proficiencies from the House Tool Proficiencies table"
+    ],
+    "languages": 1,
+    "startingEquipment": [
+      "A set of fine clothesValue:15gp Weight:6lbs",
+      "the signet ringValue:5gp Weight:0 of your house",
+      "identification papers",
+      "and a purse containing 20gp"
+    ],
+    "feature": {
+      "name": "House Agent Feature",
+      "description": ""
+    },
+    "personalityTraits": [],
+    "ideals": [],
+    "bonds": [],
+    "flaws": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/background:house-agent"
+    }
+  },
+  {
+    "slug": "anthropologist",
+    "name": "Anthropologist",
+    "book": "Tomb of Annihilation",
+    "skillProficiencies": [
+      "insight",
+      "religion"
+    ],
+    "toolProficiencies": [
+      "None"
+    ],
+    "languages": 2,
+    "startingEquipment": [
+      "A leather-bound diary",
+      "a bottle of inkValue:10gp Weight:0.0625lb",
+      "an ink penValue:2cp Weight:0",
+      "a set of traveler's clothesValue:2gp Weight:4lbs",
+      "one trinket of special significance",
+      "you spent much of your adult life away from your homeland",
+      "after which you learn a handful of important words",
+      "expressions"
+    ],
+    "feature": {
+      "name": "Anthropologist Feature",
+      "description": ""
+    },
+    "personalityTraits": [],
+    "ideals": [],
+    "bonds": [],
+    "flaws": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/background:anthropologist"
+    }
+  },
+  {
+    "slug": "archaeologist",
+    "name": "Archaeologist",
+    "book": "Tomb of Annihilation",
+    "skillProficiencies": [
+      "history",
+      "survival"
+    ],
+    "toolProficiencies": [
+      "Cartographer's tools or navigator's tools"
+    ],
+    "languages": 1,
+    "startingEquipment": [
+      "A wooden caseValue:1gp Weight:1lb containing a map to a ruin or dungeon",
+      "a bullseye lanternValue:10gp Weight:2lbs",
+      "a miner's pickValue:2gp Weight:10lbs",
+      "a set of traveler's clothesValue:2gp Weight:4lbs",
+      "a shovelValue:2gp Weight:5lbs",
+      "a two-person tentValue:2gp Weight:20lbs",
+      "a trinket recovered from a dig site",
+      "you spent most of your young life crawling around in the dust"
+    ],
+    "feature": {
+      "name": "Archaeologist Feature",
+      "description": ""
+    },
+    "personalityTraits": [],
+    "ideals": [],
+    "bonds": [],
+    "flaws": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/background:archaeologist"
+    }
+  },
+  {
+    "slug": "haunted-one",
+    "name": "Haunted One",
+    "book": "Curse of Strahd",
+    "skillProficiencies": [
+      "investigation",
+      "religion"
+    ],
+    "toolProficiencies": [
+      "None"
+    ],
+    "languages": 2,
+    "startingEquipment": [
+      "your path in life was defined by one dark moment",
+      "one fateful decision",
+      "or one tragedy. Now you feel a darkness threatening to consume you",
+      "or roll one on the Harrowing Events table."
+    ],
+    "feature": {
+      "name": "Haunted One Feature",
+      "description": ""
+    },
+    "personalityTraits": [],
+    "ideals": [],
+    "bonds": [],
+    "flaws": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/background:haunted-one"
+    }
+  },
+  {
+    "slug": "faceless",
+    "name": "Faceless",
+    "book": "Baldur's Gate: Descent into Avernus",
+    "skillProficiencies": [
+      "deception",
+      "intimidation"
+    ],
+    "toolProficiencies": [
+      "Disguise kit"
+    ],
+    "languages": 1,
+    "startingEquipment": [
+      "A disguise kitValue:25gp Weight:3lbs",
+      "a costumeValue:5gp Weight:4lbs",
+      "true face"
+    ],
+    "feature": {
+      "name": "Faceless Feature",
+      "description": ""
+    },
+    "personalityTraits": [],
+    "ideals": [],
+    "bonds": [],
+    "flaws": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/background:faceless"
+    }
+  },
+  {
+    "slug": "celebrity-adventurers-scion",
+    "name": "Celebrity Adventurer's Scion",
+    "book": "Acquisitions Incorporated",
+    "skillProficiencies": [
+      "perception",
+      "performance"
+    ],
+    "toolProficiencies": [
+      "Disguise kit"
+    ],
+    "languages": 2,
+    "startingEquipment": [
+      "A disguise kitValue:25gp Weight:3lb",
+      "a set of fine clothesValue:15gp Weight:6lbs",
+      "at the DM's discretion. Additionally",
+      "the common folk treat you with deference"
+    ],
+    "feature": {
+      "name": "Name Dropping",
+      "description": "You know and have met any number of powerful people across the land - and some of them might even remember you. You might be able to wrangle minor assistance from a major figure in the campaign, at the DM's discretion. Additionally, the common folk treat you with deference, and your heritage and the stories you tell might be good for a free meal or a place to sleep."
+    },
+    "personalityTraits": [],
+    "ideals": [],
+    "bonds": [],
+    "flaws": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/background:celebrity-adventurers-scion"
+    }
+  },
+  {
+    "slug": "failed-merchant",
+    "name": "Failed Merchant",
+    "book": "Acquisitions Incorporated",
+    "skillProficiencies": [
+      "investigation",
+      "persuasion"
+    ],
+    "toolProficiencies": [
+      "One type of artisan's tools"
+    ],
+    "languages": 1,
+    "startingEquipment": [
+      "One set of artisan's tools",
+      "merchant's scaleValue:5gp Weight:3lbs",
+      "a set of fine clothesValue:15gp Weight:6lbs",
+      "you retain connections with wholesalers",
+      "suppliers",
+      "a strong personality. the ability to make deals with hostile adversaries",
+      "a strong sword arm to fight off bandits"
+    ],
+    "feature": {
+      "name": "Supply Chain",
+      "description": "From your time as a merchant, you retain connections with wholesalers, suppliers, and other merchants and entrepreneurs. You can call upon these connections when looking for items or information."
+    },
+    "personalityTraits": [],
+    "ideals": [],
+    "bonds": [],
+    "flaws": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/background:failed-merchant"
+    }
+  },
+  {
+    "slug": "gambler",
+    "name": "Gambler",
+    "book": "Acquisitions Incorporated",
+    "skillProficiencies": [
+      "deception",
+      "insight"
+    ],
+    "toolProficiencies": [
+      "One gaming set"
+    ],
+    "languages": 1,
+    "startingEquipment": [
+      "One gaming set",
+      "a lucky charm",
+      "a set of fine clothesValue:15gp Weight:6lbs",
+      "and the worst gamblers sometimes win. Regardless"
+    ],
+    "feature": {
+      "name": "Never Tell Me the Odds",
+      "description": "Odds and probability are your bread and butter. During downtime activities that involve games of chance or figuring odds on the best plan, you can get a solid sense of which choice is likely the best one and which opportunities seem too good to be true, at the DM's determination."
+    },
+    "personalityTraits": [],
+    "ideals": [],
+    "bonds": [],
+    "flaws": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/background:gambler"
+    }
+  },
+  {
+    "slug": "plaintiff",
+    "name": "Plaintiff",
+    "book": "Acquisitions Incorporated",
+    "skillProficiencies": [
+      "medicine",
+      "persuasion"
+    ],
+    "toolProficiencies": [
+      "One type of artisan's tools"
+    ],
+    "languages": 1,
+    "startingEquipment": [
+      "One set of artisan's tools",
+      "a set of fine clothesValue:15gp Weight:6lbs"
+    ],
+    "feature": {
+      "name": "Legalese",
+      "description": "Your experience with your local legal system has given you a firm knowledge of the ins and outs of that system. Even when the law is not on your side, you can use complex terms like ex injuria jus non oritur and cogitationis poenam nemo patitur to frighten people into thinking you know what you're talking about. With common folks who don't know any better, you might be able to intimidate or deceive to get favors or special treatment."
+    },
+    "personalityTraits": [],
+    "ideals": [],
+    "bonds": [],
+    "flaws": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/background:plaintiff"
+    }
+  },
+  {
+    "slug": "rival-intern",
+    "name": "Rival Intern",
+    "book": "Acquisitions Incorporated",
+    "skillProficiencies": [
+      "history",
+      "investigation"
+    ],
+    "toolProficiencies": [
+      "One type of artisan's tools"
+    ],
+    "languages": 1,
+    "startingEquipment": [
+      "One set of artisan's tools",
+      "a set of fine clothesValue:15gp Weight:6lbs",
+      "it might have left you a blend of seething rage",
+      "practiced nonchalance"
+    ],
+    "feature": {
+      "name": "Inside Informant",
+      "description": "You have connections to your previous employer or other groups you dealt with during your previous employment. You can communicate with your contacts, gaining information at the DM's discretion."
+    },
+    "personalityTraits": [],
+    "ideals": [],
+    "bonds": [],
+    "flaws": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/background:rival-intern"
+    }
+  },
+  {
+    "slug": "astral-drifter",
+    "name": "Astral Drifter",
+    "book": "Spelljammer: Adventures in Space",
+    "skillProficiencies": [
+      "insight",
+      "religion"
+    ],
+    "toolProficiencies": [],
+    "languages": 2,
+    "startingEquipment": [
+      "A set of traveler's clothesValue: 2gp Weight: 4lbs",
+      "a diary",
+      "an ink penValue: 2cp Weight: 0",
+      "a bottle of inkValue: 10gp Weight: 0",
+      "or work with your DM to identify a more suitable choice."
+    ],
+    "feature": {
+      "name": "Astral Drifter Feature",
+      "description": ""
+    },
+    "personalityTraits": [],
+    "ideals": [],
+    "bonds": [],
+    "flaws": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/background:astral-drifter"
+    }
+  },
+  {
+    "slug": "wildspacer",
+    "name": "Wildspacer",
+    "book": "Spelljammer: Adventures in Space",
+    "skillProficiencies": [
+      "athletics",
+      "survival"
+    ],
+    "toolProficiencies": [
+      "Navigator's tools",
+      "vehicles (space)"
+    ],
+    "languages": 0,
+    "startingEquipment": [
+      "A belaying pin (club)Value: 1sp Weight: 2lbs",
+      "a set of traveler's clothesValue: 2gp Weight: 4lbs",
+      "a grappling hookValue: 2gp Weight: 4lbs",
+      "50 feet of hempen ropeValue: 1gp Weight: 10lbs",
+      "but the encounter left you with a scar or two"
+    ],
+    "feature": {
+      "name": "Wildspacer Feature",
+      "description": ""
+    },
+    "personalityTraits": [],
+    "ideals": [],
+    "bonds": [],
+    "flaws": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/background:wildspacer"
+    }
+  },
+  {
+    "slug": "gate-warden",
+    "name": "Gate Warden",
+    "book": "Planescape: Adventures in the Multiverse",
+    "skillProficiencies": [
+      "persuasion",
+      "survival"
+    ],
+    "toolProficiencies": [],
+    "languages": 2,
+    "startingEquipment": [
+      "A ring of keys to unknown locks",
+      "a blank bookValue: 25gp Weight: 5lbs",
+      "an ink pen or quillValue: 2cp Weight: 0",
+      "a bottle of black inkValue: 10gp Weight: 0",
+      "a set of traveler’s clothesValue: 2gp Weight: 4lbs",
+      "you know where to find free"
+    ],
+    "feature": {
+      "name": "Gate Warden Feature",
+      "description": ""
+    },
+    "personalityTraits": [],
+    "ideals": [],
+    "bonds": [],
+    "flaws": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/background:gate-warden"
+    }
+  },
+  {
+    "slug": "planar-philosopher",
+    "name": "Planar Philospher",
+    "book": "Planescape: Adventures in the Multiverse",
+    "skillProficiencies": [
+      "arcana"
+    ],
+    "toolProficiencies": [],
+    "languages": 2,
+    "startingEquipment": [
+      "a manifesto of your guiding philosophy",
+      "a set of common clothesValue: 5sp Weight: 3lbs in your faction's style"
+    ],
+    "feature": {
+      "name": "Planar Philospher Feature",
+      "description": ""
+    },
+    "personalityTraits": [],
+    "ideals": [],
+    "bonds": [],
+    "flaws": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/background:planar-philosopher"
+    }
+  },
+  {
+    "slug": "rewarded",
+    "name": "Rewarded",
+    "book": "Planescape: Adventures in the Multiverse",
+    "skillProficiencies": [
+      "insight",
+      "persuasion"
+    ],
+    "toolProficiencies": [],
+    "languages": 1,
+    "startingEquipment": [
+      "A bottle of black inkValue: 10gp Weight: 0",
+      "an ink penValue: 2cp Weight: 0",
+      "five sheets of paper",
+      "a gaming set (matching your chosen proficiency)",
+      "a signet ringValue:5gp Weight:0",
+      "a set of fine clothesValue:15gp Weight:6lbs",
+      "Magic Initiate",
+      "you might be Lucky instead. Alternatively"
+    ],
+    "feature": {
+      "name": "Rewarded Feature",
+      "description": ""
+    },
+    "personalityTraits": [],
+    "ideals": [],
+    "bonds": [],
+    "flaws": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/background:rewarded"
+    }
+  },
+  {
+    "slug": "knight-of-solamnia",
+    "name": "Knight of Solamnia",
+    "book": "Dragonlance: Shadow of the Dragon Queen",
+    "skillProficiencies": [
+      "athletics",
+      "survival"
+    ],
+    "toolProficiencies": [],
+    "languages": 2,
+    "startingEquipment": [
+      "An insignia of rank",
+      "a deck of cardsValue: 5sp Weight: 0",
+      "a set of common clothesValue: 5sp Weight: 3lbs",
+      "the Knights of Solamnia provide you free",
+      "you may roll once on the Knight of Solamnia Trinkets table",
+      "instead of on the Trinkets table in the Player's Handbook",
+      "for your starting trinket.\nKnight of Solamnia Trinkets"
+    ],
+    "feature": {
+      "name": "Knight of Solamnia Feature",
+      "description": ""
+    },
+    "personalityTraits": [],
+    "ideals": [],
+    "bonds": [],
+    "flaws": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/background:knight-of-solamnia"
+    }
+  },
+  {
+    "slug": "mage-of-high-sorcery",
+    "name": "Mage of High Sorcery",
+    "book": "Dragonlance: Shadow of the Dragon Queen",
+    "skillProficiencies": [
+      "arcana",
+      "history"
+    ],
+    "toolProficiencies": [],
+    "languages": 2,
+    "startingEquipment": [
+      "A bottle of colored inkValue: 10gp Weight: 0",
+      "an ink penValue: 2cp Weight: 0",
+      "a set of common clothesValue: 5sp Weight: 3lbs",
+      "the Mages of High Sorcery provide you with free",
+      "Warlocks",
+      "the Mages of High Sorcery are shrewd",
+      "you may roll once on the Mage of High Sorcery Trinkets table",
+      "instead of on the Trinkets table in the Player's Handbook"
+    ],
+    "feature": {
+      "name": "Mage of High Sorcery Feature",
+      "description": ""
+    },
+    "personalityTraits": [],
+    "ideals": [],
+    "bonds": [],
+    "flaws": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/background:mage-of-high-sorcery"
+    }
+  },
+  {
+    "slug": "investigator",
+    "name": "Investigator",
+    "book": "Other",
+    "skillProficiencies": [
+      "investigation"
+    ],
+    "toolProficiencies": [
+      "Disguise kit",
+      "thieves' tools"
+    ],
+    "languages": 0,
+    "startingEquipment": [
+      "A magnifying glassValue:100gp",
+      "personal"
+    ],
+    "feature": {
+      "name": "Investigator Feature",
+      "description": ""
+    },
+    "personalityTraits": [],
+    "ideals": [],
+    "bonds": [],
+    "flaws": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/background:investigator"
+    }
+  }
+]

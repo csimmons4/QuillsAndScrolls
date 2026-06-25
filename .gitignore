@@ -1,0 +1,9 @@
+node_modules/
+dist/
+scripts/scraper/cache/
+characters/*.json
+homebrew/**/*.json
+
+*.local
+.DS_Store
+.claude/

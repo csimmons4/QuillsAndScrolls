@@ -1,0 +1,2264 @@
+[
+  {
+    "slug": "artificer",
+    "hitDie": 8,
+    "spellcastingAbility": "int",
+    "saveProficiencies": [
+      "con",
+      "int"
+    ],
+    "armorProficiencies": [
+      "light",
+      "medium",
+      "shields"
+    ],
+    "weaponProficiencies": [
+      "simple"
+    ],
+    "toolProficiencies": [
+      "Thieves' tools",
+      "Tinker's tools",
+      "One type of artisan's tools"
+    ],
+    "skillChoices": [
+      "arcana",
+      "history",
+      "investigation",
+      "medicine",
+      "nature",
+      "perception",
+      "sleightOfHand"
+    ],
+    "numSkillChoices": 2,
+    "name": "Artificer",
+    "features": [],
+    "subclasses": [],
+    "startingEquipment": [],
+    "spellSlotTable": [
+      [
+        0
+      ],
+      [
+        2,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        3,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        3,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        2,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        2,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        2,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        2,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        2,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        2,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        3,
+        1,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        3,
+        1,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        3,
+        2,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        3,
+        2,
+        0,
+        0,
+        0,
+        0
+      ]
+    ],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/artificer"
+    }
+  },
+  {
+    "slug": "barbarian",
+    "hitDie": 12,
+    "saveProficiencies": [
+      "str",
+      "con"
+    ],
+    "armorProficiencies": [
+      "light",
+      "medium",
+      "shields"
+    ],
+    "weaponProficiencies": [
+      "simple",
+      "martial"
+    ],
+    "toolProficiencies": [],
+    "skillChoices": [
+      "animalHandling",
+      "athletics",
+      "intimidation",
+      "nature",
+      "perception",
+      "survival"
+    ],
+    "numSkillChoices": 2,
+    "name": "Barbarian",
+    "features": [],
+    "subclasses": [],
+    "startingEquipment": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/barbarian"
+    }
+  },
+  {
+    "slug": "bard",
+    "hitDie": 8,
+    "spellcastingAbility": "cha",
+    "saveProficiencies": [
+      "dex",
+      "cha"
+    ],
+    "armorProficiencies": [
+      "light"
+    ],
+    "weaponProficiencies": [
+      "simple",
+      "hand crossbows",
+      "longswords",
+      "rapiers",
+      "shortswords"
+    ],
+    "toolProficiencies": [
+      "Three musical instruments"
+    ],
+    "skillChoices": [
+      "acrobatics",
+      "animalHandling",
+      "arcana",
+      "athletics",
+      "deception",
+      "history",
+      "insight",
+      "intimidation",
+      "investigation",
+      "medicine",
+      "nature",
+      "perception",
+      "performance",
+      "persuasion",
+      "religion",
+      "sleightOfHand",
+      "stealth",
+      "survival"
+    ],
+    "numSkillChoices": 3,
+    "name": "Bard",
+    "features": [],
+    "subclasses": [],
+    "startingEquipment": [],
+    "spellSlotTable": [
+      [
+        2,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        3,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        2,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        2,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        2,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        3,
+        1,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        3,
+        2,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        3,
+        2,
+        1,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        3,
+        2,
+        1,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        3,
+        2,
+        1,
+        1,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        3,
+        2,
+        1,
+        1,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        3,
+        2,
+        1,
+        1,
+        1,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        3,
+        2,
+        1,
+        1,
+        1,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        3,
+        2,
+        1,
+        1,
+        1,
+        1
+      ],
+      [
+        4,
+        3,
+        3,
+        3,
+        3,
+        1,
+        1,
+        1,
+        1
+      ],
+      [
+        4,
+        3,
+        3,
+        3,
+        3,
+        2,
+        1,
+        1,
+        1
+      ],
+      [
+        4,
+        3,
+        3,
+        3,
+        3,
+        2,
+        2,
+        1,
+        1
+      ]
+    ],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/bard"
+    }
+  },
+  {
+    "slug": "cleric",
+    "hitDie": 8,
+    "spellcastingAbility": "wis",
+    "saveProficiencies": [
+      "wis",
+      "cha"
+    ],
+    "armorProficiencies": [
+      "light",
+      "medium",
+      "shields"
+    ],
+    "weaponProficiencies": [
+      "simple"
+    ],
+    "toolProficiencies": [],
+    "skillChoices": [
+      "history",
+      "insight",
+      "medicine",
+      "persuasion",
+      "religion"
+    ],
+    "numSkillChoices": 2,
+    "name": "Cleric",
+    "features": [],
+    "subclasses": [],
+    "startingEquipment": [],
+    "spellSlotTable": [
+      [
+        2,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        3,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        2,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        2,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        2,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        3,
+        1,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        3,
+        2,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        3,
+        2,
+        1,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        3,
+        2,
+        1,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        3,
+        2,
+        1,
+        1,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        3,
+        2,
+        1,
+        1,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        3,
+        2,
+        1,
+        1,
+        1,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        3,
+        2,
+        1,
+        1,
+        1,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        3,
+        2,
+        1,
+        1,
+        1,
+        1
+      ],
+      [
+        4,
+        3,
+        3,
+        3,
+        3,
+        1,
+        1,
+        1,
+        1
+      ],
+      [
+        4,
+        3,
+        3,
+        3,
+        3,
+        2,
+        1,
+        1,
+        1
+      ],
+      [
+        4,
+        3,
+        3,
+        3,
+        3,
+        2,
+        2,
+        1,
+        1
+      ]
+    ],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/cleric"
+    }
+  },
+  {
+    "slug": "druid",
+    "hitDie": 8,
+    "spellcastingAbility": "wis",
+    "saveProficiencies": [
+      "int",
+      "wis"
+    ],
+    "armorProficiencies": [
+      "light",
+      "medium",
+      "shields (non-metal)"
+    ],
+    "weaponProficiencies": [
+      "clubs",
+      "daggers",
+      "darts",
+      "javelins",
+      "maces",
+      "quarterstaffs",
+      "scimitars",
+      "sickles",
+      "slings",
+      "spears"
+    ],
+    "toolProficiencies": [
+      "Herbalism kit"
+    ],
+    "skillChoices": [
+      "arcana",
+      "animalHandling",
+      "insight",
+      "medicine",
+      "nature",
+      "perception",
+      "religion",
+      "survival"
+    ],
+    "numSkillChoices": 2,
+    "name": "Druid",
+    "features": [],
+    "subclasses": [],
+    "startingEquipment": [],
+    "spellSlotTable": [
+      [
+        2,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        3,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        2,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        2,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        2,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        3,
+        1,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        3,
+        2,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        3,
+        2,
+        1,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        3,
+        2,
+        1,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        3,
+        2,
+        1,
+        1,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        3,
+        2,
+        1,
+        1,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        3,
+        2,
+        1,
+        1,
+        1,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        3,
+        2,
+        1,
+        1,
+        1,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        3,
+        2,
+        1,
+        1,
+        1,
+        1
+      ],
+      [
+        4,
+        3,
+        3,
+        3,
+        3,
+        1,
+        1,
+        1,
+        1
+      ],
+      [
+        4,
+        3,
+        3,
+        3,
+        3,
+        2,
+        1,
+        1,
+        1
+      ],
+      [
+        4,
+        3,
+        3,
+        3,
+        3,
+        2,
+        2,
+        1,
+        1
+      ]
+    ],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/druid"
+    }
+  },
+  {
+    "slug": "fighter",
+    "hitDie": 10,
+    "saveProficiencies": [
+      "str",
+      "con"
+    ],
+    "armorProficiencies": [
+      "all",
+      "shields"
+    ],
+    "weaponProficiencies": [
+      "simple",
+      "martial"
+    ],
+    "toolProficiencies": [],
+    "skillChoices": [
+      "acrobatics",
+      "animalHandling",
+      "athletics",
+      "history",
+      "insight",
+      "intimidation",
+      "perception",
+      "survival"
+    ],
+    "numSkillChoices": 2,
+    "name": "Fighter",
+    "features": [],
+    "subclasses": [],
+    "startingEquipment": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/fighter"
+    }
+  },
+  {
+    "slug": "monk",
+    "hitDie": 8,
+    "saveProficiencies": [
+      "str",
+      "dex"
+    ],
+    "armorProficiencies": [],
+    "weaponProficiencies": [
+      "simple",
+      "shortswords"
+    ],
+    "toolProficiencies": [
+      "One type of artisan's tools or a musical instrument"
+    ],
+    "skillChoices": [
+      "acrobatics",
+      "athletics",
+      "history",
+      "insight",
+      "religion",
+      "stealth"
+    ],
+    "numSkillChoices": 2,
+    "name": "Monk",
+    "features": [],
+    "subclasses": [],
+    "startingEquipment": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/monk"
+    }
+  },
+  {
+    "slug": "paladin",
+    "hitDie": 10,
+    "spellcastingAbility": "cha",
+    "saveProficiencies": [
+      "wis",
+      "cha"
+    ],
+    "armorProficiencies": [
+      "all",
+      "shields"
+    ],
+    "weaponProficiencies": [
+      "simple",
+      "martial"
+    ],
+    "toolProficiencies": [],
+    "skillChoices": [
+      "athletics",
+      "insight",
+      "intimidation",
+      "medicine",
+      "persuasion",
+      "religion"
+    ],
+    "numSkillChoices": 2,
+    "name": "Paladin",
+    "features": [],
+    "subclasses": [],
+    "startingEquipment": [],
+    "spellSlotTable": [
+      [
+        0
+      ],
+      [
+        2,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        3,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        3,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        2,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        2,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        2,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        2,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        2,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        2,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        3,
+        1,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        3,
+        1,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        3,
+        2,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        3,
+        2,
+        0,
+        0,
+        0,
+        0
+      ]
+    ],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/paladin"
+    }
+  },
+  {
+    "slug": "ranger",
+    "hitDie": 10,
+    "spellcastingAbility": "wis",
+    "saveProficiencies": [
+      "str",
+      "dex"
+    ],
+    "armorProficiencies": [
+      "light",
+      "medium",
+      "shields"
+    ],
+    "weaponProficiencies": [
+      "simple",
+      "martial"
+    ],
+    "toolProficiencies": [],
+    "skillChoices": [
+      "animalHandling",
+      "athletics",
+      "insight",
+      "investigation",
+      "nature",
+      "perception",
+      "stealth",
+      "survival"
+    ],
+    "numSkillChoices": 3,
+    "name": "Ranger",
+    "features": [],
+    "subclasses": [],
+    "startingEquipment": [],
+    "spellSlotTable": [
+      [
+        0
+      ],
+      [
+        2,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        3,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        3,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        2,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        2,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        2,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        2,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        2,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        2,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        3,
+        1,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        3,
+        1,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        3,
+        2,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        3,
+        2,
+        0,
+        0,
+        0,
+        0
+      ]
+    ],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/ranger"
+    }
+  },
+  {
+    "slug": "rogue",
+    "hitDie": 8,
+    "saveProficiencies": [
+      "dex",
+      "int"
+    ],
+    "armorProficiencies": [
+      "light"
+    ],
+    "weaponProficiencies": [
+      "simple",
+      "hand crossbows",
+      "longswords",
+      "rapiers",
+      "shortswords"
+    ],
+    "toolProficiencies": [
+      "Thieves' tools"
+    ],
+    "skillChoices": [
+      "acrobatics",
+      "athletics",
+      "deception",
+      "insight",
+      "intimidation",
+      "investigation",
+      "perception",
+      "performance",
+      "persuasion",
+      "sleightOfHand",
+      "stealth"
+    ],
+    "numSkillChoices": 4,
+    "name": "Rogue",
+    "features": [],
+    "subclasses": [],
+    "startingEquipment": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/rogue"
+    }
+  },
+  {
+    "slug": "sorcerer",
+    "hitDie": 6,
+    "spellcastingAbility": "cha",
+    "saveProficiencies": [
+      "con",
+      "cha"
+    ],
+    "armorProficiencies": [],
+    "weaponProficiencies": [
+      "daggers",
+      "darts",
+      "slings",
+      "quarterstaffs",
+      "light crossbows"
+    ],
+    "toolProficiencies": [],
+    "skillChoices": [
+      "arcana",
+      "deception",
+      "insight",
+      "intimidation",
+      "persuasion",
+      "religion"
+    ],
+    "numSkillChoices": 2,
+    "name": "Sorcerer",
+    "features": [],
+    "subclasses": [],
+    "startingEquipment": [],
+    "spellSlotTable": [
+      [
+        2,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        3,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        2,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        2,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        2,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        3,
+        1,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        3,
+        2,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        3,
+        2,
+        1,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        3,
+        2,
+        1,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        3,
+        2,
+        1,
+        1,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        3,
+        2,
+        1,
+        1,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        3,
+        2,
+        1,
+        1,
+        1,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        3,
+        2,
+        1,
+        1,
+        1,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        3,
+        2,
+        1,
+        1,
+        1,
+        1
+      ],
+      [
+        4,
+        3,
+        3,
+        3,
+        3,
+        1,
+        1,
+        1,
+        1
+      ],
+      [
+        4,
+        3,
+        3,
+        3,
+        3,
+        2,
+        1,
+        1,
+        1
+      ],
+      [
+        4,
+        3,
+        3,
+        3,
+        3,
+        2,
+        2,
+        1,
+        1
+      ]
+    ],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/sorcerer"
+    }
+  },
+  {
+    "slug": "warlock",
+    "hitDie": 8,
+    "spellcastingAbility": "cha",
+    "saveProficiencies": [
+      "wis",
+      "cha"
+    ],
+    "armorProficiencies": [
+      "light"
+    ],
+    "weaponProficiencies": [
+      "simple"
+    ],
+    "toolProficiencies": [],
+    "skillChoices": [
+      "arcana",
+      "deception",
+      "history",
+      "intimidation",
+      "investigation",
+      "nature",
+      "religion"
+    ],
+    "numSkillChoices": 2,
+    "name": "Warlock",
+    "features": [],
+    "subclasses": [],
+    "startingEquipment": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/warlock"
+    }
+  },
+  {
+    "slug": "wizard",
+    "hitDie": 6,
+    "spellcastingAbility": "int",
+    "saveProficiencies": [
+      "int",
+      "wis"
+    ],
+    "armorProficiencies": [],
+    "weaponProficiencies": [
+      "daggers",
+      "darts",
+      "slings",
+      "quarterstaffs",
+      "light crossbows"
+    ],
+    "toolProficiencies": [],
+    "skillChoices": [
+      "arcana",
+      "history",
+      "insight",
+      "investigation",
+      "medicine",
+      "religion"
+    ],
+    "numSkillChoices": 2,
+    "name": "Wizard",
+    "features": [],
+    "subclasses": [],
+    "startingEquipment": [],
+    "spellSlotTable": [
+      [
+        2,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        3,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        2,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        2,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        2,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        3,
+        1,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        3,
+        2,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        3,
+        2,
+        1,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        3,
+        2,
+        1,
+        0,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        3,
+        2,
+        1,
+        1,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        3,
+        2,
+        1,
+        1,
+        0,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        3,
+        2,
+        1,
+        1,
+        1,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        3,
+        2,
+        1,
+        1,
+        1,
+        0
+      ],
+      [
+        4,
+        3,
+        3,
+        3,
+        2,
+        1,
+        1,
+        1,
+        1
+      ],
+      [
+        4,
+        3,
+        3,
+        3,
+        3,
+        1,
+        1,
+        1,
+        1
+      ],
+      [
+        4,
+        3,
+        3,
+        3,
+        3,
+        2,
+        1,
+        1,
+        1
+      ],
+      [
+        4,
+        3,
+        3,
+        3,
+        3,
+        2,
+        2,
+        1,
+        1
+      ]
+    ],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/wizard"
+    }
+  }
+]

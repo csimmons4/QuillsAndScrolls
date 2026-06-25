@@ -1,0 +1,1743 @@
+[
+  {
+    "slug": "dragonborn",
+    "name": "Dragonborn",
+    "abilityBonuses": {},
+    "size": "Medium",
+    "speed": 30,
+    "traits": [
+      "Ability Score Increase.",
+      "Alignment.",
+      "Draconic Ancestry.",
+      "Breath Weapon.",
+      "Damage Resistance.",
+      "Draconblood",
+      "Darkvision.",
+      "Forceful Presence.",
+      "Ravenite",
+      "Vengeful Assault.",
+      "Chromatic",
+      "Type.",
+      "Chromatic Ancestry.",
+      "Draconic Resistance.",
+      "Chromatic Warding."
+    ],
+    "languages": [
+      "Common"
+    ],
+    "proficiencies": [],
+    "subraces": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/lineage:dragonborn"
+    }
+  },
+  {
+    "slug": "dwarf",
+    "name": "Dwarf",
+    "abilityBonuses": {},
+    "size": "Medium",
+    "speed": 30,
+    "traits": [
+      "Ability Score Increase.",
+      "Alignment.",
+      "Darkvision.",
+      "Dwarven Resilience.",
+      "Dwarven Combat Training.",
+      "Tool Proficiency.",
+      "Stonecunning.",
+      "Hill Dwarf",
+      "Dwarven Toughness.",
+      "Mountain Dwarf",
+      "Dwarven Armor Training.",
+      "Mark of Warding",
+      "Warder's Intuition.",
+      "Wards and Seals.",
+      "Spells of the Mark."
+    ],
+    "languages": [
+      "Common"
+    ],
+    "proficiencies": [],
+    "subraces": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/lineage:dwarf"
+    }
+  },
+  {
+    "slug": "elf",
+    "name": "Elf",
+    "abilityBonuses": {},
+    "size": "Medium",
+    "speed": 30,
+    "traits": [
+      "Ability Score Increase.",
+      "Alignment.",
+      "Darkvision.",
+      "Fey Ancestry.",
+      "Trance.",
+      "Keen Senses.",
+      "Dark Elf",
+      "Superior Darkvision.",
+      "Sunlight Sensitivity.",
+      "Drow Magic.",
+      "Drow Weapon Training.",
+      "High Elf",
+      "Cantrip.",
+      "Elf Weapon Training.",
+      "Extra Language."
+    ],
+    "languages": [
+      "Common"
+    ],
+    "proficiencies": [],
+    "subraces": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/lineage:elf"
+    }
+  },
+  {
+    "slug": "gnome",
+    "name": "Gnome",
+    "abilityBonuses": {},
+    "size": "Small",
+    "speed": 30,
+    "traits": [
+      "Ability Score Increase.",
+      "Alignment.",
+      "Darkvision.",
+      "Gnome Cunning.",
+      "Forest",
+      "Natural Illusionist.",
+      "Speak with Small Beasts.",
+      "Rock",
+      "Artificer's Lore.",
+      "Tinker.",
+      "Clockwork Toy.",
+      "Fire Starter.",
+      "Music Box.",
+      "Mark of Scribing",
+      "Gifted Scribe."
+    ],
+    "languages": [
+      "spell with this trait"
+    ],
+    "proficiencies": [],
+    "subraces": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/lineage:gnome"
+    }
+  },
+  {
+    "slug": "half-elf",
+    "name": "Half Elf",
+    "abilityBonuses": {},
+    "size": "Medium",
+    "speed": 30,
+    "traits": [
+      "Ability Score Increase.",
+      "Alignment.",
+      "Darkvision.",
+      "Fey Ancestry.",
+      "Half-Elf Versatility.",
+      "Skill Versatility (General).",
+      "Elf Weapon Training (High or Wood Elf Heritage).",
+      "Cantrip (High Elf Heritage).",
+      "Fleet of Foot (Wood Elf Heritage).",
+      "Mask of the Wild (Wood Elf Heritage).",
+      "Drow Magic (Dark Elf Heritage).",
+      "Swim Speed (Aquatic Elf Heritage).",
+      "Mark of Detection",
+      "Deductive Intuition.",
+      "Magical Detection."
+    ],
+    "languages": [
+      "Common"
+    ],
+    "proficiencies": [],
+    "subraces": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/lineage:half-elf"
+    }
+  },
+  {
+    "slug": "half-orc",
+    "name": "Half Orc",
+    "abilityBonuses": {},
+    "size": "Medium",
+    "speed": 30,
+    "traits": [
+      "Ability Score Increase.",
+      "Alignment.",
+      "Darkvision.",
+      "Menacing.",
+      "Relentless Endurance.",
+      "Savage Attacks.",
+      "Mark of Finding",
+      "Hunter's Intuition.",
+      "Finder's Magic.",
+      "Spells of the Mark.",
+      "Mark of Finding Spells"
+    ],
+    "languages": [
+      "Common"
+    ],
+    "proficiencies": [],
+    "subraces": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/lineage:half-orc"
+    }
+  },
+  {
+    "slug": "halfling",
+    "name": "Halfling",
+    "abilityBonuses": {},
+    "size": "small",
+    "speed": 30,
+    "traits": [
+      "Ability Score Increase.",
+      "Alignment.",
+      "Lucky.",
+      "Brave.",
+      "Nimble.",
+      "Lightfoot",
+      "Naturally Stealthy.",
+      "Stout",
+      "Stout Resilience.",
+      "Ghostwise",
+      "Silent Speech.",
+      "Lotusden",
+      "Children of the Woods.",
+      "Timberwalk.",
+      "Mark of Hospitality"
+    ],
+    "languages": [
+      "Common"
+    ],
+    "proficiencies": [],
+    "subraces": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/lineage:halfling"
+    }
+  },
+  {
+    "slug": "human",
+    "name": "Human",
+    "abilityBonuses": {},
+    "size": "Medium",
+    "speed": 30,
+    "traits": [
+      "Ability Score Increase.",
+      "Alignment.",
+      "Variant",
+      "Skills.",
+      "Feat.",
+      "Mark of Finding",
+      "Darkvision.",
+      "Hunter's Intuition.",
+      "Finder's Magic.",
+      "Spells of the Mark.",
+      "Mark of Finding Spells",
+      "Mark of Handling",
+      "Wild Intuition.",
+      "Primal Connection.",
+      "The Bigger They Are."
+    ],
+    "languages": [
+      "of other peoples they deal with",
+      "including obscure dialects"
+    ],
+    "proficiencies": [],
+    "subraces": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/lineage:human"
+    }
+  },
+  {
+    "slug": "tiefling",
+    "name": "Tiefling",
+    "abilityBonuses": {},
+    "size": "Medium",
+    "speed": 30,
+    "traits": [
+      "Ability Score Increase.",
+      "Alignment.",
+      "Darkvision.",
+      "Hellish Resistance.",
+      "Bloodline of Asmodeus",
+      "Infernal Legacy.",
+      "Bloodline of Baalzebul",
+      "Legacy of Maladomini.",
+      "Bloodline of Dispater",
+      "Legacy of Dis.",
+      "Bloodline of Fierna",
+      "Legacy of Phlegethos.",
+      "Bloodline of Glasya",
+      "Legacy of Malbolge.",
+      "Bloodline of Levistus"
+    ],
+    "languages": [
+      "Common"
+    ],
+    "proficiencies": [],
+    "subraces": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/lineage:tiefling"
+    }
+  },
+  {
+    "slug": "aarakocra",
+    "name": "Aarakocra",
+    "abilityBonuses": {},
+    "size": "large",
+    "speed": 30,
+    "traits": [
+      "Ability Score Increase.",
+      "Creature Type.",
+      "Flight.",
+      "Talons.",
+      "Wind Caller.",
+      "Alignment."
+    ],
+    "languages": [
+      "to choose from"
+    ],
+    "proficiencies": [],
+    "subraces": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/lineage:aarakocra"
+    }
+  },
+  {
+    "slug": "aasimar",
+    "name": "Aasimar",
+    "abilityBonuses": {},
+    "size": "Medium",
+    "speed": 30,
+    "traits": [
+      "Ability Score Increase.",
+      "Creature Type.",
+      "Darkvision.",
+      "Celestial Resistance.",
+      "Healing Hands.",
+      "Light Bearer.",
+      "Celestial Revelation.",
+      "Necrotic Shroud.",
+      "Radiant Consumption.",
+      "Radiant Soul.",
+      "Alignment.",
+      "Protector",
+      "Scourge",
+      "Fallen"
+    ],
+    "languages": [
+      "to choose from"
+    ],
+    "proficiencies": [],
+    "subraces": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/lineage:aasimar"
+    }
+  },
+  {
+    "slug": "changeling",
+    "name": "Changeling",
+    "abilityBonuses": {},
+    "size": "Medium",
+    "speed": 30,
+    "traits": [
+      "Ability Score Increase.",
+      "Creature Type.",
+      "Changeling Instincts.",
+      "Shapechanger.",
+      "Alignment.",
+      "Change Appearance.",
+      "Unsettling Visage.",
+      "Divergent Persona."
+    ],
+    "languages": [
+      "to choose from"
+    ],
+    "proficiencies": [],
+    "subraces": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/lineage:changeling"
+    }
+  },
+  {
+    "slug": "deep-gnome",
+    "name": "Deep Gnome",
+    "abilityBonuses": {},
+    "size": "Small",
+    "speed": 30,
+    "traits": [
+      "Ability Score Increase.",
+      "Creature Type.",
+      "Darkvision.",
+      "Gift of the Svirfneblin.",
+      "Gnomish Magic Resistance.",
+      "Svirfneblin Camouflage.",
+      "Superior Darkvision.",
+      "Gnome Cunning.",
+      "Stone Camouflage."
+    ],
+    "languages": [
+      "to choose from"
+    ],
+    "proficiencies": [],
+    "subraces": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/lineage:deep-gnome"
+    }
+  },
+  {
+    "slug": "duergar",
+    "name": "Duergar",
+    "abilityBonuses": {},
+    "size": "Medium",
+    "speed": 30,
+    "traits": [
+      "Ability Score Increase.",
+      "Creature Type.",
+      "Darkvision.",
+      "Duergar Magic.",
+      "Dwarven Resilience.",
+      "Psionic Fortitude.",
+      "Superior Darkvision.",
+      "Duergar Resilience.",
+      "Dwarven Combat Training.",
+      "Tool Proficiency.",
+      "Stonecunning.",
+      "Sunlight Sensitivity."
+    ],
+    "languages": [
+      "to choose from"
+    ],
+    "proficiencies": [],
+    "subraces": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/lineage:duergar"
+    }
+  },
+  {
+    "slug": "eladrin",
+    "name": "Eladrin",
+    "abilityBonuses": {},
+    "size": "Medium",
+    "speed": 30,
+    "traits": [
+      "Autumn:",
+      "Winter:",
+      "Spring:",
+      "Summer:",
+      "Ability Score Increase.",
+      "Creature Type.",
+      "Darkvision.",
+      "Fey Ancestry.",
+      "Fey Step.",
+      "Autumn.",
+      "Winter.",
+      "Spring.",
+      "Summer.",
+      "Keen Senses.",
+      "Trance."
+    ],
+    "languages": [
+      "to choose from"
+    ],
+    "proficiencies": [],
+    "subraces": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/lineage:eladrin"
+    }
+  },
+  {
+    "slug": "fairy",
+    "name": "Fairy",
+    "abilityBonuses": {},
+    "size": "Small",
+    "speed": 30,
+    "traits": [
+      "Ability Score Increase.",
+      "Creature Type.",
+      "Fairy Magic.",
+      "Flight.",
+      "Life Span.",
+      "Type.",
+      "Fairy Flight.",
+      "Fey Passage."
+    ],
+    "languages": [
+      "to choose from"
+    ],
+    "proficiencies": [],
+    "subraces": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/lineage:fairy"
+    }
+  },
+  {
+    "slug": "firbolg",
+    "name": "Firbolg",
+    "abilityBonuses": {},
+    "size": "Medium",
+    "speed": 30,
+    "traits": [
+      "Firbolgs can live up to 500 years.",
+      "Ability Score Increase.",
+      "Creature Type.",
+      "Firbolg Magic.",
+      "Hidden Step.",
+      "Powerful Build.",
+      "Speech of Beast and Leaf.",
+      "Alignment."
+    ],
+    "languages": [
+      "to choose from"
+    ],
+    "proficiencies": [],
+    "subraces": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/lineage:firbolg"
+    }
+  },
+  {
+    "slug": "genasi-air",
+    "name": "Air Genasi",
+    "abilityBonuses": {},
+    "size": "Medium",
+    "speed": 30,
+    "traits": [
+      "A typical genasi has a life span of 120 years",
+      "Ability Score Increase.",
+      "Creature Type.",
+      "Darkvision.",
+      "Unending Breath.",
+      "Lightning Resistance.",
+      "Mingle with the Wind.",
+      "Alignment."
+    ],
+    "languages": [
+      "to choose from"
+    ],
+    "proficiencies": [],
+    "subraces": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/lineage:genasi-air"
+    }
+  },
+  {
+    "slug": "genasi-earth",
+    "name": "Earth Genasi",
+    "abilityBonuses": {},
+    "size": "Medium",
+    "speed": 30,
+    "traits": [
+      "A typical genasi has a life span of 120 years",
+      "Ability Score Increase.",
+      "Creature Type.",
+      "Darkvision.",
+      "Earth Walk.",
+      "Merge with Stone.",
+      "Alignment."
+    ],
+    "languages": [
+      "to choose from"
+    ],
+    "proficiencies": [],
+    "subraces": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/lineage:genasi-earth"
+    }
+  },
+  {
+    "slug": "genasi-fire",
+    "name": "Fire Genasi",
+    "abilityBonuses": {},
+    "size": "Medium",
+    "speed": 30,
+    "traits": [
+      "A typical genasi has a life span of 120 years",
+      "Ability Score Increase.",
+      "Creature Type.",
+      "Darkvision.",
+      "Fire Resistance.",
+      "Reach to the Blaze.",
+      "Alignment."
+    ],
+    "languages": [
+      "to choose from"
+    ],
+    "proficiencies": [],
+    "subraces": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/lineage:genasi-fire"
+    }
+  },
+  {
+    "slug": "genasi-water",
+    "name": "Water Genasi",
+    "abilityBonuses": {},
+    "size": "Medium",
+    "speed": 30,
+    "traits": [
+      "A typical genasi has a life span of 120 years",
+      "Ability Score Increase.",
+      "Creature Type.",
+      "Darkvision.",
+      "Acid Resistance.",
+      "Amphibious.",
+      "Call to the Wave.",
+      "Alignment.",
+      "Swim."
+    ],
+    "languages": [
+      "to choose from"
+    ],
+    "proficiencies": [],
+    "subraces": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/lineage:genasi-water"
+    }
+  },
+  {
+    "slug": "githyanki",
+    "name": "Githyanki",
+    "abilityBonuses": {},
+    "size": "Medium",
+    "speed": 30,
+    "traits": [
+      "Ability Score Increase.",
+      "Creature Type.",
+      "Astral Knowledge.",
+      "Githyanki Psionics.",
+      "Psychic Resilience.",
+      "Alignment.",
+      "Decadent Mastery.",
+      "Martial Prodigy.",
+      "Gith Tables.",
+      "Fidelity.",
+      "Power.",
+      "Duty.",
+      "Freedom."
+    ],
+    "languages": [
+      "to choose from"
+    ],
+    "proficiencies": [],
+    "subraces": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/lineage:githyanki"
+    }
+  },
+  {
+    "slug": "githzerai",
+    "name": "Githzerai",
+    "abilityBonuses": {},
+    "size": "Medium",
+    "speed": 30,
+    "traits": [
+      "Ability Score Increase.",
+      "Creature Type.",
+      "Githzerai Psionics.",
+      "Mental Discipline.",
+      "Psychic Resilience.",
+      "Alignment.",
+      "Gith Tables.",
+      "Faith.",
+      "Courage.",
+      "Duty.",
+      "Freedom."
+    ],
+    "languages": [
+      "to choose from"
+    ],
+    "proficiencies": [],
+    "subraces": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/lineage:githzerai"
+    }
+  },
+  {
+    "slug": "goliath",
+    "name": "Goliath",
+    "abilityBonuses": {},
+    "size": "Medium",
+    "speed": 30,
+    "traits": [
+      "Ability Score Increase.",
+      "Creature Type.",
+      "Little Giant.",
+      "Mountain Born.",
+      "Stone's Endurance.",
+      "Alignment.",
+      "Natural Athlete.",
+      "Powerful Build."
+    ],
+    "languages": [
+      "to choose from"
+    ],
+    "proficiencies": [],
+    "subraces": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/lineage:goliath"
+    }
+  },
+  {
+    "slug": "harengon",
+    "name": "Harengon",
+    "abilityBonuses": {},
+    "size": "Medium",
+    "speed": 30,
+    "traits": [
+      "Ability Score Increase.",
+      "Creature Type.",
+      "Hare-Trigger.",
+      "Leporine Senses.",
+      "Lucky Footwork.",
+      "Rabbit Hop.",
+      "Life Span."
+    ],
+    "languages": [
+      "as they went"
+    ],
+    "proficiencies": [],
+    "subraces": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/lineage:harengon"
+    }
+  },
+  {
+    "slug": "kenku",
+    "name": "Kenku",
+    "abilityBonuses": {},
+    "size": "Medium",
+    "speed": 30,
+    "traits": [
+      "Ability Score Increase.",
+      "Creature Type.",
+      "Expert Duplication.",
+      "Kenku Recall.",
+      "Mimicry.",
+      "Alignment.",
+      "Expert Forgery.",
+      "Kenku Training."
+    ],
+    "languages": [
+      "to choose from"
+    ],
+    "proficiencies": [],
+    "subraces": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/lineage:kenku"
+    }
+  },
+  {
+    "slug": "locathah",
+    "name": "Locathah (LR)",
+    "abilityBonuses": {},
+    "size": "Medium",
+    "speed": 30,
+    "traits": [
+      "Ability Score Increase.",
+      "Alignment.",
+      "Natural Armor.",
+      "Observant and Athletic.",
+      "Leviathan Will.",
+      "Limited Amphibiousness."
+    ],
+    "languages": [
+      "Common"
+    ],
+    "proficiencies": [],
+    "subraces": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/lineage:locathah"
+    }
+  },
+  {
+    "slug": "owlin",
+    "name": "Owlin (SCC)",
+    "abilityBonuses": {},
+    "size": "Medium",
+    "speed": 30,
+    "traits": [
+      "Ability Score Increase.",
+      "Creature Type.",
+      "Darkvision.",
+      "Flight.",
+      "Silent Feathers."
+    ],
+    "languages": [
+      "Common"
+    ],
+    "proficiencies": [],
+    "subraces": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/lineage:owlin"
+    }
+  },
+  {
+    "slug": "satyr",
+    "name": "Satyr",
+    "abilityBonuses": {},
+    "size": "Medium",
+    "speed": 30,
+    "traits": [
+      "Ability Score Increase.",
+      "Creature Type.",
+      "Ram.",
+      "Magic Resistance.",
+      "Mirthful Leaps.",
+      "Reveler.",
+      "Alignment.",
+      "Fey."
+    ],
+    "languages": [
+      "to choose from"
+    ],
+    "proficiencies": [],
+    "subraces": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/lineage:satyr"
+    }
+  },
+  {
+    "slug": "sea-elf",
+    "name": "Sea Elf",
+    "abilityBonuses": {},
+    "size": "Medium",
+    "speed": 30,
+    "traits": [
+      "Ability Score Increase.",
+      "Creature Type.",
+      "Child of the Sea.",
+      "Darkvision.",
+      "Fey Ancestry.",
+      "Friend of the Sea.",
+      "Keen Senses.",
+      "Trance.",
+      "Sea Elf Training."
+    ],
+    "languages": [
+      "to choose from"
+    ],
+    "proficiencies": [],
+    "subraces": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/lineage:sea-elf"
+    }
+  },
+  {
+    "slug": "shadar-kai",
+    "name": "Shadar-Kai",
+    "abilityBonuses": {},
+    "size": "Medium",
+    "speed": 30,
+    "traits": [
+      "Ability Score Increase.",
+      "Creature Type.",
+      "Blessing of the Raven Queen.",
+      "Darkvision.",
+      "Fey Ancestry.",
+      "Keen Senses.",
+      "Necrotic Resistance.",
+      "Trance."
+    ],
+    "languages": [
+      "to choose from"
+    ],
+    "proficiencies": [],
+    "subraces": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/lineage:shadar-kai"
+    }
+  },
+  {
+    "slug": "tabaxi",
+    "name": "Tabaxi",
+    "abilityBonuses": {},
+    "size": "Medium",
+    "speed": 30,
+    "traits": [
+      "Ability Score Increase.",
+      "Creature Type.",
+      "Cat's Claws.",
+      "Cat's Talent.",
+      "Darkvision.",
+      "Feline Agility.",
+      "Alignment."
+    ],
+    "languages": [
+      "to choose from"
+    ],
+    "proficiencies": [],
+    "subraces": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/lineage:tabaxi"
+    }
+  },
+  {
+    "slug": "tortle",
+    "name": "Tortle",
+    "abilityBonuses": {},
+    "size": "Medium",
+    "speed": 30,
+    "traits": [
+      "Ability Score Increase.",
+      "Creature Type.",
+      "Claws.",
+      "Hold Breath.",
+      "Natural Armor.",
+      "Nature's Intuition.",
+      "Shell Defense.",
+      "Alignment.",
+      "Survival Instinct."
+    ],
+    "languages": [
+      "to choose from"
+    ],
+    "proficiencies": [],
+    "subraces": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/lineage:tortle"
+    }
+  },
+  {
+    "slug": "triton",
+    "name": "Triton",
+    "abilityBonuses": {},
+    "size": "small",
+    "speed": 30,
+    "traits": [
+      "Ability Score Increase.",
+      "Creature Type.",
+      "Amphibious.",
+      "Control Air and Water.",
+      "Darkvision.",
+      "Emissary of the Sea.",
+      "Guardian of the Depths.",
+      "Alignment.",
+      "Guardians of the Depths."
+    ],
+    "languages": [
+      "to choose from"
+    ],
+    "proficiencies": [],
+    "subraces": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/lineage:triton"
+    }
+  },
+  {
+    "slug": "verdan",
+    "name": "Verdan (AI)",
+    "abilityBonuses": {},
+    "size": "small",
+    "speed": 30,
+    "traits": [
+      "Ability Score Increase.",
+      "Alignment.",
+      "Black Blood Healing.",
+      "Limited Telepathy.",
+      "Persuasive.",
+      "Telepathic Insight."
+    ],
+    "languages": [
+      "Common"
+    ],
+    "proficiencies": [],
+    "subraces": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/lineage:verdan"
+    }
+  },
+  {
+    "slug": "bugbear",
+    "name": "Bugbear",
+    "abilityBonuses": {},
+    "size": "small",
+    "speed": 30,
+    "traits": [
+      "Ability Score Increase.",
+      "Creature Type.",
+      "Darkvision.",
+      "Fey Ancestry.",
+      "Long-Limbed.",
+      "Powerful Build.",
+      "Sneaky.",
+      "Surprise Attack.",
+      "Alignment."
+    ],
+    "languages": [
+      "to choose from"
+    ],
+    "proficiencies": [],
+    "subraces": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/lineage:bugbear"
+    }
+  },
+  {
+    "slug": "centaur",
+    "name": "Centaur",
+    "abilityBonuses": {},
+    "size": "Medium",
+    "speed": 30,
+    "traits": [
+      "Ability Score Increase.",
+      "Creature Type.",
+      "Charge.",
+      "Equine Build.",
+      "Hooves.",
+      "Natural Affinity.",
+      "Alignment.",
+      "Fey.",
+      "Survivor."
+    ],
+    "languages": [
+      "to choose from"
+    ],
+    "proficiencies": [],
+    "subraces": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/lineage:centaur"
+    }
+  },
+  {
+    "slug": "goblin",
+    "name": "Goblin",
+    "abilityBonuses": {},
+    "size": "Small",
+    "speed": 30,
+    "traits": [
+      "Ability Score Increase.",
+      "Creature Type.",
+      "Darkvision.",
+      "Fey Ancestry.",
+      "Fury of the Small.",
+      "Nimble Escape.",
+      "Alignment.",
+      "Speak with Small Beasts.",
+      "Agile Climber.",
+      "Grit.",
+      "Tribe.",
+      "Grotag Tamer.",
+      "Lavastep Grit.",
+      "Tuktuk Cunning."
+    ],
+    "languages": [
+      "to choose from"
+    ],
+    "proficiencies": [],
+    "subraces": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/lineage:goblin"
+    }
+  },
+  {
+    "slug": "hobgoblin",
+    "name": "Hobgoblin",
+    "abilityBonuses": {},
+    "size": "Medium",
+    "speed": 30,
+    "traits": [
+      "Ability Score Increase.",
+      "Creature Type.",
+      "Darkvision.",
+      "Fey Ancestry.",
+      "Fey Gift.",
+      "Hospitality.",
+      "Passage.",
+      "Spite.",
+      "Fortune from the Many.",
+      "Alignment.",
+      "Martial Training.",
+      "Saving Face."
+    ],
+    "languages": [
+      "to choose from"
+    ],
+    "proficiencies": [],
+    "subraces": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/lineage:hobgoblin"
+    }
+  },
+  {
+    "slug": "kobold",
+    "name": "Kobold",
+    "abilityBonuses": {},
+    "size": "Small",
+    "speed": 30,
+    "traits": [
+      "Ability Score Increase.",
+      "Creature Type.",
+      "Darkvision.",
+      "Draconic Cry.",
+      "Kobold Legacy.",
+      "Craftiness.",
+      "Defiance.",
+      "Draconic Sorcery.",
+      "Alignment.",
+      "Grovel, Cower, and Beg.",
+      "Pack Tactics.",
+      "Sunlight Sensitivity.",
+      "Type.",
+      "Draconic Legacy.",
+      "Draconic Roar."
+    ],
+    "languages": [
+      "to choose from"
+    ],
+    "proficiencies": [],
+    "subraces": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/lineage:kobold"
+    }
+  },
+  {
+    "slug": "lizardfolk",
+    "name": "Lizardfolk",
+    "abilityBonuses": {},
+    "size": "Medium",
+    "speed": 30,
+    "traits": [
+      "Ability Score Increase.",
+      "Creature Type.",
+      "Bite.",
+      "Hold Breath.",
+      "Hungry Jaws.",
+      "Natural Armor.",
+      "Nature's Intuition.",
+      "Alignment.",
+      "Cunning Artisan.",
+      "Hunter's Lore."
+    ],
+    "languages": [
+      "to choose from"
+    ],
+    "proficiencies": [],
+    "subraces": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/lineage:lizardfolk"
+    }
+  },
+  {
+    "slug": "minotaur",
+    "name": "Minotaur",
+    "abilityBonuses": {},
+    "size": "Medium",
+    "speed": 30,
+    "traits": [
+      "Ability Score Increase.",
+      "Creature Type.",
+      "Horns.",
+      "Goring Rush.",
+      "Hammering Horns.",
+      "Labyrinthine Recall.",
+      "Alignment.",
+      "Imposing Presence.",
+      "Natural Weapon.",
+      "Menacing.",
+      "Relentless Endurance.",
+      "Savage Attacks."
+    ],
+    "languages": [
+      "to choose from"
+    ],
+    "proficiencies": [],
+    "subraces": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/lineage:minotaur"
+    }
+  },
+  {
+    "slug": "orc",
+    "name": "Orc",
+    "abilityBonuses": {},
+    "size": "Medium",
+    "speed": 30,
+    "traits": [
+      "Ability Score Increase.",
+      "Creature Type.",
+      "Adrenaline Rush.",
+      "Darkvision.",
+      "Powerful Build.",
+      "Relentless Endurance.",
+      "Alignment.",
+      "Aggressive.",
+      "Primal Intuition.",
+      "Menacing.",
+      "Savage Attacks."
+    ],
+    "languages": [
+      "to choose from"
+    ],
+    "proficiencies": [],
+    "subraces": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/lineage:orc"
+    }
+  },
+  {
+    "slug": "shifter",
+    "name": "Shifter",
+    "abilityBonuses": {},
+    "size": "large",
+    "speed": 30,
+    "traits": [
+      "Ability Score Increase.",
+      "Creature Type.",
+      "Bestial Instincts.",
+      "Darkvision.",
+      "Shifting.",
+      "Beasthide.",
+      "Longtooth.",
+      "Swiftstride.",
+      "Wildhunt.",
+      "Alignment.",
+      "Keen Senses.",
+      "Beasthide",
+      "Natural Athlete.",
+      "Shifting Feature.",
+      "Longtooth"
+    ],
+    "languages": [
+      "to choose from"
+    ],
+    "proficiencies": [],
+    "subraces": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/lineage:shifter"
+    }
+  },
+  {
+    "slug": "yuan-ti",
+    "name": "Yuan Ti",
+    "abilityBonuses": {},
+    "size": "Medium",
+    "speed": 30,
+    "traits": [
+      "Ability Score Increase.",
+      "Creature Type.",
+      "Darkvision.",
+      "Magic Resistance.",
+      "Poison Resilience.",
+      "Serpentine Spellcasting.",
+      "Alignment.",
+      "Innate Spellcasting.",
+      "Poison Immunity."
+    ],
+    "languages": [
+      "to choose from"
+    ],
+    "proficiencies": [],
+    "subraces": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/lineage:yuan-ti"
+    }
+  },
+  {
+    "slug": "kalashtar",
+    "name": "Kalashtar",
+    "abilityBonuses": {},
+    "size": "Medium",
+    "speed": 30,
+    "traits": [
+      "Ability Score Increase.",
+      "Alignment.",
+      "Dual Mind.",
+      "Mental Discipline.",
+      "Mind Link.",
+      "Severed from Dreams.",
+      "Psychic Glamour."
+    ],
+    "languages": [
+      "Common"
+    ],
+    "proficiencies": [],
+    "subraces": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/lineage:kalashtar"
+    }
+  },
+  {
+    "slug": "warforged",
+    "name": "Warforged",
+    "abilityBonuses": {},
+    "size": "Medium",
+    "speed": 30,
+    "traits": [
+      "Ability Score Increase.",
+      "Alignment.",
+      "Constructed Resilience.",
+      "Sentry's Rest.",
+      "Integrated Protection.",
+      "Specialized Design.",
+      "Features",
+      "Warforged Resilience.",
+      "Envoy",
+      "Integrated Tool.",
+      "Juggernaut",
+      "Iron Fists.",
+      "Powerful Build.",
+      "Skirmisher",
+      "Swift."
+    ],
+    "languages": [
+      "Common"
+    ],
+    "proficiencies": [],
+    "subraces": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/lineage:warforged"
+    }
+  },
+  {
+    "slug": "dhampir",
+    "name": "Dhampir",
+    "abilityBonuses": {},
+    "size": "Medium",
+    "speed": 30,
+    "traits": [
+      "Dhampir Hungers",
+      "Dhampir Origins",
+      "Dhampir Traits",
+      "Ability Score Increase.",
+      "Creature Type.",
+      "Ancestral Legacy.",
+      "Darkvision.",
+      "Deathless Nature.",
+      "Spider Climb.",
+      "Vampiric Bite.",
+      "Type."
+    ],
+    "languages": [
+      "you had",
+      "gain no new languages"
+    ],
+    "proficiencies": [],
+    "subraces": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/lineage:dhampir"
+    }
+  },
+  {
+    "slug": "hexblood",
+    "name": "Hexblood",
+    "abilityBonuses": {},
+    "size": "Medium",
+    "speed": 30,
+    "traits": [
+      "Heir of Hags",
+      "Hexblood Origins",
+      "Hexblood Traits",
+      "Ability Score Increase.",
+      "Creature Type.",
+      "Ancestral Legacy.",
+      "Darkvision.",
+      "Eerie Token.",
+      "Telepathic Message.",
+      "Remote Viewing.",
+      "Hex Magic.",
+      "Type.",
+      "Fey Resilience.",
+      "Magic Token."
+    ],
+    "languages": [
+      "you had",
+      "gain no new languages"
+    ],
+    "proficiencies": [],
+    "subraces": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/lineage:hexblood"
+    }
+  },
+  {
+    "slug": "reborn",
+    "name": "Reborn",
+    "abilityBonuses": {},
+    "size": "Medium",
+    "speed": 30,
+    "traits": [
+      "Faded Memories",
+      "Reborn Origins",
+      "Reborn Traits",
+      "Ability Score Increase.",
+      "Creature Type.",
+      "Ancestral Legacy.",
+      "Deathless Nature.",
+      "Knowledge from a Past Life.",
+      "Type.",
+      "Darkvision."
+    ],
+    "languages": [
+      "you had",
+      "gain no new languages"
+    ],
+    "proficiencies": [],
+    "subraces": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/lineage:reborn"
+    }
+  },
+  {
+    "slug": "loxodon",
+    "name": "Loxodon",
+    "abilityBonuses": {},
+    "size": "Medium",
+    "speed": 30,
+    "traits": [
+      "Ability Score Increase.",
+      "Alignment.",
+      "Powerful Build.",
+      "Loxodon Serenity.",
+      "Natural Armour.",
+      "Trunk.",
+      "Keen Smell."
+    ],
+    "languages": [
+      "Common"
+    ],
+    "proficiencies": [],
+    "subraces": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/lineage:loxodon"
+    }
+  },
+  {
+    "slug": "simic-hybrid",
+    "name": "Simic Hybrid",
+    "abilityBonuses": {},
+    "size": "Medium",
+    "speed": 30,
+    "traits": [
+      "Ability Score Increase.",
+      "Alignment.",
+      "Darkvision.",
+      "Animal Enhancements.",
+      "Manta Glide (1st level).",
+      "Nimble Climber (1st level).",
+      "Underwater Adaptation (1st level).",
+      "Grappling Appendages (5th level).",
+      "Carapace (5th level).",
+      "Acid Spit (5th level)."
+    ],
+    "languages": [
+      "Common"
+    ],
+    "proficiencies": [],
+    "subraces": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/lineage:simic-hybrid"
+    }
+  },
+  {
+    "slug": "vedalken",
+    "name": "Vedalken",
+    "abilityBonuses": {},
+    "size": "medium",
+    "speed": 30,
+    "traits": [
+      "Ability Score Increase.",
+      "Alignment.",
+      "Vedalken Dispassion.",
+      "Tireless Precision.",
+      "Partially Amphibious.",
+      "Vedalken Cunning.",
+      "Aether Lore."
+    ],
+    "languages": [
+      "Common"
+    ],
+    "proficiencies": [],
+    "subraces": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/lineage:vedalken"
+    }
+  },
+  {
+    "slug": "autognome",
+    "name": "Autognome",
+    "abilityBonuses": {},
+    "size": "Small",
+    "speed": 30,
+    "traits": [
+      "Ability Score Increase.",
+      "Creature Type.",
+      "Armored Casing.",
+      "Built for Success.",
+      "Healing Machine.",
+      "Mechanical Nature.",
+      "Sentry's Rest.",
+      "Specialized Design."
+    ],
+    "languages": [
+      "Common"
+    ],
+    "proficiencies": [],
+    "subraces": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/lineage:autognome"
+    }
+  },
+  {
+    "slug": "giff",
+    "name": "Giff",
+    "abilityBonuses": {},
+    "size": "Medium",
+    "speed": 30,
+    "traits": [
+      "Ability Score Increase.",
+      "Creature Type.",
+      "Astral Spark.",
+      "Firearms Mastery.",
+      "Hippo Build."
+    ],
+    "languages": [
+      "Common"
+    ],
+    "proficiencies": [],
+    "subraces": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/lineage:giff"
+    }
+  },
+  {
+    "slug": "hadozee",
+    "name": "Hadozee",
+    "abilityBonuses": {},
+    "size": "Medium",
+    "speed": 30,
+    "traits": [
+      "Ability Score Increase.",
+      "Creature Type.",
+      "Dexterous Feet.",
+      "Glide.",
+      "Hadozee Dodge."
+    ],
+    "languages": [
+      "Common"
+    ],
+    "proficiencies": [],
+    "subraces": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/lineage:hadozee"
+    }
+  },
+  {
+    "slug": "plasmoid",
+    "name": "Plasmoid",
+    "abilityBonuses": {},
+    "size": "tiny",
+    "speed": 30,
+    "traits": [
+      "Ability Score Increase.",
+      "Creature Type.",
+      "Amorphous.",
+      "Darkvision.",
+      "Hold Breath.",
+      "Natural Resilience.",
+      "Shape Self."
+    ],
+    "languages": [
+      "Common"
+    ],
+    "proficiencies": [],
+    "subraces": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/lineage:plasmoid"
+    }
+  },
+  {
+    "slug": "thri-kreen",
+    "name": "Thri-kreen",
+    "abilityBonuses": {},
+    "size": "Medium",
+    "speed": 30,
+    "traits": [
+      "Ability Score Increase.",
+      "Creature Type.",
+      "Chameleon Carapace.",
+      "Darkvision.",
+      "Secondary Arms.",
+      "Sleepless.",
+      "Thri-kreen Telepathy."
+    ],
+    "languages": [
+      "you know"
+    ],
+    "proficiencies": [],
+    "subraces": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/lineage:thri-kreen"
+    }
+  },
+  {
+    "slug": "leonin",
+    "name": "Leonin",
+    "abilityBonuses": {},
+    "size": "Medium",
+    "speed": 30,
+    "traits": [
+      "Ability Score Increase.",
+      "Alignment.",
+      "Darkvision.",
+      "Claws.",
+      "Hunter's Instincts.",
+      "Daunting Roar."
+    ],
+    "languages": [
+      "Common"
+    ],
+    "proficiencies": [],
+    "subraces": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/lineage:leonin"
+    }
+  },
+  {
+    "slug": "kender",
+    "name": "Kender",
+    "abilityBonuses": {},
+    "size": "Small",
+    "speed": 30,
+    "traits": [
+      "Kender Traits",
+      "Ability Score Increase.",
+      "Creature Type.",
+      "Fearless.",
+      "Kender Aptitude.",
+      "Taunt."
+    ],
+    "languages": [
+      "Common"
+    ],
+    "proficiencies": [],
+    "subraces": [],
+    "source": {
+      "site": "dnd5e.wikidot.com",
+      "license": "CC BY-SA 3.0",
+      "url": "https://dnd5e.wikidot.com/lineage:kender"
+    }
+  }
+]
