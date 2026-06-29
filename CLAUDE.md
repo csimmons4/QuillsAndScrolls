@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+**GitHub:** https://github.com/csimmons4/QuillsAndScrolls
+
 ## Commands
 
 ```bash
@@ -49,7 +51,7 @@ All game reference data (spells, items, races, classes, backgrounds, feats) flow
 
 **Disk (authoritative, via Express server):**
 - Characters: `characters/<name>_<id8>.json` — written by `PUT /api/characters/:id`
-- Homebrew: `homebrew/{spells,items,feats,races,classes}/<slug>.json` — CRUD via `/api/homebrew/:category/:slug`
+- Homebrew: `homebrew/{spells,items,feats,races,classes,backgrounds}/<slug>.json` — CRUD via `/api/homebrew/:category/:slug`
 
 **Browser localStorage (ephemeral fallback, not synced to disk):**
 - `localStore.ts` — provides `listCharacters`, `saveCharacter`, etc. backed by `localStorage`. Used by Vault as a secondary read path. Characters saved by the Express server are the source of truth.
@@ -71,7 +73,7 @@ The scraper can't capture all structured data. Curated overlays in `src/data/` f
 
 ## Key modules
 
-- `src/character/model.ts` — Zod schema + `Character` type. Single source of truth for character shape. Bump `SCHEMA_VERSION` here when the shape changes; add a migration case in `localStore.ts#migrate()`.
+- `src/character/model.ts` — Zod schema + `Character` type. Single source of truth for character shape. Bump `SCHEMA_VERSION` here when the shape changes; if the change isn't backward-compatible (a new required field with no Zod default, a renamed/reshaped field), add a step to the `MIGRATIONS` map in `localStore.ts` keyed by the from-version. Both load paths (localStorage via `localStore.ts` and disk via `charApi.ts`) run the exported `migrate()`, which applies those steps sequentially before Zod-parsing; entries that still fail to parse are skipped with a `console.warn` rather than silently dropped.
 - `src/character/derive.ts` — Pure functions for all game math: `abilityMod`, `profBonus`, `skillMod`, `saveMod`, `hpMax`, spell DC/attack, class resources. No side effects; takes `Character` + optional `ContentData`.
 - `src/character/featBonuses.ts` — `sumFeatBonuses()` aggregates all passive feat bonuses (initiative, speed, perception, HP/level, resistances, granted spells, etc.) into a `FeatBonuses` object used throughout `Sheet.tsx`.
 - `src/character/itemBonuses.ts` — `sumItemBonuses()` / `effectiveAbilityScores()` — aggregates passive equipped-item bonuses (AC, saves, spell DC, ability overrides). Applied before AC and ability score display in `Sheet.tsx`.
@@ -85,6 +87,8 @@ The scraper can't capture all structured data. Curated overlays in `src/data/` f
 - `src/data/raceData.ts` — `RACE_OPTIONS` with ability bonuses, subraces, resistances, granted spells, etc.
 - `src/data/spellMeta.ts` — Cantrip damage scaling table (`CANTRIP_SCALING`) and ritual spell slug set (`RITUAL_SLUGS`). Everything else now lives on `SpellDef` directly after derivation.
 - `src/data/startingGear.ts` — `CLASS_STARTING_GEAR` with fixed items and choice groups for the Creator wizard.
+- `src/data/strixhavenSpells.ts` — `CollegeSpells` lists keyed by background slug, for the Strixhaven Initiate benefit. Consumed by Creator (granted-spell picks) and Sheet.
+- `src/components/` — Shared UI pieces reused across routes: `FeatPicker` (+ `cleanFeatDesc`, `FeatEffectBadges`), `SpellChooser`, `FeatGrantsBlock`, `InlinePicker`, `ItemStatBlock`, `SpellStatBlock`. (`src/routes/Feats.tsx` is currently unrouted/dead — Lookup is the live reference browser.)
 
 ## Styling
 
@@ -98,7 +102,8 @@ Custom Tailwind palette: `parchment-{50–900}` (warm tan/gold) and `dungeon-{80
 | `/new` | `Creator` | 8-step character creation wizard |
 | `/c/:id` | `Sheet` | Character sheet (tabbed: Stats, Spells, Inventory, Features, Summons, Notes) |
 | `/c/:id/level-up` | `LevelUp` | Level-up wizard |
-| `/homebrew` | `Homebrew` | CRUD for homebrew entries (spells, items, feats, races, classes) |
+| `/lookup` | `Lookup` | Searchable/filterable reference browser for all content (spells, items, feats, races, backgrounds, classes) |
+| `/homebrew` | `Homebrew` | CRUD for homebrew entries (spells, items, feats, races, classes, backgrounds) |
 | `/settings` | `Settings` | Scrape metadata, backup zip |
 
 ## Sheet.tsx internals

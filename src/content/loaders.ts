@@ -287,6 +287,7 @@ export const BackgroundSchema = z.object({
 
   // Enrichment fields (overlay-supplied):
   grantsSpells: FeatGrantsSpellsSchema.optional(),
+  startingGold: z.number().default(0),
 })
 
 export type BackgroundDef = z.infer<typeof BackgroundSchema>

@@ -8,12 +8,52 @@ import { ABILITIES, Character, SKILLS, SKILL_LABELS } from '../character/model'
 import {
   CLASS_OPTIONS, slotsForLevel, PACT_SLOT_TABLE,
   ELDRITCH_INVOCATIONS, METAMAGIC_OPTIONS, ARTIFICER_INFUSIONS,
+  BATTLE_MASTER_MANEUVERS, MULTICLASS_PROF_GRANTS,
+  LAND_CIRCLE_SPELLS, RUNE_KNIGHT_RUNES, HUNTER_CHOICES,
+  TOTEM_ANIMALS, TOTEM_TIER_LEVELS, STORM_AURA_OPTIONS, FOUR_ELEMENTS_DISCIPLINES,
   spellcastingClasses, multiclassSpellSlotsMax,
 } from '../data/classData'
 import { FeatPicker } from '../components/FeatPicker'
 import { FeatGrantsBlock } from '../components/FeatGrantsBlock'
 import { InlinePicker } from '../components/InlinePicker'
 import { resolveFeatGrants, applyGrantPicks, withFeatClassChoice } from '../character/grants'
+
+const MULTICLASS_PREREQS: Record<string, (s: { str: number; dex: number; con: number; int: number; wis: number; cha: number }) => boolean> = {
+  barbarian: s => s.str >= 13,
+  bard:      s => s.cha >= 13,
+  cleric:    s => s.wis >= 13,
+  druid:     s => s.wis >= 13,
+  fighter:   s => s.str >= 13 || s.dex >= 13,
+  monk:      s => s.dex >= 13 && s.wis >= 13,
+  paladin:   s => s.str >= 13 && s.cha >= 13,
+  ranger:    s => s.dex >= 13 && s.wis >= 13,
+  rogue:     s => s.dex >= 13,
+  sorcerer:  s => s.cha >= 13,
+  warlock:   s => s.cha >= 13,
+  wizard:    s => s.int >= 13,
+  artificer: s => s.int >= 13,
+}
+
+const MULTICLASS_PREREQ_LABEL: Record<string, string> = {
+  barbarian: 'STR 13',
+  bard:      'CHA 13',
+  cleric:    'WIS 13',
+  druid:     'WIS 13',
+  fighter:   'STR 13 or DEX 13',
+  monk:      'DEX 13 & WIS 13',
+  paladin:   'STR 13 & CHA 13',
+  ranger:    'DEX 13 & WIS 13',
+  rogue:     'DEX 13',
+  sorcerer:  'CHA 13',
+  warlock:   'CHA 13',
+  wizard:    'INT 13',
+  artificer: 'INT 13',
+}
+
+const CLASS_SECRET_LANGUAGES: Record<string, string> = {
+  druid: 'Druidic',
+  rogue: "Thieves' Cant",
+}
 
 const ABILITY_LABELS: Record<string, string> = {
   str: 'Strength', dex: 'Dexterity', con: 'Constitution',
@@ -110,6 +150,19 @@ export default function LevelUp() {
   const [spellToForget, setSpellToForget] = useState('')
   const [cantripToForget, setCantripToForget] = useState('')
   const [newSpellSearch, setNewSpellSearch] = useState('')
+  const [multiclassSkill, setMulticlassSkill] = useState('')
+  const [pactBoon, setPactBoon] = useState('')
+  const [maneuverChoices, setManeuverChoices] = useState<string[]>([])
+  const [favoredEnemy, setFavoredEnemy] = useState('')
+  const [favoredTerrain, setFavoredTerrain] = useState('')
+  const [fightingStyle, setFightingStyle] = useState('')
+  const [landTerrain, setLandTerrain] = useState('')
+  const [runeChoices, setRuneChoices] = useState<string[]>([])
+  const [hunterChoice, setHunterChoice] = useState('')
+  const [showAllSchools, setShowAllSchools] = useState(false)
+  const [totemAnimal, setTotemAnimal] = useState('')
+  const [stormAura, setStormAura] = useState('')
+  const [fourElementsChoices, setFourElementsChoices] = useState<string[]>([])
 
   if (!char) {
     return (
@@ -183,6 +236,92 @@ export default function LevelUp() {
   })()
   const infusionsToGain = Math.max(0, infusionsTotal - currentInfusions.length)
 
+  // Battle Master maneuvers (Fighter: Battle Master subclass)
+  const BM_MANEUVERS_AT_LEVEL: Record<number, number> = { 3: 3, 7: 5, 10: 9 }
+  const bmTotalManeuvers = (effectiveSubclassSlug === 'battle-master')
+    ? (BM_MANEUVERS_AT_LEVEL[nextLevel] ?? 0)
+    : 0
+  const existingManeuversFC = char.featuresChosen.find(fc => fc.key === 'maneuvers')
+  const currentManeuvers: string[] = (() => {
+    if (!existingManeuversFC) return []
+    const v = existingManeuversFC.value
+    return Array.isArray(v) ? v : [v]
+  })()
+  const maneuversToGain = Math.max(0, bmTotalManeuvers - currentManeuvers.length)
+
+  // Warlock Pact Boon (level 3)
+  const needsPactBoon = selectedClass === 'warlock' && nextLevel === 3
+    && !char.featuresChosen.find(fc => fc.key === 'pact-boon')
+
+  // Multiclass skill grant
+  const isMulticlassing = !char.classes.find(c => c.classSlug === selectedClass)
+  const multiclassGrant = isMulticlassing ? MULTICLASS_PROF_GRANTS[selectedClass] : undefined
+  const needsMulticlassSkill = !!(multiclassGrant?.skills?.count)
+
+  // Ranger favored enemy / terrain choices at specific levels
+  const rangerFavoredEnemyLevels = [1, 6, 14]
+  const rangerTerrainLevels = [1, 6, 10]
+  const needsFavoredEnemy = selectedClass === 'ranger' && rangerFavoredEnemyLevels.includes(nextLevel)
+  const needsFavoredTerrain = selectedClass === 'ranger' && rangerTerrainLevels.includes(nextLevel)
+
+  // Fighting Style (Fighter L1, Paladin L2, Ranger L2)
+  const FIGHTING_STYLE_LEVEL: Record<string, number> = { fighter: 1, paladin: 2, ranger: 2 }
+  const alreadyHasFightingStyle = char.featuresChosen.some(f =>
+    f.key === 'fighting-style' || f.key === `fighting-style-${selectedClass}`
+  )
+  const needsFightingStyle = !!(classOptsDef?.fightingStyles?.length) &&
+    nextLevel === FIGHTING_STYLE_LEVEL[selectedClass] &&
+    !alreadyHasFightingStyle
+
+  // Circle of the Land terrain
+  const needsLandTerrain = selectedClass === 'druid' &&
+    (subclass === 'land' || effectiveSubclassSlug === 'land') &&
+    !char.featuresChosen.find(f => f.key === 'land-terrain')
+
+  // Rune Knight runes
+  const existingRunesFC = char.featuresChosen.find(fc => fc.key === 'runes')
+  const currentRunes: string[] = !existingRunesFC ? [] : Array.isArray(existingRunesFC.value) ? existingRunesFC.value : [existingRunesFC.value]
+  const RUNE_MAX_AT: Record<number, number> = { 3: 2, 7: 3, 10: 4, 15: 5 }
+  const needsRunesTotal = selectedClass === 'fighter' && effectiveSubclassSlug === 'rune-knight'
+    ? (RUNE_MAX_AT[nextLevel] ?? 0) : 0
+  const runesToGain = Math.max(0, needsRunesTotal - currentRunes.length)
+
+  // Hunter subclass choices
+  const isHunterRanger = selectedClass === 'ranger' && effectiveSubclassSlug === 'hunter'
+  const HUNTER_CHOICE_LEVELS = [3, 7, 11, 15]
+  const needsHunterChoice = isHunterRanger && HUNTER_CHOICE_LEVELS.includes(nextLevel) &&
+    !char.featuresChosen.find(f => f.key === `hunter-${nextLevel}`)
+
+  // Barbarian Totem Warrior choices
+  const isTotemWarrior = selectedClass === 'barbarian' && effectiveSubclassSlug === 'totem-warrior'
+  const totemTierKey = isTotemWarrior
+    ? (nextLevel >= 14 && !char.featuresChosen.find(f => f.key === 'totem-attunement') ? 'totem-attunement'
+      : nextLevel >= 6 && !char.featuresChosen.find(f => f.key === 'totem-aspect') ? 'totem-aspect'
+      : nextLevel >= 3 && !char.featuresChosen.find(f => f.key === 'totem-spirit') ? 'totem-spirit'
+      : null)
+    : null
+  const needsTotemChoice = !!totemTierKey
+
+  // Barbarian Storm Herald aura choice
+  const isStormHerald = selectedClass === 'barbarian' && effectiveSubclassSlug === 'storm-herald'
+  const needsStormAura = isStormHerald && nextLevel >= 3 && !char.featuresChosen.find(f => f.key === 'storm-aura')
+
+  // Monk Four Elements disciplines
+  const isFourElements = selectedClass === 'monk' && effectiveSubclassSlug === 'four-elements'
+  const existingDisciplines = (() => {
+    const fc = char.featuresChosen.find(f => f.key === 'four-elements')
+    if (!fc) return []
+    return Array.isArray(fc.value) ? fc.value : [fc.value]
+  })()
+  const FOUR_ELEMENTS_DISC_AT: Record<number, number> = { 3: 2, 6: 1, 11: 1, 17: 1 }
+  const disciplinesToGain = isFourElements ? (FOUR_ELEMENTS_DISC_AT[nextLevel] ?? 0) : 0
+  const needsFourElements = disciplinesToGain > 0
+
+  // EK / Arcane Trickster school restriction
+  const ekRestriction = selectedClass === 'fighter' && effectiveSubclassSlug === 'eldritch-knight'
+  const atRestriction = selectedClass === 'rogue' && effectiveSubclassSlug === 'arcane-trickster'
+  const FREE_SCHOOL_LEVELS = [8, 14, 20]
+
   async function finish() {
     if (!char) return
     const featureChoices = [
@@ -210,13 +349,28 @@ export default function LevelUp() {
           .filter(s => s !== infusionToSwapOut)
           .concat(currentInfusions.includes(infusionToSwapIn) ? [] : [infusionToSwapIn]),
       }] : []),
+      ...(maneuversToGain > 0 && maneuverChoices.length > 0 ? [{
+        key: 'maneuvers' as const,
+        value: [...currentManeuvers, ...maneuverChoices],
+      }] : []),
+      ...(pactBoon ? [{ key: 'pact-boon' as const, value: pactBoon }] : []),
+      ...(needsFavoredEnemy && favoredEnemy ? [{ key: `favored-enemy-${nextLevel}` as const, value: favoredEnemy }] : []),
+      ...(needsFavoredTerrain && favoredTerrain ? [{ key: `favored-terrain-${nextLevel}` as const, value: favoredTerrain }] : []),
     ]
-    const isMulticlassing = !char.classes.find(c => c.classSlug === selectedClass)
     const choices: LevelUpChoices = {
       classSlug: selectedClass,
       hpRoll: effectiveHpRoll,
       subclassSlug: subclass || undefined,
       newSaveProficiencies: isMulticlassing ? (cls?.saveProficiencies ?? []) : undefined,
+      multiclassSkill: needsMulticlassSkill ? multiclassSkill : undefined,
+      fightingStyle: needsFightingStyle && fightingStyle ? fightingStyle : undefined,
+      landTerrain: needsLandTerrain && landTerrain ? landTerrain : undefined,
+      runeChoices: runesToGain > 0 && runeChoices.length > 0 ? runeChoices : undefined,
+      hunterChoice: needsHunterChoice && hunterChoice ? hunterChoice : undefined,
+      totemTierKey: needsTotemChoice && totemAnimal ? totemTierKey! : undefined,
+      totemAnimal: needsTotemChoice && totemAnimal ? totemAnimal : undefined,
+      stormAura: needsStormAura && stormAura ? stormAura : undefined,
+      fourElementsDisciplines: needsFourElements && fourElementsChoices.length > 0 ? fourElementsChoices : undefined,
       asiOrFeat: isAsiLevel
         ? (asiChoice === 'asi'
           ? { type: 'asi', ability1, ability2 }
@@ -292,6 +446,14 @@ export default function LevelUp() {
       }
     }
 
+    // Grant secret language when multiclassing into druid or rogue for the first time
+    if (isMulticlassing) {
+      const secretLang = CLASS_SECRET_LANGUAGES[selectedClass]
+      if (secretLang && !updated.languages.includes(secretLang)) {
+        updated = { ...updated, languages: [...updated.languages, secretLang] }
+      }
+    }
+
     await saveCharacterToDisk(updated)
     navigate(`/c/${char.id}`)
   }
@@ -326,12 +488,22 @@ export default function LevelUp() {
               <div className="mt-2 space-y-1 pl-3">
                 {content.classes
                   .filter(c => !char.classes.find(cc => cc.classSlug === c.slug))
-                  .map(c => (
-                    <label key={c.slug} className={`flex items-center gap-3 p-2 rounded border cursor-pointer ${selectedClass === c.slug ? 'border-parchment-500 bg-parchment-50' : 'border-parchment-200'}`}>
-                      <input type="radio" name="class" value={c.slug} checked={selectedClass === c.slug} onChange={() => setSelectedClass(c.slug)} />
-                      <span>{c.name} (Multiclass Level 1)</span>
-                    </label>
-                  ))}
+                  .map(c => {
+                    const check = MULTICLASS_PREREQS[c.slug]
+                    const met = !check || check(char.abilityScores)
+                    const label = MULTICLASS_PREREQ_LABEL[c.slug]
+                    return (
+                      <label key={c.slug} className={`flex items-center gap-3 p-2 rounded border cursor-pointer ${selectedClass === c.slug ? 'border-parchment-500 bg-parchment-50' : met ? 'border-parchment-200' : 'border-parchment-200 opacity-50'}`}>
+                        <input type="radio" name="class" value={c.slug} checked={selectedClass === c.slug} onChange={() => setSelectedClass(c.slug)} />
+                        <span>{c.name} (Multiclass Level 1)</span>
+                        {label && (
+                          <span className={`ml-auto text-xs px-1.5 py-0.5 rounded ${met ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'}`}>
+                            {label}
+                          </span>
+                        )}
+                      </label>
+                    )
+                  })}
               </div>
             </details>
           )}
@@ -814,14 +986,33 @@ export default function LevelUp() {
           )}
           {/* Searchable spell list */}
           {(() => {
+            const schoolFilter = ekRestriction && !showAllSchools
+              ? ['abjuration', 'evocation']
+              : atRestriction && !showAllSchools
+                ? ['enchantment', 'illusion']
+                : null
             const available = content.spells
               .filter(s => s.level > 0 && (s.classLists ?? []).includes(selectedClass))
               .filter(s => !char.spells.find(cs => cs.spellSlug === s.slug))
+              .filter(s => !schoolFilter || schoolFilter.includes(s.school.toLowerCase()))
             const filtered = newSpellSearch
               ? available.filter(s => s.name.toLowerCase().includes(newSpellSearch.toLowerCase()) || s.school.toLowerCase().includes(newSpellSearch.toLowerCase()))
               : available
             return (
               <>
+                {(ekRestriction || atRestriction) && (
+                  <div className="mb-2 p-2 rounded border text-xs flex items-start gap-2 bg-amber-50 border-amber-200 text-amber-800">
+                    <span className="shrink-0">⚠</span>
+                    <span>
+                      {ekRestriction ? 'Eldritch Knight: spells must be Abjuration or Evocation' : 'Arcane Trickster: spells must be Enchantment or Illusion'}
+                      {FREE_SCHOOL_LEVELS.includes(nextLevel) ? ' (one free-school spell unlocked at this level)' : ''}.
+                      <label className="ml-2 cursor-pointer font-medium">
+                        <input type="checkbox" className="mr-1" checked={showAllSchools} onChange={e => setShowAllSchools(e.target.checked)} />
+                        Show all schools
+                      </label>
+                    </span>
+                  </div>
+                )}
                 <input
                   className="input mb-2"
                   placeholder="Search available spells…"
@@ -852,6 +1043,307 @@ export default function LevelUp() {
               </>
             )
           })()}
+        </div>
+      )}
+
+      {/* Multiclass skill grant */}
+      {needsMulticlassSkill && multiclassGrant?.skills && (
+        <div className="card mb-4">
+          <h2 className="section-header">Multiclass Skill Proficiency</h2>
+          <p className="text-sm text-parchment-500 mb-3">
+            Multiclassing into {content.classes.find(c => c.slug === selectedClass)?.name ?? selectedClass} grants 1 skill proficiency from:
+          </p>
+          <div className="grid grid-cols-2 gap-1.5">
+            {(multiclassGrant.skills.from.length > 0 ? multiclassGrant.skills.from : SKILLS.map(s => SKILL_LABELS[s])).map(skill => {
+              const slug = skill.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z-]/g, '') as typeof SKILLS[number]
+              const alreadyHas = char.skillProficiencies.includes(slug) || char.skillProficiencies.includes(skill)
+              return (
+                <label key={skill} className={`flex items-center gap-2 p-2 rounded border text-sm cursor-pointer
+                  ${multiclassSkill === skill ? 'border-parchment-500 bg-parchment-50' : 'border-parchment-200'}
+                  ${alreadyHas ? 'opacity-40' : ''}`}>
+                  <input type="radio" name="mc-skill" value={skill}
+                    checked={multiclassSkill === skill}
+                    disabled={alreadyHas}
+                    onChange={() => setMulticlassSkill(skill)} />
+                  {skill}{alreadyHas ? ' (already proficient)' : ''}
+                </label>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Warlock Pact Boon */}
+      {needsPactBoon && (
+        <div className="card mb-4">
+          <h2 className="section-header">Pact Boon</h2>
+          <p className="text-sm text-parchment-500 mb-3">Choose your Warlock Pact Boon at level 3.</p>
+          <div className="space-y-2">
+            {[
+              { slug: 'blade', name: 'Pact of the Blade', desc: 'Summon a pact weapon as an action. You are proficient with it and can use it as a spellcasting focus. Required for many combat-focused invocations.' },
+              { slug: 'chain', name: 'Pact of the Chain', desc: 'Learn Find Familiar. Your familiar can take one of 4 special forms (imp, pseudodragon, quasit, sprite). It can attack using its reaction.' },
+              { slug: 'tome', name: 'Pact of the Tome', desc: 'Receive a Book of Shadows. Learn 3 cantrips from any class. Required for Book of Ancient Secrets invocation.' },
+            ].map(b => (
+              <label key={b.slug} className={`flex items-start gap-3 p-3 rounded border cursor-pointer
+                ${pactBoon === b.slug ? 'border-parchment-500 bg-parchment-50' : 'border-parchment-200 hover:border-parchment-300'}`}>
+                <input type="radio" name="pact-boon" value={b.slug} checked={pactBoon === b.slug} onChange={() => setPactBoon(b.slug)} className="mt-0.5" />
+                <div>
+                  <div className="font-medium">{b.name}</div>
+                  <div className="text-xs text-parchment-500 mt-0.5">{b.desc}</div>
+                </div>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Battle Master Maneuvers */}
+      {maneuversToGain > 0 && (
+        <div className="card mb-4">
+          <h2 className="section-header">Battle Master Maneuvers — Choose {maneuversToGain}</h2>
+          <p className="text-sm text-parchment-500 mb-3">
+            ({maneuverChoices.length}/{maneuversToGain} chosen)
+          </p>
+          <div className="space-y-1 max-h-80 overflow-y-auto pr-1">
+            {BATTLE_MASTER_MANEUVERS.filter(m => !currentManeuvers.includes(m.slug)).map(m => {
+              const selected = maneuverChoices.includes(m.slug)
+              const atMax = maneuverChoices.length >= maneuversToGain
+              return (
+                <label key={m.slug} className={`flex items-start gap-2 p-2 rounded border cursor-pointer text-sm
+                  ${selected ? 'border-parchment-500 bg-parchment-50' : 'border-parchment-200'}
+                  ${!selected && atMax ? 'opacity-40 cursor-not-allowed' : ''}`}>
+                  <input type="checkbox" checked={selected} disabled={!selected && atMax}
+                    onChange={() => setManeuverChoices(prev =>
+                      selected ? prev.filter(x => x !== m.slug) : prev.length < maneuversToGain ? [...prev, m.slug] : prev
+                    )} className="mt-0.5 shrink-0" />
+                  <div>
+                    <span className="font-medium">{m.name}</span>
+                    <span className="text-parchment-500 ml-1">— {m.description}</span>
+                  </div>
+                </label>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Ranger: Favored Enemy & Natural Explorer */}
+      {needsFavoredEnemy && (
+        <div className="card mb-4">
+          <h2 className="section-header">Favored Enemy</h2>
+          <p className="text-sm text-parchment-500 mb-2">Choose a creature type. You have advantage on Survival checks to track it and INT checks to recall lore.</p>
+          <select className="input text-sm" value={favoredEnemy} onChange={e => setFavoredEnemy(e.target.value)}>
+            <option value="">— choose —</option>
+            {['Aberrations','Beasts','Celestials','Constructs','Dragons','Elementals','Fey','Fiends','Giants','Humanoids','Monstrosities','Oozes','Plants','Undead','Two humanoid types'].map(t => (
+              <option key={t} value={t}>{t}</option>
+            ))}
+          </select>
+        </div>
+      )}
+      {needsFavoredTerrain && (
+        <div className="card mb-4">
+          <h2 className="section-header">Natural Explorer Terrain</h2>
+          <p className="text-sm text-parchment-500 mb-2">Choose a favored terrain type for exploration benefits.</p>
+          <select className="input text-sm" value={favoredTerrain} onChange={e => setFavoredTerrain(e.target.value)}>
+            <option value="">— choose —</option>
+            {['Arctic','Coast','Desert','Forest','Grassland','Mountain','Swamp','Underdark'].map(t => (
+              <option key={t} value={t}>{t}</option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {/* Fighting Style */}
+      {needsFightingStyle && classOptsDef?.fightingStyles && (
+        <div className="card mb-4">
+          <h2 className="section-header">Fighting Style</h2>
+          <p className="text-sm text-parchment-500 mb-3">Choose a fighting style for this class.</p>
+          <div className="space-y-2">
+            {classOptsDef.fightingStyles.map(style => (
+              <label key={style.slug} className={`flex items-start gap-3 p-3 rounded border cursor-pointer
+                ${fightingStyle === style.slug ? 'border-parchment-500 bg-parchment-50' : 'border-parchment-200 hover:border-parchment-300'}`}>
+                <input type="radio" name="fighting-style" value={style.slug} checked={fightingStyle === style.slug} onChange={() => setFightingStyle(style.slug)} className="mt-0.5" />
+                <div>
+                  <div className="font-medium">{style.name}</div>
+                  <div className="text-xs text-parchment-500 mt-0.5">{style.description}</div>
+                </div>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Circle of the Land terrain */}
+      {needsLandTerrain && (
+        <div className="card mb-4">
+          <h2 className="section-header">Circle Spells — Choose Terrain</h2>
+          <p className="text-sm text-parchment-500 mb-3">
+            Your terrain determines which spells are always prepared as Circle Spells.
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            {Object.keys(LAND_CIRCLE_SPELLS).map(terrain => (
+              <label key={terrain} className={`flex items-center gap-2 p-2.5 rounded border cursor-pointer text-sm capitalize
+                ${landTerrain === terrain ? 'border-parchment-500 bg-parchment-50' : 'border-parchment-200 hover:border-parchment-400'}`}>
+                <input type="radio" name="land-terrain" value={terrain} checked={landTerrain === terrain} onChange={() => setLandTerrain(terrain)} />
+                {terrain}
+              </label>
+            ))}
+          </div>
+          {landTerrain && (
+            <div className="mt-3 p-2 rounded bg-green-50 border border-green-200 text-xs text-green-800">
+              <div className="font-semibold mb-1">Always Prepared ({landTerrain.charAt(0).toUpperCase() + landTerrain.slice(1)}):</div>
+              {LAND_CIRCLE_SPELLS[landTerrain].map(s => (
+                <span key={s.slug} className="mr-2">{s.name} (L{s.level}, Druid {s.grantedAtLevel}+)</span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Rune Knight rune choices */}
+      {runesToGain > 0 && (
+        <div className="card mb-4">
+          <h2 className="section-header">Rune Carver — Choose {runesToGain} Rune{runesToGain !== 1 ? 's' : ''}</h2>
+          <p className="text-sm text-parchment-500 mb-3">
+            ({runeChoices.length}/{runesToGain} chosen)
+          </p>
+          <div className="space-y-2">
+            {RUNE_KNIGHT_RUNES.filter(r => !currentRunes.includes(r.slug)).map(rune => {
+              const selected = runeChoices.includes(rune.slug)
+              const atMax = runeChoices.length >= runesToGain
+              return (
+                <label key={rune.slug} className={`flex items-start gap-3 p-3 rounded border cursor-pointer
+                  ${selected ? 'border-parchment-500 bg-parchment-50' : 'border-parchment-200'}
+                  ${!selected && atMax ? 'opacity-40 cursor-not-allowed' : 'hover:border-parchment-400'}`}>
+                  <input type="checkbox" checked={selected} disabled={!selected && atMax} className="mt-0.5 shrink-0"
+                    onChange={() => setRuneChoices(prev =>
+                      selected ? prev.filter(x => x !== rune.slug) : prev.length < runesToGain ? [...prev, rune.slug] : prev
+                    )} />
+                  <div>
+                    <div className="font-medium text-sm">{rune.name}</div>
+                    <div className="text-xs text-parchment-500 mt-0.5">{rune.description}</div>
+                  </div>
+                </label>
+              )
+            })}
+          </div>
+          {currentRunes.length > 0 && (
+            <details className="mt-3">
+              <summary className="text-xs text-parchment-400 cursor-pointer">Already inscribed ({currentRunes.length})</summary>
+              <div className="mt-1 flex flex-wrap gap-1">
+                {currentRunes.map(slug => {
+                  const r = RUNE_KNIGHT_RUNES.find(x => x.slug === slug)
+                  return <span key={slug} className="text-xs bg-parchment-100 text-parchment-600 rounded px-2 py-0.5">{r?.name ?? slug}</span>
+                })}
+              </div>
+            </details>
+          )}
+        </div>
+      )}
+
+      {/* Hunter subclass choice */}
+      {needsHunterChoice && HUNTER_CHOICES[nextLevel] && (
+        <div className="card mb-4">
+          <h2 className="section-header">Hunter Technique — Level {nextLevel}</h2>
+          <p className="text-sm text-parchment-500 mb-3">Choose one technique to learn.</p>
+          <div className="space-y-2">
+            {HUNTER_CHOICES[nextLevel].map(choice => (
+              <label key={choice.slug} className={`flex items-start gap-3 p-3 rounded border cursor-pointer
+                ${hunterChoice === choice.slug ? 'border-parchment-500 bg-parchment-50' : 'border-parchment-200 hover:border-parchment-300'}`}>
+                <input type="radio" name="hunter-choice" value={choice.slug} checked={hunterChoice === choice.slug} onChange={() => setHunterChoice(choice.slug)} className="mt-0.5" />
+                <div>
+                  <div className="font-medium">{choice.name}</div>
+                  <div className="text-xs text-parchment-500 mt-0.5">{choice.description}</div>
+                </div>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Barbarian Totem Warrior — totem animal choice */}
+      {needsTotemChoice && (
+        <div className="card mb-4">
+          <h2 className="section-header">Totem Spirit{totemTierKey === 'totem-aspect' ? ' — Aspect of the Beast' : totemTierKey === 'totem-attunement' ? ' — Totemic Attunement' : ''}</h2>
+          <p className="text-sm text-parchment-500 mb-3">Choose your totem animal for this tier.</p>
+          <div className="space-y-2">
+            {TOTEM_ANIMALS.map(animal => {
+              const tierKey = totemTierKey as 'totem-spirit' | 'totem-aspect' | 'totem-attunement' | null
+              const desc = tierKey ? animal.tierDescs[tierKey === 'totem-spirit' ? 'spirit' : tierKey === 'totem-aspect' ? 'aspect' : 'attunement'] : ''
+              return (
+                <label key={animal.slug} className={`flex items-start gap-3 p-3 rounded border cursor-pointer
+                  ${totemAnimal === animal.slug ? 'border-amber-400 bg-amber-50' : 'border-parchment-200 hover:border-parchment-400'}`}>
+                  <input type="radio" name="totem-animal" value={animal.slug} checked={totemAnimal === animal.slug} onChange={() => setTotemAnimal(animal.slug)} className="mt-0.5" />
+                  <div>
+                    <div className="font-medium">{animal.name}</div>
+                    <div className="text-xs text-parchment-500 mt-0.5">{desc}</div>
+                  </div>
+                </label>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Barbarian Storm Herald — aura type choice */}
+      {needsStormAura && (
+        <div className="card mb-4">
+          <h2 className="section-header">Storm Aura — Choose Environment</h2>
+          <p className="text-sm text-parchment-500 mb-3">Your aura type is permanent and determines the elemental fury of your rage.</p>
+          <div className="space-y-2">
+            {STORM_AURA_OPTIONS.map(aura => (
+              <label key={aura.slug} className={`flex items-start gap-3 p-3 rounded border cursor-pointer
+                ${stormAura === aura.slug ? 'border-sky-400 bg-sky-50' : 'border-parchment-200 hover:border-parchment-400'}`}>
+                <input type="radio" name="storm-aura" value={aura.slug} checked={stormAura === aura.slug} onChange={() => setStormAura(aura.slug)} className="mt-0.5" />
+                <div>
+                  <div className="font-medium">{aura.name}</div>
+                  <div className="text-xs text-parchment-500 mt-0.5">{aura.description}</div>
+                  <div className="text-xs text-sky-600 mt-0.5">Storm Soul (L6): {aura.soulDesc}</div>
+                </div>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Monk Four Elements — discipline choices */}
+      {needsFourElements && (
+        <div className="card mb-4">
+          <h2 className="section-header">Elemental Disciplines — Choose {disciplinesToGain}</h2>
+          <p className="text-sm text-parchment-500 mb-3">
+            ({fourElementsChoices.length}/{disciplinesToGain} chosen)
+          </p>
+          <div className="space-y-2">
+            {FOUR_ELEMENTS_DISCIPLINES.filter(d => !existingDisciplines.includes(d.slug)).map(disc => {
+              const selected = fourElementsChoices.includes(disc.slug)
+              const atMax = fourElementsChoices.length >= disciplinesToGain
+              return (
+                <label key={disc.slug} className={`flex items-start gap-3 p-3 rounded border cursor-pointer
+                  ${selected ? 'border-parchment-500 bg-parchment-50' : 'border-parchment-200'}
+                  ${!selected && atMax ? 'opacity-40 cursor-not-allowed' : 'hover:border-parchment-400'}`}>
+                  <input type="checkbox" checked={selected} disabled={!selected && atMax} className="mt-0.5 shrink-0"
+                    onChange={() => setFourElementsChoices(prev =>
+                      selected ? prev.filter(x => x !== disc.slug) : prev.length < disciplinesToGain ? [...prev, disc.slug] : prev
+                    )} />
+                  <div>
+                    <div className="font-medium text-sm">{disc.name} <span className="text-xs text-violet-600 ml-1">{disc.ki}</span></div>
+                    <div className="text-xs text-parchment-500 mt-0.5">{disc.description}</div>
+                  </div>
+                </label>
+              )
+            })}
+          </div>
+          {existingDisciplines.length > 0 && (
+            <details className="mt-3">
+              <summary className="text-xs text-parchment-400 cursor-pointer">Already known ({existingDisciplines.length})</summary>
+              <div className="mt-1 flex flex-wrap gap-1">
+                {existingDisciplines.map(slug => {
+                  const d = FOUR_ELEMENTS_DISCIPLINES.find(x => x.slug === slug)
+                  return <span key={slug} className="text-xs bg-violet-100 text-violet-700 rounded px-2 py-0.5">{d?.name ?? slug}</span>
+                })}
+              </div>
+            </details>
+          )}
         </div>
       )}
 

@@ -336,7 +336,7 @@ export default function Lookup() {
 
   const results = useMemo((): ResultEntry[] => {
     const q = search.toLowerCase().trim()
-    const matches = (s: string) => s.toLowerCase().includes(q)
+    const matches = (s: string | null | undefined) => Boolean(s?.toLowerCase().includes(q))
 
     const out: ResultEntry[] = []
 
@@ -393,7 +393,11 @@ export default function Lookup() {
 
   // Reset page when search/category changes
   const handleSearch = (v: string) => { setSearch(v); setPage(1) }
-  const handleCategory = (c: Category) => { setCategory(c); setPage(1) }
+  const handleCategory = (c: Category) => {
+    setCategory(c)
+    setSearch('')
+    setPage(1)
+  }
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -408,7 +412,6 @@ export default function Lookup() {
         placeholder="Search across all content…"
         value={search}
         onChange={e => handleSearch(e.target.value)}
-        autoFocus
       />
 
       <div className="flex flex-wrap gap-1.5 mb-4">
@@ -437,37 +440,37 @@ export default function Lookup() {
             : null
 
           if (entry.kind === 'spell') return (
-            <div key={`spell-${entry.data.slug}-${i}`}>
+            <div key={`spell-${entry.data.slug}`}>
               {kindBadge && <div className="mb-0.5">{kindBadge}</div>}
               <SpellCard spell={entry.data} />
             </div>
           )
           if (entry.kind === 'item') return (
-            <div key={`item-${entry.data.slug}-${i}`}>
+            <div key={`item-${entry.data.slug}`}>
               {kindBadge && <div className="mb-0.5">{kindBadge}</div>}
               <ItemCard item={entry.data} />
             </div>
           )
           if (entry.kind === 'feat') return (
-            <div key={`feat-${entry.data.slug}-${i}`}>
+            <div key={`feat-${entry.data.slug}`}>
               {kindBadge && <div className="mb-0.5">{kindBadge}</div>}
               <FeatCard feat={entry.data} />
             </div>
           )
           if (entry.kind === 'race') return (
-            <div key={`race-${entry.data.slug}-${i}`}>
+            <div key={`race-${entry.data.slug}`}>
               {kindBadge && <div className="mb-0.5">{kindBadge}</div>}
               <RaceCard race={entry.data} />
             </div>
           )
           if (entry.kind === 'background') return (
-            <div key={`bg-${entry.data.slug}-${i}`}>
+            <div key={`bg-${entry.data.slug}`}>
               {kindBadge && <div className="mb-0.5">{kindBadge}</div>}
               <BackgroundCard bg={entry.data} />
             </div>
           )
           if (entry.kind === 'class') return (
-            <div key={`class-${entry.data.slug}-${i}`}>
+            <div key={`class-${entry.data.slug}`}>
               {kindBadge && <div className="mb-0.5">{kindBadge}</div>}
               <ClassCard cls={entry.data} />
             </div>

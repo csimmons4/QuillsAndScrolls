@@ -5,6 +5,7 @@ import { importCharacter } from '../storage/ioFile'
 import { listCharactersFromDisk, saveCharacterToDisk, deleteCharacterFromDisk } from '../storage/charApi'
 import { totalLevel } from '../character/derive'
 import { useContent } from '../content/ContentProvider'
+import { v4 as uuidv4 } from 'uuid'
 
 export default function Vault() {
   const [characters, setCharacters] = useState<Character[]>([])
@@ -44,6 +45,19 @@ export default function Vault() {
   async function handleDelete(id: string, name: string) {
     if (!confirm(`Delete "${name}"? This cannot be undone.`)) return
     await deleteCharacterFromDisk(id)
+    await refresh()
+  }
+
+  async function handleDuplicate(char: Character) {
+    const now = new Date().toISOString()
+    const copy: Character = {
+      ...char,
+      id: uuidv4(),
+      name: `${char.name} (Copy)`,
+      createdAt: now,
+      updatedAt: now,
+    }
+    await saveCharacterToDisk(copy)
     await refresh()
   }
 
@@ -104,6 +118,9 @@ export default function Vault() {
               <div className="mt-4 flex gap-2">
                 <button className="btn-primary text-sm flex-1" onClick={() => navigate(`/c/${char.id}`)}>
                   Open
+                </button>
+                <button className="btn-secondary text-sm" title="Duplicate character" onClick={() => handleDuplicate(char)}>
+                  Copy
                 </button>
                 <button className="btn-danger text-sm" onClick={() => handleDelete(char.id, char.name)}>
                   Delete

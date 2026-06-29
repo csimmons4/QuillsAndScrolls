@@ -1,5 +1,5 @@
-import { Character, CharacterSchema } from '../character/model'
-import type { HomebrewStore } from './localStore'
+import { Character } from '../character/model'
+import { migrate, type HomebrewStore } from './localStore'
 
 async function apiFetch(path: string, options?: RequestInit) {
   const res = await fetch(path, options)
@@ -12,7 +12,12 @@ async function apiFetch(path: string, options?: RequestInit) {
 export async function listCharactersFromDisk(): Promise<Character[]> {
   const raw: unknown[] = await apiFetch('/api/characters')
   return raw.flatMap(r => {
-    try { return [CharacterSchema.parse(r)] } catch { return [] }
+    try {
+      return [migrate(r)]
+    } catch (err) {
+      console.warn('[storage] skipping unreadable character from disk:', err)
+      return []
+    }
   }).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
 }
 
@@ -30,14 +35,14 @@ export async function deleteCharacterFromDisk(id: string): Promise<void> {
 
 // ── Homebrew ─────────────────────────────────────────────────────────────────
 
-export type HomebrewCategory = 'spells' | 'items' | 'feats' | 'races' | 'classes'
+export type HomebrewCategory = 'spells' | 'items' | 'feats' | 'races' | 'classes' | 'backgrounds'
 
 export async function loadHomebrewFromDisk(): Promise<HomebrewStore> {
   try {
     const data = await apiFetch('/api/homebrew')
-    return { classes: [], ...data }
+    return { classes: [], backgrounds: [], ...data }
   } catch {
-    return { items: [], spells: [], feats: [], races: [], classes: [] }
+    return { items: [], spells: [], feats: [], races: [], classes: [], backgrounds: [] }
   }
 }
 
@@ -62,7 +67,7 @@ export async function deleteHomebrewEntry(
 
 // Used when importing a full homebrew pack — saves each entry individually
 export async function importHomebrewStore(data: HomebrewStore): Promise<void> {
-  const validCategories: HomebrewCategory[] = ['spells', 'items', 'feats', 'races', 'classes']
+  const validCategories: HomebrewCategory[] = ['spells', 'items', 'feats', 'races', 'classes', 'backgrounds']
   const saves: Promise<void>[] = []
   for (const cat of validCategories) {
     const entries = (data[cat] ?? []) as Record<string, unknown>[]

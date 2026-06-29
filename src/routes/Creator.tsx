@@ -17,8 +17,53 @@ import { resolveFeatGrants, applyGrantPicks, withFeatClassChoice } from '../char
 
 const STEPS = ['Race', 'Class', 'Background', 'Abilities', 'Skills', 'Equipment', 'Details', 'Review']
 
+const BG_ITEM_SKIP = [
+  'or ', 'and ', 'but ', 'you ', 'your ', 'will ', 'people ', 'to ', 'these ',
+  'if ', 'as ', 'who ', 'whom', 'which ', 'though', 'similar', 'inspired', 'instead',
+  'burning', 'from ', 'including', 'like ', 'modifying', 'roll', 'includes ',
+  'about ', 'when ', 'much ', 'for instance', 'discussing ', 'disbanded',
+  'whether', 'behind', 'it ', 'here ', 'founded', 'in a ', 'in the ', 'perhaps ',
+  'sending ', 'such as', 'by ', 'underground', 'overgrown', 'at the ',
+  'hunt ', 'practiced', 'sailing', 'so they', 'determined', 'dangerous ',
+  'a strong ', 'procure ', 'obstacles', 'expressions',
+  'the rough', 'the harpers', 'the common', 'the mages', 'the knights',
+  'the object', 'is beorun', 'they consider', 'after which', 'established',
+]
+function parseBgItems(raw: string[]): string[] {
+  return raw
+    .filter(s => !s.includes('\n'))
+    .map(s => s.replace(/Value:\s*[\d.]+\s*(?:gp|sp|cp|pp|lb)?\s*(?:Weight:\s*[\d.]+\s*(?:lbs?)?)?/gi, '').trim())
+    .map(s => s.replace(/\s{2,}/g, ' ').trim())
+    .filter(s => {
+      if (s.length < 4) return false
+      const lower = s.toLowerCase()
+      return !BG_ITEM_SKIP.some(p => lower.startsWith(p))
+    })
+}
+
 const LANGUAGES_STANDARD = ['Common', 'Dwarvish', 'Elvish', 'Giant', 'Gnomish', 'Goblin', 'Halfling', 'Orc']
 const LANGUAGES_EXOTIC = ['Abyssal', 'Celestial', 'Draconic', 'Deep Speech', 'Infernal', 'Primordial', 'Sylvan', 'Undercommon']
+
+const MUSICAL_INSTRUMENTS = ['Bagpipes', 'Drum', 'Dulcimer', 'Flute', 'Lute', 'Lyre', 'Horn', 'Pan flute', 'Shawm', 'Viol']
+const ARTISAN_TOOLS = [
+  "Alchemist's supplies", "Brewer's supplies", "Calligrapher's supplies", "Carpenter's tools",
+  "Cartographer's tools", "Cobbler's tools", "Cook's utensils", "Glassblower's tools",
+  "Jeweler's tools", "Leatherworker's tools", "Mason's tools", "Painter's supplies",
+  "Potter's tools", "Smith's tools", "Tinker's tools", "Weaver's tools", "Woodcarver's tools",
+]
+const GAMING_SETS = ['Dice set', 'Dragonchess set', 'Playing card set', 'Three-Dragon Ante set']
+
+function bgToolOptions(choiceLabel: string): string[] {
+  const lower = choiceLabel.toLowerCase()
+  const wantsInstrument = lower.includes('musical instrument')
+  const wantsArtisan = lower.includes('artisan')
+  const wantsGaming = lower.includes('gaming set') || lower.includes('gaming')
+  if (wantsArtisan) return ARTISAN_TOOLS
+  if (wantsInstrument && wantsGaming) return [...MUSICAL_INSTRUMENTS, ...GAMING_SETS]
+  if (wantsInstrument) return MUSICAL_INSTRUMENTS
+  if (wantsGaming) return GAMING_SETS
+  return [...ARTISAN_TOOLS, ...MUSICAL_INSTRUMENTS, ...GAMING_SETS]
+}
 
 const STANDARD_ARRAY = [15, 14, 13, 12, 10, 8]
 const ABILITY_LABELS: Record<string, string> = {
@@ -59,6 +104,10 @@ export default function Creator() {
   const [raceSkillChoices, setRaceSkillChoices] = useState<string[]>([])
   // Starting equipment choices: choiceGroupIndex → selected option label ('a'|'b'|'c')
   const [gearChoices, setGearChoices] = useState<Record<number, string>>({})
+
+  // Background tool-of-choice state
+  const [bgToolChoiceLabel, setBgToolChoiceLabel] = useState('')
+  const [bgToolChoice, setBgToolChoice] = useState('')
 
   // Class option state
   const [fightingStyle, setFightingStyle] = useState('')
@@ -154,22 +203,25 @@ export default function Creator() {
     setSelectedCantrips([])
     setSelectedL1Spells([])
     const initialSlots = INITIAL_SPELL_SLOTS[slug] ?? {}
+    const secretLangs: string[] = slug === 'druid' ? ['Druidic'] : slug === 'rogue' ? ["Thieves' Cant"] : []
     update({
       classes: [{ classSlug: slug, level: 1, hitDieRolls: [cls.hitDie] }],
       saveProficiencies: cls.saveProficiencies,
       armorProficiencies: cls.armorProficiencies,
       weaponProficiencies: cls.weaponProficiencies,
       spellSlots: initialSlots,
+      languages: [...new Set([...char.languages, ...secretLangs])],
     })
   }
 
   function selectBackground(slug: string) {
     const bg = backgrounds.find(b => b.slug === slug)
     if (!bg) return
-    // Parse concrete tool proficiencies (skip "None", skip "One type of…")
-    const concreteTools = bg.toolProficiencies.filter(t =>
-      t.toLowerCase() !== 'none' && !t.toLowerCase().startsWith('one type') && !t.toLowerCase().startsWith('one ')
-    )
+    const isChoiceTool = (t: string) => /^one\b|^any\b/i.test(t.trim())
+    const concreteTools = bg.toolProficiencies.filter(t => !isChoiceTool(t))
+    const choiceTool = bg.toolProficiencies.find(isChoiceTool) ?? ''
+    setBgToolChoiceLabel(choiceTool)
+    setBgToolChoice('')
     update({
       backgroundSlug: slug,
       skillProficiencies: [...new Set([...char.skillProficiencies, ...bg.skillProficiencies])],
@@ -313,6 +365,29 @@ export default function Creator() {
           finalChar.equipment = [...finalChar.equipment, item]
           existingNames.add(item.name)
         }
+      }
+    }
+
+    // Apply background starting equipment and gold
+    const bgDef = backgrounds.find(b => b.slug === finalChar.backgroundSlug)
+    if (bgDef) {
+      const bgItems = parseBgItems(bgDef.startingEquipment)
+      const existingNames = new Set(finalChar.equipment.map(e => e.name))
+      for (const name of bgItems) {
+        if (!existingNames.has(name)) {
+          finalChar.equipment = [...finalChar.equipment, {
+            itemSlug: `bg-${name.toLowerCase().replace(/[^a-z0-9]/g, '-')}`,
+            name, quantity: 1, equipped: false, attuned: false, isHomebrew: false, notes: '',
+          }]
+          existingNames.add(name)
+        }
+      }
+      if (bgDef.startingGold > 0) {
+        finalChar.currency = { ...finalChar.currency, gp: finalChar.currency.gp + bgDef.startingGold }
+      }
+      // Apply tool-of-choice selection
+      if (bgToolChoice) {
+        finalChar.toolProficiencies = [...new Set([...finalChar.toolProficiencies, bgToolChoice])]
       }
     }
 
@@ -902,6 +977,22 @@ export default function Creator() {
           </button>
         )
 
+        // Tool choice picker shown after a background is selected
+        const ToolChoicePicker = char.backgroundSlug && bgToolChoiceLabel ? (
+          <div className="mt-4 p-3 rounded border border-amber-200 bg-amber-50">
+            <div className="text-xs font-bold text-amber-800 uppercase tracking-wider mb-1">Tool Proficiency Choice</div>
+            <p className="text-sm text-parchment-600 mb-2">{bgToolChoiceLabel}</p>
+            <select
+              className="input text-sm"
+              value={bgToolChoice}
+              onChange={e => setBgToolChoice(e.target.value)}
+            >
+              <option value="">— choose a tool —</option>
+              {bgToolOptions(bgToolChoiceLabel).map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </div>
+        ) : null
+
         // Flat filtered list when searching
         if (bgSearch) {
           const filtered = backgrounds.filter(bgMatchFilter)
@@ -911,6 +1002,7 @@ export default function Creator() {
               {filtered.length > 0
                 ? <div className="grid grid-cols-2 gap-2">{filtered.map(bg => BgCard(bg))}</div>
                 : <p className="text-parchment-400 text-sm text-center py-4">No backgrounds match "{bgSearch}"</p>}
+              {ToolChoicePicker}
             </div>
           )
         }
@@ -941,6 +1033,7 @@ export default function Creator() {
                 </div>
               )
             })}
+            {ToolChoicePicker}
           </div>
         )
       })()}
@@ -1204,6 +1297,16 @@ export default function Creator() {
           {/* Languages */}
           <div>
             <label className="label">Languages</label>
+            {(() => {
+              const bgDef = backgrounds.find(b => b.slug === char.backgroundSlug)
+              const bgLangCount = bgDef?.languages ?? 0
+              if (bgLangCount === 0) return null
+              return (
+                <p className="text-xs text-parchment-500 mb-2 p-2 bg-parchment-50 rounded border border-parchment-200">
+                  Your background grants {bgLangCount} language choice{bgLangCount > 1 ? 's' : ''} — pick {bgLangCount > 1 ? 'them' : 'one'} below.
+                </p>
+              )
+            })()}
 
             {/* Currently known */}
             {char.languages.length > 0 && (

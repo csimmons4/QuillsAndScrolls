@@ -4,10 +4,10 @@ import { loadHomebrewFromDisk, saveHomebrewEntry, deleteHomebrewEntry, importHom
 import { exportHomebrew, importHomebrew } from '../storage/ioFile'
 import { useContent } from '../content/ContentProvider'
 
-type Category = 'items' | 'spells' | 'feats' | 'races' | 'classes'
+type Category = 'items' | 'spells' | 'feats' | 'races' | 'classes' | 'backgrounds'
 
 const CATEGORY_LABELS: Record<Category, string> = {
-  items: 'Items', spells: 'Spells', feats: 'Feats', races: 'Races', classes: 'Classes',
+  items: 'Items', spells: 'Spells', feats: 'Feats', races: 'Races', classes: 'Classes', backgrounds: 'Backgrounds',
 }
 
 const SKILLS = [
@@ -835,6 +835,99 @@ function ClassForm({ initial, onSave, onCancel }: { initial?: Record<string, unk
   )
 }
 
+// ─── Background Form ──────────────────────────────────────────────────────
+
+interface BgFormState {
+  slug: string; name: string
+  skillProficiencies: string[]
+  toolProficiencies: string
+  languages: string
+  featureName: string; featureDescription: string
+  startingGold: string
+  startingEquipment: string
+}
+
+function emptyBgForm(): BgFormState {
+  return { slug:'',name:'',skillProficiencies:[],toolProficiencies:'',languages:'0',featureName:'',featureDescription:'',startingGold:'',startingEquipment:'' }
+}
+
+function deserializeBg(entry: Record<string, unknown>): BgFormState {
+  const s = (k: unknown) => String(k ?? '')
+  const feature = (entry.feature as { name?: string; description?: string }) ?? {}
+  return {
+    slug: s(entry.slug), name: s(entry.name),
+    skillProficiencies: (entry.skillProficiencies as string[]) ?? [],
+    toolProficiencies: (Array.isArray(entry.toolProficiencies) ? (entry.toolProficiencies as string[]).join(', ') : s(entry.toolProficiencies ?? '')),
+    languages: s(entry.languages ?? '0'),
+    featureName: s(feature.name ?? ''),
+    featureDescription: s(feature.description ?? ''),
+    startingGold: s(entry.startingGold ?? ''),
+    startingEquipment: (Array.isArray(entry.startingEquipment) ? (entry.startingEquipment as string[]).join(', ') : s(entry.startingEquipment ?? '')),
+  }
+}
+
+function serializeBg(f: BgFormState): Record<string, unknown> {
+  const slug = f.slug || autoSlug(f.name)
+  const csv = (s: string) => s.split(',').map(x => x.trim()).filter(Boolean)
+  return {
+    slug, name: f.name,
+    skillProficiencies: f.skillProficiencies,
+    toolProficiencies: csv(f.toolProficiencies),
+    languages: parseInt(f.languages) || 0,
+    feature: { name: f.featureName, description: f.featureDescription },
+    startingGold: parseFloat(f.startingGold) || 0,
+    startingEquipment: csv(f.startingEquipment),
+    source: { site: 'homebrew', license: 'homebrew', url: '' },
+  }
+}
+
+function BackgroundForm({ initial, onSave, onCancel }: { initial?: Record<string, unknown>; onSave: (e: Record<string, unknown>) => void; onCancel?: () => void }) {
+  const [f, setF] = useState<BgFormState>(initial ? deserializeBg(initial) : emptyBgForm())
+  const up = (k: keyof BgFormState, v: unknown) => setF(prev => ({ ...prev, [k]: v }))
+  return (
+    <div className="space-y-3">
+      <Field label="Name">
+        <input className="input" value={f.name} onChange={e => {
+          const name = e.target.value
+          setF(prev => ({ ...prev, name, slug: prev.slug || autoSlug(name) }))
+        }} />
+      </Field>
+      <Field label="Slug">
+        <input className="input font-mono text-sm" value={f.slug} onChange={e => up('slug', e.target.value)} />
+      </Field>
+      <SkillPicker label="Skill Proficiencies (pick 2)" selected={f.skillProficiencies} onChange={v => up('skillProficiencies', v)} />
+      <Field label="Tool Proficiencies" hint="Comma-separated (e.g. Thieves' tools, One musical instrument)">
+        <input className="input" value={f.toolProficiencies} onChange={e => up('toolProficiencies', e.target.value)} placeholder="e.g. Disguise kit, Forgery kit" />
+      </Field>
+      <Field label="Bonus Languages">
+        <select className="input w-24 text-sm" value={f.languages} onChange={e => up('languages', e.target.value)}>
+          <option value="0">0</option>
+          <option value="1">1</option>
+          <option value="2">2</option>
+        </select>
+      </Field>
+      <Field label="Feature Name">
+        <input className="input" value={f.featureName} onChange={e => up('featureName', e.target.value)} placeholder="e.g. Researcher" />
+      </Field>
+      <Field label="Feature Description">
+        <textarea className="input min-h-[80px]" value={f.featureDescription} onChange={e => up('featureDescription', e.target.value)} />
+      </Field>
+      <Field label="Starting Gold (gp)">
+        <input type="number" className="input w-24 text-sm" value={f.startingGold} min={0} onChange={e => up('startingGold', e.target.value)} placeholder="0" />
+      </Field>
+      <Field label="Starting Equipment" hint="Comma-separated item names">
+        <textarea className="input min-h-[60px]" value={f.startingEquipment} onChange={e => up('startingEquipment', e.target.value)} placeholder="e.g. Ink bottle, Quill, Small knife" />
+      </Field>
+      <div className="flex gap-2 pt-1">
+        <button className="btn-primary flex-1" onClick={() => onSave(serializeBg(f))}>
+          {initial ? 'Update' : 'Add Background'}
+        </button>
+        {onCancel && <button className="btn-secondary" onClick={onCancel}>Cancel</button>}
+      </div>
+    </div>
+  )
+}
+
 // ─── Entry List ───────────────────────────────────────────────────────────
 
 function EntryList({ category, entries, onEdit, onDelete }: {
@@ -877,6 +970,12 @@ function EntryList({ category, entries, onEdit, onDelete }: {
               {category === 'classes' && (
                 <span className="text-[10px] text-parchment-400">d{String(entry.hitDie ?? 8)} hit die</span>
               )}
+              {category === 'backgrounds' && (
+                <span className="text-[10px] text-parchment-400">
+                  {((entry.skillProficiencies as string[]) ?? []).slice(0, 2).join(', ')}
+                  {(entry.startingGold as number) > 0 ? ` · ${entry.startingGold} gp` : ''}
+                </span>
+              )}
               <span className="text-[10px] text-parchment-300 font-mono">{String(entry.slug ?? '')}</span>
             </div>
           </div>
@@ -892,7 +991,7 @@ function EntryList({ category, entries, onEdit, onDelete }: {
 
 export default function Homebrew() {
   const [category, setCategory] = useState<Category>('items')
-  const [store, setStore] = useState<HomebrewStore>({ items: [], spells: [], feats: [], races: [], classes: [] })
+  const [store, setStore] = useState<HomebrewStore>({ items: [], spells: [], feats: [], races: [], classes: [], backgrounds: [] })
   const [editEntry, setEditEntry] = useState<Record<string, unknown> | null>(null)
   const [editIdx, setEditIdx] = useState<number | null>(null)
   const [error, setError] = useState('')
@@ -983,6 +1082,7 @@ export default function Homebrew() {
           {category === 'feats' && <FeatForm key={editIdx ?? 'new'} initial={editEntry ?? undefined} {...formProps} />}
           {category === 'races' && <RaceForm key={editIdx ?? 'new'} initial={editEntry ?? undefined} {...formProps} />}
           {category === 'classes' && <ClassForm key={editIdx ?? 'new'} initial={editEntry ?? undefined} {...formProps} />}
+          {category === 'backgrounds' && <BackgroundForm key={editIdx ?? 'new'} initial={editEntry ?? undefined} {...formProps} />}
         </div>
 
         {/* List panel */}

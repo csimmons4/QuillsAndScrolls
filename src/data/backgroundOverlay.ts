@@ -13,81 +13,106 @@ export const BACKGROUND_OVERLAY: Record<string, Partial<BackgroundDef>> = {
 
   'acolyte': {
     feature: { name: 'Shelter of the Faithful', description: 'You and your party receive free healing and care at temples of your faith, and commoners of that faith will provide you with food and lodging. You have a connection to a specific temple where you can call on priests for aid within reason.' },
+    startingGold: 15,
   },
   'charlatan': {
     feature: { name: 'False Identity', description: 'You have a second identity complete with forged documents and established contacts. You can also forge documents — official papers, personal letters, and similar items — as long as you have seen a comparable example.' },
+    startingGold: 15,
   },
   'criminal': {
     feature: { name: 'Criminal Contact', description: 'You have a reliable and trustworthy contact who acts as your liaison to a criminal network. You know how to get messages to and from your contact over great distances, and can use this network to gather information or pass along warnings.' },
+    startingGold: 15,
   },
   'entertainer': {
     feature: { name: 'By Popular Demand', description: 'You can always find a place to perform — an inn, a theater, or a noble\'s court — in exchange for free lodging and food of a modest or comfortable standard. Your performance makes you a local figure of some renown wherever you stay.' },
+    startingGold: 15,
   },
   'folk-hero': {
     feature: { name: 'Rustic Hospitality', description: 'Common folk will shelter you and help hide you from authorities, as one of their own. They won\'t risk their lives for you but will provide food, shelter, and information while keeping your presence secret from those who would harm you.' },
+    startingGold: 10,
   },
   'guild-artisan': {
     feature: { name: 'Guild Membership', description: 'Fellow guild members provide you with lodging, food, and a funeral if needed. Guilds wield political power that can open doors and pressure officials, though you owe dues and occasional service in return.' },
+    startingGold: 15,
   },
   'hermit': {
     feature: { name: 'Discovery', description: 'Your hermitage granted you access to a unique discovery — a truth about the cosmos, a hidden power, or an unexplained phenomenon. Work with your DM to determine the nature and implications of what you found.' },
+    startingGold: 5,
   },
   'noble': {
     feature: { name: 'Position of Privilege', description: 'People assume you have the right to be wherever you are. You are welcome in high society and others of noble birth treat you as a peer. Common folk make way for you and rarely challenge your authority.' },
+    startingGold: 25,
   },
   'outlander': {
     feature: { name: 'Wanderer', description: 'You have an excellent memory for maps and geography. You can always recall the general layout of terrain and settlements around you, and can find food and fresh water for yourself and up to five others each day, provided the land offers foraging opportunities.' },
+    startingGold: 10,
   },
   'sage': {
     feature: { name: 'Researcher', description: 'When you don\'t know a piece of lore, you know where and from whom to obtain it — usually a library, university, or learned person. You can always find the right source, even if the information is obscure, though gathering it may take time or cost favors.' },
+    startingGold: 10,
   },
   'sailor': {
     feature: { name: "Ship's Passage", description: 'You can secure free passage on a sailing ship for yourself and your companions. In return, you and your party are expected to assist the crew during the voyage. The ship\'s captain may also ask for a favor in exchange.' },
+    startingGold: 10,
   },
   'soldier': {
     feature: { name: 'Military Rank', description: 'Soldiers loyal to your former military organization recognize your rank and defer to you if they are of lower rank. You can invoke your rank to exert influence, commandeer equipment, or gain access to military fortifications.' },
+    startingGold: 10,
   },
   'urchin': {
     feature: { name: 'City Secrets', description: 'You know the hidden passages and flows of cities. When not in combat, you and companions you lead can travel between any two locations in a city twice as fast as your speed would normally allow.' },
+    startingGold: 10,
   },
 
-  // ── Sword Coast Adventurer\'s Guide ────────────────────────────────────────
+  // ── Sword Coast Adventurer's Guide ────────────────────────────────────────
 
   'city-watch': {
     feature: { name: "Watcher's Eye", description: 'Your law enforcement experience helps you quickly locate the nearest guard post or watch headquarters in any city. You can also sniff out criminal dens and back-alley meeting spots, assuming they exist.' },
+    startingGold: 10,
   },
   'clan-crafter': {
     feature: { name: 'Respect of the Stout Folk', description: 'Dwarves hold clan crafters in the highest regard. You always have free room and board in any settlement where shield or gold dwarves dwell, and they may shield you from harm out of professional respect.' },
+    startingGold: 5,
   },
   'cloistered-scholar': {
     feature: { name: 'Library Access', description: 'While others must obtain permits to access your institution\'s archives, you move freely through most of the library\'s holdings. You also know which scholars to approach for obscure topics outside your area of expertise.' },
+    startingGold: 10,
   },
   'courtier': {
     feature: { name: 'Court Functionary', description: 'Your knowledge of bureaucratic procedures lets you navigate any noble court or government. You know who the key power brokers are and how to approach them for favors, audiences, or access to restricted information.' },
+    startingGold: 5,
   },
   'faction-agent': {
     feature: { name: 'Safe Haven', description: 'You know secret signs and passwords to identify fellow operatives of your faction. They can provide you with a safe house, free lodging, or assistance finding information in any city where your faction is active.' },
+    startingGold: 15,
   },
   'far-traveler': {
     feature: { name: 'All Eyes on You', description: 'Your foreign appearance and manner draw curious attention everywhere you go. Scholars, merchants, and nobles often seek you out for news of distant lands. This curiosity can be leveraged to gain introductions and open doors that would otherwise stay shut.' },
+    startingGold: 10,
   },
   'inheritor': {
     feature: { name: 'Inheritance', description: 'You carry or have access to something of great value — an item, a title, a secret, or an obligation that shapes how others perceive you. Work with your DM to determine what you inherited and how it affects your relationships and responsibilities.' },
+    startingGold: 15,
   },
   'knight-of-the-order': {
     feature: { name: 'Knightly Regard', description: 'Members of your knightly order and their allies will provide you with shelter, food, and assistance. Religious orders associated with your knights will also aid you. Fellow knights share information and resources with you as a professional courtesy.' },
+    startingGold: 10,
   },
   'mercenary-veteran': {
     feature: { name: 'Mercenary Life', description: 'You can identify any mercenary company by its insignia and know something of its reputation, commanders, and methods. You can always locate the taverns and gathering spots that mercenaries frequent in any area.' },
+    startingGold: 10,
   },
   'urban-bounty-hunter': {
     feature: { name: 'Ear to the Ground', description: 'You are in regular contact with people who move in the same circles as your quarries — street toughs, fences, criminal fixers, or high-society gossips. In any city you visit, you can establish contact with an informant in the relevant social stratum within a day.' },
+    startingGold: 20,
   },
   'uthgardt-tribe-member': {
     feature: { name: 'Uthgardt Heritage', description: 'You know the territory and natural resources of the North intimately. When you forage, you find twice as much food and water as normal. You can also call upon the hospitality of Uthgardt clans, who will shelter and feed you while you travel through their lands.' },
+    startingGold: 10,
   },
   'waterdhavian-noble': {
     feature: { name: 'Kept in Style', description: 'While in Waterdeep or elsewhere in the North, your house covers your everyday expenses. Your name and family signet are sufficient to live at a comfortable or even wealthy lifestyle — the bill is sent home and settled by your family.' },
+    startingGold: 20,
   },
 
   // ── Strixhaven ────────────────────────────────────────────────────────────

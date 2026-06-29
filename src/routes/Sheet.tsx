@@ -8,11 +8,13 @@ import {
   totalLevel, passivePerception, formatMod,
   spellSaveDC, spellAttackBonus,
   deriveClassResources, shortRestResourceKeys, longRestResourceKeys,
-  hasBardJackOfAllTrades,
+  hasBardJackOfAllTrades, monkSpeedBonus, sneakAttackDice, paladinAuraBonus,
 } from '../character/derive'
 import { touchUpdated } from '../character/create'
 import {
   CLASS_OPTIONS, ELDRITCH_INVOCATIONS, METAMAGIC_OPTIONS, ARTIFICER_INFUSIONS,
+  LAND_CIRCLE_SPELLS, RUNE_KNIGHT_RUNES, HUNTER_CHOICES,
+  TOTEM_ANIMALS, STORM_AURA_OPTIONS, FOUR_ELEMENTS_DISCIPLINES,
   isMulticlassSpellcaster, multiclassSpellSlotsMax, CASTER_TYPE, effectiveCasterLevel,
 } from '../data/classData'
 import { asiLevelsForClass } from '../character/levelUp'
@@ -23,6 +25,8 @@ import { WeaponStatBlock, ArmorStatBlock, MagicItemStatBlock } from '../componen
 import { sumFeatBonuses } from '../character/featBonuses'
 import { sumItemBonuses, effectiveAbilityScores } from '../character/itemBonuses'
 import { cantripDiceAtLevel } from '../data/spellMeta'
+import { exportCharacter } from '../storage/ioFile'
+import { BATTLE_MASTER_MANEUVERS } from '../data/classData'
 import type { WeaponStats, ArmorStats, ItemDef } from '../content/loaders'
 
 // ── Weapon / armor resolution ─────────────────────────────────────────────
@@ -932,6 +936,9 @@ export default function Sheet() {
   const [newSummonForm, setNewSummonForm] = useState<{ name: string; hp: string; ac: string } | null>(null)
   const [addFeatOpen, setAddFeatOpen] = useState(false)
   const [addFeatSearch, setAddFeatSearch] = useState('')
+  const [newResourceName, setNewResourceName] = useState('')
+  const [newResourceMax, setNewResourceMax] = useState('')
+  const [newResourceRecharge, setNewResourceRecharge] = useState<'short' | 'long'>('long')
   const saveFlashTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const charRef = useRef<Character | null>(null)
 
@@ -1070,13 +1077,29 @@ export default function Sheet() {
     }
   }
 
+  // Circle of the Land terrain-based always-prepared spells
+  const landDruid = char.classes.find(c => c.classSlug === 'druid' && c.subclassSlug === 'land')
+  if (landDruid) {
+    const terrainFC = char.featuresChosen.find(f => f.key === 'land-terrain')
+    const terrain = typeof terrainFC?.value === 'string' ? terrainFC.value.toLowerCase() : ''
+    for (const s of LAND_CIRCLE_SPELLS[terrain] ?? []) {
+      if (s.grantedAtLevel > landDruid.level) continue
+      freeSpells.push({ key: `subclass:druid:land:${s.slug}`, slug: s.slug, name: s.name, level: s.level, source: 'Circle of the Land', alwaysPrepared: true })
+    }
+  }
+
   const maxHp = hpMax(effectiveChar, content) + featBonuses.hpBonusPerLevel * level
   const { ac, source: acSource, stealthDisadv } = computeFullAC(effectiveChar, featBonuses.naturalArmorBase, content.items, raceDef, itemBonuses.acBonus)
   const initiative = abilityModFor(effectiveChar, 'dex') + featBonuses.initiativeBonus
   const passive = passivePerception(effectiveChar) + featBonuses.passivePerceptionBonus + itemBonuses.abilityCheckBonus
   const passiveInvestigation = 10 + skillMod(effectiveCharSkills, 'investigation') + featBonuses.passiveInvestigationBonus + itemBonuses.abilityCheckBonus
+  const passiveInsight = 10 + skillMod(effectiveCharSkills, 'insight') + itemBonuses.abilityCheckBonus
   const raceSpeed = raceDef?.speed ?? 30
-  const speed = raceSpeed + featBonuses.speedBonus
+  const monkMovement = monkSpeedBonus(char)
+  const speed = raceSpeed + featBonuses.speedBonus + monkMovement
+  const sneakDice = sneakAttackDice(char)
+  const paladinAura = paladinAuraBonus(char)
+
   const attuned = char.equipment.filter(e => e.attuned).length
   const skillInfo = deriveSkillSources(char, content, raceDef, CLASS_OPTIONS, featSlugs)
   const classResources = deriveClassResources(char)
@@ -1166,6 +1189,7 @@ export default function Sheet() {
             {saveFlash === 'saved' ? '✓ Saved!' : 'Save Character'}
           </button>
           <Link to={`/c/${char.id}/level-up`} className="btn-secondary text-sm">Level Up</Link>
+          <button onClick={() => exportCharacter(char)} className="btn-ghost text-sm" title="Download character as JSON">↓ Export</button>
           <Link to="/" className="btn-ghost text-sm">← Vault</Link>
         </div>
       </div>
@@ -1272,14 +1296,15 @@ export default function Sheet() {
       </div>
 
       {/* Quick stats bar */}
-      <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 mb-4">
+      <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-7 gap-2 mb-4">
         {[
           { label: 'AC', value: ac, note: acSource + (stealthDisadv ? ' ⚠ Stealth disadv.' : '') },
           { label: 'Initiative', value: formatMod(initiative), note: featBonuses.initiativeBonus ? `+${featBonuses.initiativeBonus} Alert` : undefined },
-          { label: 'Speed', value: `${speed}ft`, note: featBonuses.speedBonus ? `+${featBonuses.speedBonus}ft feat` : undefined },
+          { label: 'Speed', value: `${speed}ft`, note: monkMovement ? `+${monkMovement}ft Unarmored Movement` : featBonuses.speedBonus ? `+${featBonuses.speedBonus}ft feat` : undefined },
           { label: 'Prof. Bonus', value: formatMod(pb) },
           { label: 'Passive Perc.', value: passive, note: featBonuses.passivePerceptionBonus ? `+${featBonuses.passivePerceptionBonus} Observant` : undefined },
           { label: 'Passive Inv.', value: passiveInvestigation, note: featBonuses.passiveInvestigationBonus ? `+${featBonuses.passiveInvestigationBonus} Observant` : undefined },
+          { label: 'Passive Ins.', value: passiveInsight },
         ].map(s => (
           <div key={s.label} className="stat-box text-center">
             <div className="text-xs text-parchment-500 uppercase">{s.label}</div>
@@ -1478,7 +1503,15 @@ export default function Sheet() {
                       {[0,1,2].map(i => (
                         <button
                           key={i}
-                          onClick={() => patch({ deathSaves: { ...char.deathSaves, successes: char.deathSaves.successes === i + 1 ? i : i + 1 } })}
+                          onClick={() => {
+                            const newSuccesses = char.deathSaves.successes === i + 1 ? i : i + 1
+                            if (newSuccesses >= 3) {
+                              // Auto-stabilize: 3 successes → set HP to 1, clear saves
+                              patch({ hp: { ...char.hp, current: 1 }, deathSaves: { successes: 0, failures: 0 } })
+                            } else {
+                              patch({ deathSaves: { ...char.deathSaves, successes: newSuccesses } })
+                            }
+                          }}
                           className={`w-14 h-14 rounded-full border-2 transition-all duration-300 ${
                             char.deathSaves.successes > i
                               ? 'bg-green-500 border-green-400 shadow-[0_0_20px_rgba(74,222,128,0.7)]'
@@ -1617,8 +1650,9 @@ export default function Sheet() {
                           patch({ saveProficiencies: [...s] })
                         }}
                       />
-                      <span className="w-10 font-mono text-right text-parchment-700">{formatMod(saveMod(effectiveChar, a) + itemBonuses.savingThrowBonus)}</span>
+                      <span className="w-10 font-mono text-right text-parchment-700">{formatMod(saveMod(effectiveChar, a) + itemBonuses.savingThrowBonus + paladinAura)}</span>
                       <span className="flex-1">{ABILITY_FULL[a]}</span>
+                      {paladinAura > 0 && <span className="text-xs bg-yellow-100 text-yellow-700 rounded px-1.5 py-0.5">+{paladinAura} Aura</span>}
                       {a === 'con' && featBonuses.concentrationAdvantage && (
                         <span className="text-xs bg-amber-100 text-amber-700 rounded px-1.5 py-0.5">War Caster</span>
                       )}
@@ -1736,9 +1770,11 @@ export default function Sheet() {
                   ))}
                 </div>
                 {char.exhaustionLevel > 0 && (
-                  <p className="text-xs text-red-600 mt-1">
-                    {(['Disadv. on ability checks','Speed halved','Disadv. on attacks & saves','HP max halved','Speed = 0','Dead'])[char.exhaustionLevel - 1]}
-                  </p>
+                  <ul className="text-xs text-red-600 mt-1 space-y-0.5">
+                    {(['Disadv. on ability checks','Speed halved','Disadv. on attacks & saves','HP max halved','Speed = 0','Dead'] as const)
+                      .slice(0, char.exhaustionLevel)
+                      .map((effect, i) => <li key={i}>· {effect}</li>)}
+                  </ul>
                 )}
 
               </div>
@@ -1957,6 +1993,91 @@ export default function Sheet() {
                     if (val) { patch({ languages: [...new Set([...char.languages, val])] });(e.target as HTMLInputElement).value = '' }
                   }
                 }} />
+              </div>
+            </div>
+          </div>
+          {/* Custom Resources */}
+          <div className="card">
+            <h3 className="section-header mb-3">Custom Resources</h3>
+            {(char.customResources ?? []).length > 0 && (
+              <div className="space-y-3 mb-4">
+                {(char.customResources ?? []).map(r => {
+                  const current = char.classResources[r.key] ?? r.max
+                  return (
+                    <div key={r.key} className="flex items-center gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium text-parchment-800 truncate">{r.name}</div>
+                        <div className="text-xs text-parchment-400">{r.recharge === 'short' ? 'Short rest' : 'Long rest'} · {r.max} max</div>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => patch({ classResources: { ...char.classResources, [r.key]: Math.max(0, current - 1) } })}
+                          className="w-6 h-6 rounded border border-parchment-300 text-parchment-600 hover:bg-parchment-100 text-sm font-bold flex items-center justify-center"
+                        >−</button>
+                        <span className="text-sm font-mono w-10 text-center">{current}/{r.max}</span>
+                        <button
+                          onClick={() => patch({ classResources: { ...char.classResources, [r.key]: Math.min(r.max, current + 1) } })}
+                          className="w-6 h-6 rounded border border-parchment-300 text-parchment-600 hover:bg-parchment-100 text-sm font-bold flex items-center justify-center"
+                        >+</button>
+                        <button
+                          onClick={() => {
+                            const updated = (char.customResources ?? []).filter(x => x.key !== r.key)
+                            const newClassRes = { ...char.classResources }
+                            delete newClassRes[r.key]
+                            patch({ customResources: updated, classResources: newClassRes })
+                          }}
+                          className="w-6 h-6 rounded border border-red-200 text-red-400 hover:bg-red-50 text-xs flex items-center justify-center ml-1"
+                          title="Remove resource"
+                        >✕</button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+            <div className="border-t border-parchment-200 pt-3">
+              <div className="text-xs text-parchment-500 mb-2 font-medium">Add Resource</div>
+              <div className="flex gap-2 flex-wrap">
+                <input
+                  type="text"
+                  placeholder="Name"
+                  value={newResourceName}
+                  onChange={e => setNewResourceName(e.target.value)}
+                  className="border border-parchment-300 rounded px-2 py-1 text-sm flex-1 min-w-0 bg-white"
+                />
+                <input
+                  type="number"
+                  placeholder="Max"
+                  min={1}
+                  value={newResourceMax}
+                  onChange={e => setNewResourceMax(e.target.value)}
+                  className="border border-parchment-300 rounded px-2 py-1 text-sm w-16 bg-white"
+                />
+                <select
+                  value={newResourceRecharge}
+                  onChange={e => setNewResourceRecharge(e.target.value as 'short' | 'long')}
+                  className="border border-parchment-300 rounded px-2 py-1 text-sm bg-white"
+                >
+                  <option value="long">Long Rest</option>
+                  <option value="short">Short Rest</option>
+                </select>
+                <button
+                  onClick={() => {
+                    const name = newResourceName.trim()
+                    const max = parseInt(newResourceMax, 10)
+                    if (!name || !max || max < 1) return
+                    const key = `custom-${name.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}`
+                    const newRes = { key, name, max, recharge: newResourceRecharge }
+                    patch({
+                      customResources: [...(char.customResources ?? []), newRes],
+                      classResources: { ...char.classResources, [key]: max },
+                    })
+                    setNewResourceName('')
+                    setNewResourceMax('')
+                    setNewResourceRecharge('long')
+                  }}
+                  className="btn-primary text-sm px-3 py-1"
+                >Add</button>
               </div>
             </div>
           </div>
@@ -2184,6 +2305,74 @@ export default function Sheet() {
                     </div>
                   </div>
                 )}
+
+                {/* ── Sorcery Points: Flexible Casting ── */}
+                {char.classes.some(c => c.classSlug === 'sorcerer') && (() => {
+                  const sorcLevel = char.classes.find(c => c.classSlug === 'sorcerer')?.level ?? 0
+                  if (sorcLevel < 2) return null
+                  const spCurrent = char.classResources['sorcery-points'] ?? sorcLevel
+                  const SLOT_TO_POINTS: Record<number, number> = { 1: 2, 2: 3, 3: 5, 4: 6, 5: 7 }
+                  const POINTS_TO_SLOT: Record<number, number> = { 1: 2, 2: 3, 3: 5, 4: 6, 5: 7 }
+                  return (
+                    <div className="card">
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 className="text-sm font-bold text-parchment-700 uppercase tracking-wider">Flexible Casting</h3>
+                        <span className="text-xs bg-purple-100 text-purple-700 rounded-full px-2 py-0.5 font-medium">{spCurrent}/{sorcLevel} Sorcery Pts</span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <div className="text-xs font-semibold text-parchment-500 uppercase mb-1">Convert Slot → Points</div>
+                          <div className="space-y-1">
+                            {[1,2,3,4,5].filter(lvl => (char.spellSlots[String(lvl)]?.max ?? 0) > 0).map(lvl => {
+                              const used = char.spellSlots[String(lvl)]?.used ?? 0
+                              const max = char.spellSlots[String(lvl)]?.max ?? 0
+                              const available = max - used
+                              const gain = SLOT_TO_POINTS[lvl]!
+                              return (
+                                <button key={lvl} disabled={available === 0}
+                                  onClick={() => {
+                                    const newUsed = used + 1
+                                    const newSP = Math.min(sorcLevel, spCurrent + gain)
+                                    patch({
+                                      spellSlots: { ...char.spellSlots, [String(lvl)]: { max, used: newUsed } },
+                                      classResources: { ...char.classResources, 'sorcery-points': newSP },
+                                    })
+                                  }}
+                                  className="w-full text-left text-xs px-2 py-1 rounded border border-parchment-200 hover:border-purple-300 hover:bg-purple-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
+                                  Expend L{lvl} slot (+{gain} pts) <span className="text-parchment-400">[{available} avail]</span>
+                                </button>
+                              )
+                            })}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-xs font-semibold text-parchment-500 uppercase mb-1">Convert Points → Slot</div>
+                          <div className="space-y-1">
+                            {([1,2,3,4,5] as const).filter(lvl => lvl <= Math.min(5, sorcLevel)).map(lvl => {
+                              const cost = POINTS_TO_SLOT[lvl]!
+                              return (
+                                <button key={lvl} disabled={spCurrent < cost}
+                                  onClick={() => {
+                                    const newSP = spCurrent - cost
+                                    const slotMax = (char.spellSlots[String(lvl)]?.max ?? 0) + 1
+                                    const slotUsed = char.spellSlots[String(lvl)]?.used ?? 0
+                                    patch({
+                                      classResources: { ...char.classResources, 'sorcery-points': newSP },
+                                      spellSlots: { ...char.spellSlots, [String(lvl)]: { max: slotMax, used: slotUsed } },
+                                    })
+                                  }}
+                                  className="w-full text-left text-xs px-2 py-1 rounded border border-parchment-200 hover:border-purple-300 hover:bg-purple-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
+                                  Create L{lvl} slot (−{cost} pts) <span className="text-parchment-400">[need {cost}]</span>
+                                </button>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                      <p className="text-[10px] text-parchment-400 mt-2">Created slots are temporary (disappear on long rest). Slot conversion limited to L5 maximum.</p>
+                    </div>
+                  )
+                })()}
 
                 {/* ── Prepared / Known Spells ── */}
                 <div className="card">
@@ -2848,8 +3037,8 @@ export default function Sheet() {
       {/* Inventory Tab */}
       {tab === 'inventory' && (
         <div>
-          {/* Top row: Currency + Attunement + Carry Weight */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
+          {/* Top row: Currency + Attunement */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5">
             {/* Currency */}
             {(() => {
               const COIN_DOT: Record<string, string> = {
@@ -2926,6 +3115,25 @@ export default function Sheet() {
                       }}
                     >− Spend</button>
                   </div>
+                  {/* Convert down */}
+                  <div className="pt-2 border-t border-parchment-200">
+                    <div className="text-xs text-parchment-400 mb-1.5">Break into smaller coins</div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {([
+                        { from: 'pp', to: 'gp', rate: 10, label: '1 pp → 10 gp' },
+                        { from: 'gp', to: 'sp', rate: 10, label: '1 gp → 10 sp' },
+                        { from: 'ep', to: 'sp', rate: 5,  label: '1 ep → 5 sp'  },
+                        { from: 'sp', to: 'cp', rate: 10, label: '1 sp → 10 cp' },
+                      ] as const).map(({ from, to, rate, label }) => (
+                        <button
+                          key={label}
+                          disabled={char.currency[from] < 1}
+                          className="px-2 py-1 text-xs rounded border border-parchment-300 bg-parchment-50 text-parchment-600 hover:bg-parchment-100 disabled:opacity-30 transition-colors"
+                          onClick={() => patch({ currency: { ...char.currency, [from]: char.currency[from] - 1, [to]: char.currency[to] + rate } })}
+                        >{label}</button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </div>
               )
@@ -2975,41 +3183,6 @@ export default function Sheet() {
               {attuned >= 3 && <p className="text-xs text-red-500 mt-1">Maximum reached</p>}
             </div>
 
-            {/* Carry weight */}
-            {(() => {
-              const totalWeight = char.equipment.reduce((sum, item) => {
-                const def = content.items.find(i => i.slug === item.itemSlug)
-                const ws = resolveWeapon(item, content.items)
-                const as_ = resolveArmor(item, content.items)
-                const w = def?.weight ?? ws?.weight ?? as_?.weight ?? 0
-                return sum + w * item.quantity
-              }, 0)
-              const capacity = char.abilityScores.str * 15
-              const pct = Math.min(100, Math.round(totalWeight / capacity * 100))
-              const encumbered = totalWeight > char.abilityScores.str * 5
-              const heavy = totalWeight > char.abilityScores.str * 10
-              return (
-                <div className="card p-3">
-                  <div className="text-xs font-bold text-parchment-500 uppercase tracking-wider mb-2">Carry Weight</div>
-                  <div className="flex items-end gap-1 mb-2">
-                    <span className={`text-2xl font-bold ${heavy ? 'text-red-600' : encumbered ? 'text-amber-600' : 'text-parchment-800'}`}>
-                      {totalWeight % 1 === 0 ? totalWeight : totalWeight.toFixed(1)}
-                    </span>
-                    <span className="text-parchment-300 text-lg mb-0.5">/</span>
-                    <span className="text-lg font-semibold text-parchment-400 mb-0.5">{capacity}</span>
-                    <span className="text-xs text-parchment-400 mb-0.5 ml-1">lbs</span>
-                  </div>
-                  <div className="h-1.5 bg-parchment-200 rounded-full overflow-hidden">
-                    <div className={`h-full rounded-full transition-all ${heavy ? 'bg-red-500' : encumbered ? 'bg-amber-400' : 'bg-green-500'}`} style={{ width: `${pct}%` }} />
-                  </div>
-                  {(heavy || encumbered) && (
-                    <p className="text-xs mt-1 font-medium" style={{ color: heavy ? '#dc2626' : '#d97706' }}>
-                      {heavy ? 'Heavily Encumbered' : 'Encumbered'}
-                    </p>
-                  )}
-                </div>
-              )
-            })()}
 
           </div>{/* end top row grid */}
 
@@ -3132,7 +3305,7 @@ export default function Sheet() {
               patch({ equipment: eq })
             }
 
-            const ItemRow = ({ item, idx, badge, badgeColor, descriptionText, showAttune, consumable }: {
+            const itemRow = ({ item, idx, badge, badgeColor, descriptionText, showAttune, consumable }: {
               item: typeof char.equipment[0]; idx: number; badge?: string | null; badgeColor?: string; descriptionText?: string | null; showAttune?: boolean; consumable?: boolean
             }) => {
               const isExpanded = expandedInventoryItem === idx
@@ -3171,6 +3344,7 @@ export default function Sheet() {
 
               return (
                 <div
+                  key={idx}
                   ref={isExpanded ? el => { if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' }) } : undefined}
                   className={`rounded-lg overflow-hidden border-l-4 ${rarityAccent} transition-all ${
                     isExpanded ? 'border border-parchment-300 shadow-sm' : 'border border-parchment-100 hover:border-parchment-300 hover:shadow-sm'
@@ -3184,6 +3358,9 @@ export default function Sheet() {
                         {item.attuned && <span className="text-[11px] text-indigo-500 shrink-0">✦</span>}
                         {item.quantity > 1 && (
                           <span className="text-[11px] bg-parchment-100 text-parchment-500 px-1.5 py-0.5 rounded-full font-medium shrink-0">×{item.quantity}</span>
+                        )}
+                        {item.chargesMax !== undefined && (
+                          <span className="text-[11px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded-full font-medium shrink-0">{item.charges ?? item.chargesMax}/{item.chargesMax}</span>
                         )}
                       </div>
                       <div className="flex items-center gap-2 flex-wrap">
@@ -3380,14 +3557,38 @@ export default function Sheet() {
                       </div>
                       <input className="input text-xs py-1 w-full" placeholder="Notes…" value={item.notes}
                         onChange={e => { const eq=[...char.equipment]; eq[idx]={...eq[idx],notes:e.target.value}; patch({equipment:eq}) }} />
+                      {item.chargesMax !== undefined ? (
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs text-parchment-600 shrink-0">Charges:</span>
+                          <button type="button" className="w-5 h-5 rounded border border-parchment-200 text-parchment-500 hover:border-parchment-400 text-xs font-bold"
+                            onClick={() => { const eq=[...char.equipment]; eq[idx]={...eq[idx],charges:Math.max(0,(item.charges??item.chargesMax??0)-1)}; patch({equipment:eq}) }}>−</button>
+                          <span className="text-sm font-semibold w-5 text-center">{item.charges ?? item.chargesMax}</span>
+                          <span className="text-xs text-parchment-400">/</span>
+                          <input type="number" min={1} max={999} className="input text-xs py-0.5 w-12 text-center"
+                            value={item.chargesMax}
+                            onChange={e => { const val=parseInt(e.target.value,10); if(!isNaN(val)&&val>=1){const eq=[...char.equipment];eq[idx]={...eq[idx],chargesMax:val,charges:Math.min(item.charges??val,val)};patch({equipment:eq})} }} />
+                          <button type="button" className="w-5 h-5 rounded border border-parchment-200 text-parchment-500 hover:border-parchment-400 text-xs font-bold"
+                            onClick={() => { const eq=[...char.equipment]; eq[idx]={...eq[idx],charges:Math.min(item.chargesMax!,(item.charges??item.chargesMax??0)+1)}; patch({equipment:eq}) }}>+</button>
+                          <label className="flex items-center gap-1 text-xs cursor-pointer ml-1">
+                            <input type="checkbox" checked={!!item.rechargesOnLongRest}
+                              onChange={e => { const eq=[...char.equipment]; eq[idx]={...eq[idx],rechargesOnLongRest:e.target.checked}; patch({equipment:eq}) }} />
+                            <span>Recharge LR</span>
+                          </label>
+                          <button type="button" className="text-xs text-parchment-300 hover:text-red-500 ml-auto"
+                            onClick={() => { const eq=[...char.equipment]; eq[idx]={...eq[idx],chargesMax:undefined,charges:undefined,rechargesOnLongRest:undefined}; patch({equipment:eq}) }}>✕ charges</button>
+                        </div>
+                      ) : (
+                        <button type="button" className="text-xs text-parchment-400 hover:text-parchment-700"
+                          onClick={() => { const eq=[...char.equipment]; eq[idx]={...eq[idx],chargesMax:1,charges:1}; patch({equipment:eq}) }}>＋ Add charges</button>
+                      )}
                     </div>
                   )}
                 </div>
               )
             }
 
-            // Section header component
-            const SectionHead = ({ title, count, onAdd, addLabel }: { title: string; count: number; onAdd?: () => void; addLabel?: string }) => (
+            // Section header — plain function to avoid component-identity remounts
+            const sectionHead = (title: string, count: number, onAdd?: () => void, addLabel?: string) => (
               <div className="flex items-center gap-2 mb-2 mt-4 first:mt-0">
                 <span className="text-xs font-bold text-parchment-600 uppercase tracking-wider">{title}</span>
                 <span className="text-xs text-parchment-400">{count}</span>
@@ -3753,7 +3954,7 @@ export default function Sheet() {
                     'shield-1', 'shield-2', 'shield-3',
                   ])
 
-                  const MagicPicker = ({ filter }: { filter: (it: ItemDef) => boolean }) => (
+                  const magicPicker = (filter: (it: ItemDef) => boolean) => (
                     <div className="mt-3 p-3 rounded-lg border border-parchment-200 bg-parchment-50">
                       <input className="input mb-2 text-sm" placeholder="Search…" value={addPanelSearch}
                         onChange={e => setAddPanelSearch(e.target.value)} autoFocus />
@@ -3773,7 +3974,7 @@ export default function Sheet() {
                     </div>
                   )
 
-                  const SecLabel = ({ cat, label }: { cat: ItemCat; label: string }) => (
+                  const secLabel = (cat: ItemCat, label: string) => (
                     <div className="flex items-center gap-2 mb-3">
                       <span className="text-xs font-bold text-parchment-500 uppercase tracking-widest">{label}</span>
                       {grouped[cat].length > 0 && (
@@ -3790,11 +3991,11 @@ export default function Sheet() {
                   const HELD_CATS:   ItemCat[] = ['weapon', 'rod', 'staff', 'wand', 'scroll']
                   const SUPPLY_CATS: ItemCat[] = ['potion', 'gear']
 
-                  const AddPill = ({ cat }: { cat: ItemCat }) => {
+                  const addPill = (cat: ItemCat) => {
                     const key = catKey(cat)
                     const active = addPanel === key
                     return (
-                      <button type="button"
+                      <button key={cat} type="button"
                         className={`text-xs rounded-full px-2.5 py-0.5 border transition-colors ${active ? 'bg-parchment-700 text-white border-parchment-700' : 'border-parchment-200 text-parchment-500 hover:border-parchment-500 hover:text-parchment-800'}`}
                         onClick={() => { setAddPanel(active ? null : key); setAddPanelSearch('') }}>
                         {active ? `✕ ${CAT_LABELS[cat]}` : `+ ${CAT_LABELS[cat]}`}
@@ -3802,11 +4003,11 @@ export default function Sheet() {
                     )
                   }
 
-                  const CardHeader = ({ title, cats, extra }: { title: string; cats: ItemCat[]; extra?: React.ReactNode }) => (
+                  const cardHeader = (title: string, cats: ItemCat[], extra?: React.ReactNode) => (
                     <div className="flex items-center justify-between mb-3 pb-2 border-b border-parchment-100">
                       <span className="font-semibold text-parchment-800 text-sm">{title}</span>
                       <div className="flex flex-wrap gap-1.5 justify-end">
-                        {cats.map(cat => <AddPill key={cat} cat={cat} />)}
+                        {cats.map(cat => addPill(cat))}
                         {extra}
                       </div>
                     </div>
@@ -3817,12 +4018,12 @@ export default function Sheet() {
 
                       {/* ── Worn ── */}
                       <div className="card">
-                        <CardHeader title="Worn" cats={WORN_CATS} />
+                        {cardHeader('Worn', WORN_CATS)}
                         <div className="divide-y divide-parchment-100">
 
                           {catVisible('armor') && (
                             <div className="py-3 first:pt-0 last:pb-0">
-                              <SecLabel cat="armor" label="Armor" />
+                              {secLabel('armor', 'Armor')}
                               {addPanel === 'add-armor' && (() => {
                                 const mundaneArmorSlugs = new Set(['padded','leather','studded-leather','hide','chain-shirt','scale-mail','breastplate','half-plate','ring-mail','chain-mail','splint','plate','shield'])
                                 const groups = [
@@ -3898,7 +4099,7 @@ export default function Sheet() {
                                   if (as_.minStrength && char.abilityScores.str < as_.minStrength) warnings.push(`STR ${as_.minStrength} req.`)
                                   const def = content.items.find(i => i.slug === item.itemSlug && i.name)
                                   const descParts = [warnings.length ? `⚠ ${warnings.join(' · ')}` : null, def?.description || null, item.notes || null].filter(Boolean)
-                                  return <ItemRow key={idx} item={item} idx={idx} badge={calcAC} badgeColor="bg-blue-100 text-blue-700" descriptionText={descParts.join('\n\n') || null} />
+                                  return itemRow({ item, idx, badge: calcAC, badgeColor: 'bg-blue-100 text-blue-700', descriptionText: descParts.join('\n\n') || null })
                                 })}
                               </div>
                             </div>
@@ -3906,13 +4107,13 @@ export default function Sheet() {
 
                           {catVisible('ring') && (
                             <div className="py-3 first:pt-0 last:pb-0">
-                              <SecLabel cat="ring" label="Ring" />
-                              {addPanel === 'add-ring' && <MagicPicker filter={it => it.type === 'Ring'} />}
+                              {secLabel('ring', 'Ring')}
+                              {addPanel === 'add-ring' && magicPicker(it => it.type === 'Ring')}
                               <div className="mt-1 space-y-2">
                                 {grouped.ring.map(({ item, idx }) => {
                                   const def = content.items.find(i => i.slug === item.itemSlug && i.name)
                                   const rb = rarityBadge(def?.rarity)
-                                  return <ItemRow key={idx} item={item} idx={idx} badge={rb.badge} badgeColor={rb.badgeColor} descriptionText={def?.description || item.notes || null} showAttune={def?.attunement} />
+                                  return itemRow({ item, idx, badge: rb.badge, badgeColor: rb.badgeColor, descriptionText: def?.description || item.notes || null, showAttune: def?.attunement })
                                 })}
                               </div>
                             </div>
@@ -3920,16 +4121,16 @@ export default function Sheet() {
 
                           {catVisible('wondrous') && (
                             <div className="py-3 first:pt-0 last:pb-0">
-                              <SecLabel cat="wondrous" label="Wondrous Item" />
-                              {addPanel === 'add-wondrous' && <MagicPicker filter={it => {
+                              {secLabel('wondrous', 'Wondrous Item')}
+                              {addPanel === 'add-wondrous' && magicPicker(it => {
                                 const n = it.name.toLowerCase()
                                 return it.type === 'Wondrous Item' && !/^rod\b/.test(n) && !/^scroll\b/.test(n) && !/^staff\b/.test(n) && !/^wand\b/.test(n) && !it.weaponStats && !it.armorStats
-                              }} />}
+                              })}
                               <div className="mt-1 space-y-2">
                                 {grouped.wondrous.map(({ item, idx }) => {
                                   const def = content.items.find(i => i.slug === item.itemSlug && i.name)
                                   const rb = rarityBadge(def?.rarity)
-                                  return <ItemRow key={idx} item={item} idx={idx} badge={rb.badge} badgeColor={rb.badgeColor} descriptionText={def?.description || item.notes || null} showAttune={def?.attunement} />
+                                  return itemRow({ item, idx, badge: rb.badge, badgeColor: rb.badgeColor, descriptionText: def?.description || item.notes || null, showAttune: def?.attunement })
                                 })}
                               </div>
                             </div>
@@ -3943,12 +4144,12 @@ export default function Sheet() {
 
                       {/* ── Held ── */}
                       <div className="card">
-                        <CardHeader title="Held" cats={HELD_CATS} />
+                        {cardHeader('Held', HELD_CATS)}
                         <div className="divide-y divide-parchment-100">
 
                           {catVisible('weapon') && (
                             <div className="py-3 first:pt-0 last:pb-0">
-                              <SecLabel cat="weapon" label="Weapon" />
+                              {secLabel('weapon', 'Weapon')}
                               {addPanel === 'add-weapon' && (() => {
                                 const mundaneSlugs = new Set(['club','dagger','greatclub','handaxe','javelin','light-hammer','mace','quarterstaff','sickle','spear','crossbow-light','dart','shortbow','sling','battleaxe','flail','glaive','greataxe','greatsword','halberd','lance','longsword','maul','morningstar','pike','rapier','scimitar','shortsword','trident','war-pick','warhammer','whip','crossbow-hand','crossbow-heavy','longbow','net'])
                                 const groups = [
@@ -4014,7 +4215,7 @@ export default function Sheet() {
                                   const dmgMod = weaponDamageMod(char, ws, bonus)
                                   const dmgStr = ws.damage === '—' ? ws.damage : `${ws.damage}${dmgMod !== 0 ? formatMod(dmgMod) : ''} ${ws.damageType}`
                                   const badge = `${dmgStr}${ws.finesse ? ' · Finesse' : ''}${ws.ranged ? ' · Ranged' : ''}`
-                                  return <ItemRow key={idx} item={item} idx={idx} badge={badge} badgeColor="bg-green-100 text-green-700" descriptionText={item.notes || null} />
+                                  return itemRow({ item, idx, badge, badgeColor: 'bg-green-100 text-green-700', descriptionText: item.notes || null })
                                 })}
                               </div>
                             </div>
@@ -4022,13 +4223,13 @@ export default function Sheet() {
 
                           {catVisible('rod') && (
                             <div className="py-3 first:pt-0 last:pb-0">
-                              <SecLabel cat="rod" label="Rod" />
-                              {addPanel === 'add-rod' && <MagicPicker filter={it => /^rod\b/i.test(it.name)} />}
+                              {secLabel('rod', 'Rod')}
+                              {addPanel === 'add-rod' && magicPicker(it => /^rod\b/i.test(it.name))}
                               <div className="mt-1 space-y-2">
                                 {grouped.rod.map(({ item, idx }) => {
                                   const def = content.items.find(i => i.slug === item.itemSlug && i.name)
                                   const rb = rarityBadge(def?.rarity)
-                                  return <ItemRow key={idx} item={item} idx={idx} badge={rb.badge} badgeColor={rb.badgeColor} descriptionText={def?.description || item.notes || null} showAttune={def?.attunement} />
+                                  return itemRow({ item, idx, badge: rb.badge, badgeColor: rb.badgeColor, descriptionText: def?.description || item.notes || null, showAttune: def?.attunement })
                                 })}
                               </div>
                             </div>
@@ -4036,13 +4237,13 @@ export default function Sheet() {
 
                           {catVisible('staff') && (
                             <div className="py-3 first:pt-0 last:pb-0">
-                              <SecLabel cat="staff" label="Staff" />
-                              {addPanel === 'add-staff' && <MagicPicker filter={it => /^staff\b/i.test(it.name)} />}
+                              {secLabel('staff', 'Staff')}
+                              {addPanel === 'add-staff' && magicPicker(it => /^staff\b/i.test(it.name))}
                               <div className="mt-1 space-y-2">
                                 {grouped.staff.map(({ item, idx }) => {
                                   const def = content.items.find(i => i.slug === item.itemSlug && i.name)
                                   const rb = rarityBadge(def?.rarity)
-                                  return <ItemRow key={idx} item={item} idx={idx} badge={rb.badge} badgeColor={rb.badgeColor} descriptionText={def?.description || item.notes || null} showAttune={def?.attunement} />
+                                  return itemRow({ item, idx, badge: rb.badge, badgeColor: rb.badgeColor, descriptionText: def?.description || item.notes || null, showAttune: def?.attunement })
                                 })}
                               </div>
                             </div>
@@ -4050,13 +4251,13 @@ export default function Sheet() {
 
                           {catVisible('wand') && (
                             <div className="py-3 first:pt-0 last:pb-0">
-                              <SecLabel cat="wand" label="Wand" />
-                              {addPanel === 'add-wand' && <MagicPicker filter={it => /^wand\b/i.test(it.name)} />}
+                              {secLabel('wand', 'Wand')}
+                              {addPanel === 'add-wand' && magicPicker(it => /^wand\b/i.test(it.name))}
                               <div className="mt-1 space-y-2">
                                 {grouped.wand.map(({ item, idx }) => {
                                   const def = content.items.find(i => i.slug === item.itemSlug && i.name)
                                   const rb = rarityBadge(def?.rarity)
-                                  return <ItemRow key={idx} item={item} idx={idx} badge={rb.badge} badgeColor={rb.badgeColor} descriptionText={def?.description || item.notes || null} showAttune={def?.attunement} />
+                                  return itemRow({ item, idx, badge: rb.badge, badgeColor: rb.badgeColor, descriptionText: def?.description || item.notes || null, showAttune: def?.attunement })
                                 })}
                               </div>
                             </div>
@@ -4064,13 +4265,13 @@ export default function Sheet() {
 
                           {catVisible('scroll') && (
                             <div className="py-3 first:pt-0 last:pb-0">
-                              <SecLabel cat="scroll" label="Scroll" />
-                              {addPanel === 'add-scroll' && <MagicPicker filter={it => /^scroll\b/i.test(it.name)} />}
+                              {secLabel('scroll', 'Scroll')}
+                              {addPanel === 'add-scroll' && magicPicker(it => /^scroll\b/i.test(it.name))}
                               <div className="mt-1 space-y-2">
                                 {grouped.scroll.map(({ item, idx }) => {
                                   const def = content.items.find(i => i.slug === item.itemSlug && i.name)
                                   const rb = rarityBadge(def?.rarity)
-                                  return <ItemRow key={idx} item={item} idx={idx} badge={rb.badge} badgeColor={rb.badgeColor} descriptionText={def?.description || item.notes || null} showAttune={def?.attunement} consumable />
+                                  return itemRow({ item, idx, badge: rb.badge, badgeColor: rb.badgeColor, descriptionText: def?.description || item.notes || null, showAttune: def?.attunement, consumable: true })
                                 })}
                               </div>
                             </div>
@@ -4084,7 +4285,7 @@ export default function Sheet() {
 
                       {/* ── Other ── */}
                       <div className="card">
-                        <CardHeader title="Other" cats={SUPPLY_CATS} extra={
+                        {cardHeader('Other', SUPPLY_CATS,
                           <button type="button"
                             className="text-xs rounded-full px-2.5 py-0.5 border border-parchment-200 text-parchment-500 hover:border-parchment-500 hover:text-parchment-800 transition-colors"
                             onClick={() => {
@@ -4092,22 +4293,20 @@ export default function Sheet() {
                               if (!name) return
                               patch({ equipment: [...char.equipment, { itemSlug: `custom-${Date.now()}`, name, quantity: 1, equipped: false, attuned: false, isHomebrew: true, notes: '' }] })
                             }}>+ Custom</button>
-                        } />
+                        )}
                         <div className="divide-y divide-parchment-100">
 
                           {catVisible('potion') && (
                             <div className="py-3 first:pt-0 last:pb-0">
-                              <SecLabel cat="potion" label="Potion" />
-                              {addPanel === 'add-potion' && <MagicPicker filter={it => it.type === 'Potion'} />}
+                              {secLabel('potion', 'Potion')}
+                              {addPanel === 'add-potion' && magicPicker(it => it.type === 'Potion')}
                               <div className="mt-1 space-y-2">
                                 {grouped.potion.map(({ item, idx }) => {
                                   const cd = CONSUMABLE_DATA[item.name]
                                   const def = content.items.find(i => i.slug === item.itemSlug && i.name)
                                   const rb = rarityBadge(def?.rarity)
                                   const descParts = [cd?.text ?? def?.description ?? null, item.notes || null].filter(Boolean)
-                                  return <ItemRow key={idx} item={item} idx={idx}
-                                    badge={cd?.badge ?? rb.badge} badgeColor={cd?.badgeColor ?? rb.badgeColor}
-                                    descriptionText={descParts.join('\n\n') || null} consumable={!!cd} showAttune={def?.attunement} />
+                                  return itemRow({ item, idx, badge: cd?.badge ?? rb.badge, badgeColor: cd?.badgeColor ?? rb.badgeColor, descriptionText: descParts.join('\n\n') || null, consumable: !!cd, showAttune: def?.attunement })
                                 })}
                               </div>
                             </div>
@@ -4115,7 +4314,7 @@ export default function Sheet() {
 
                           {catVisible('gear') && (
                             <div className="py-3 first:pt-0 last:pb-0">
-                              <SecLabel cat="gear" label="Gear" />
+                              {secLabel('gear', 'Gear')}
                               {addPanel === 'add-gear-browse' && (
                                 <div className="mb-3 p-3 rounded-lg border border-parchment-200 bg-parchment-50">
                                   <input className="input mb-2 text-sm" placeholder="Search gear…" value={addPanelSearch} onChange={e => setAddPanelSearch(e.target.value)} autoFocus />
@@ -4144,7 +4343,7 @@ export default function Sheet() {
                                 {grouped.gear.map(({ item, idx }) => {
                                   const cd = CONSUMABLE_DATA[item.name]
                                   const descText = cd ? cd.text + (item.notes ? '\n\n' + item.notes : '') : (item.notes || null)
-                                  return <ItemRow key={idx} item={item} idx={idx} badge={cd?.badge} badgeColor={cd?.badgeColor} descriptionText={descText} consumable={!!cd} />
+                                  return itemRow({ item, idx, badge: cd?.badge, badgeColor: cd?.badgeColor, descriptionText: descText, consumable: !!cd })
                                 })}
                               </div>
                             </div>
@@ -4526,7 +4725,7 @@ export default function Sheet() {
             if (!cls) return null
             const classOptsDef = CLASS_OPTIONS[cc.classSlug]
             const features = (classOptsDef?.features ?? cls.features).filter(f => f.level <= cc.level)
-            const fightingStyleChoice = char.featuresChosen.find(fc => fc.key === 'fighting-style')
+            const fightingStyleChoice = char.featuresChosen.find(fc => fc.key === 'fighting-style' || fc.key === `fighting-style-${cc.classSlug}`)
             const fightingStyleSlug = typeof fightingStyleChoice?.value === 'string' ? fightingStyleChoice.value : null
             const chosenStyle = classOptsDef?.fightingStyles?.find(s => s.slug === fightingStyleSlug)
             const subclassEntry = cc.subclassSlug
@@ -4812,6 +5011,456 @@ export default function Sheet() {
                     </div>
                   )
                 })}
+
+                {/* Rogue: Sneak Attack */}
+                {cc.classSlug === 'rogue' && sneakDice > 0 && (
+                  <div className="mb-3 p-3 rounded border border-red-100 bg-red-50">
+                    <div className="flex items-center justify-between">
+                      <div className="font-medium text-sm text-red-800">Sneak Attack</div>
+                      <div className="text-xl font-bold text-red-700">{sneakDice}d6</div>
+                    </div>
+                    <p className="text-xs text-red-600 mt-1">Once per turn when you hit with a finesse/ranged weapon and have advantage or a nearby ally.</p>
+                  </div>
+                )}
+
+                {/* Warlock: Pact Boon */}
+                {cc.classSlug === 'warlock' && (() => {
+                  const fc = char.featuresChosen.find(f => f.key === 'pact-boon')
+                  const boon = typeof fc?.value === 'string' ? fc.value : null
+                  const BOON_LABELS: Record<string, string> = { blade: 'Pact of the Blade', chain: 'Pact of the Chain', tome: 'Pact of the Tome' }
+                  const BOON_DESC: Record<string, string> = {
+                    blade: 'Summon a pact weapon. Use CHA for attack/damage (with Hex Warrior). Pact weapon is magical.',
+                    chain: 'Find Familiar — can take imp, pseudodragon, quasit, or sprite form. Familiar can attack on reaction.',
+                    tome: 'Book of Shadows: gain 3 cantrips from any class list. Required for Book of Ancient Secrets.',
+                  }
+                  if (!boon) return (
+                    cc.level >= 3
+                      ? <div className="mb-3 p-3 rounded border border-indigo-100 bg-indigo-50 text-xs text-indigo-600">No Pact Boon recorded — level up to choose one.</div>
+                      : null
+                  )
+                  return (
+                    <div className="mb-3 p-3 rounded border border-indigo-200 bg-indigo-50">
+                      <div className="font-medium text-sm text-indigo-800">{BOON_LABELS[boon] ?? boon}</div>
+                      <p className="text-xs text-indigo-600 mt-1">{BOON_DESC[boon] ?? ''}</p>
+                    </div>
+                  )
+                })()}
+
+                {/* Battle Master: Maneuvers */}
+                {cc.classSlug === 'fighter' && cc.subclassSlug === 'battle-master' && (() => {
+                  const fc = char.featuresChosen.find(f => f.key === 'maneuvers')
+                  const slugs: string[] = !fc ? [] : Array.isArray(fc.value) ? fc.value : [fc.value]
+                  if (slugs.length === 0) return null
+                  return (
+                    <div className="mb-3 p-3 rounded border border-amber-100 bg-amber-50">
+                      <div className="font-medium text-sm text-amber-800 mb-2">Maneuvers Known ({slugs.length})</div>
+                      <div className="space-y-1">
+                        {slugs.map(slug => {
+                          const m = BATTLE_MASTER_MANEUVERS.find(x => x.slug === slug)
+                          return (
+                            <div key={slug} className="text-sm">
+                              <span className="font-medium">{m?.name ?? slug}</span>
+                              {m?.description && <span className="text-xs text-parchment-500 ml-2">— {m.description}</span>}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )
+                })()}
+
+                {/* Ranger: Favored Enemy & Natural Explorer */}
+                {cc.classSlug === 'ranger' && (() => {
+                  const enemies = char.featuresChosen
+                    .filter(f => f.key.startsWith('favored-enemy-'))
+                    .map(f => typeof f.value === 'string' ? f.value : '')
+                    .filter(Boolean)
+                  const terrains = char.featuresChosen
+                    .filter(f => f.key.startsWith('favored-terrain-'))
+                    .map(f => typeof f.value === 'string' ? f.value : '')
+                    .filter(Boolean)
+                  if (enemies.length === 0 && terrains.length === 0) return null
+                  return (
+                    <div className="mb-3 p-3 rounded border border-green-100 bg-green-50">
+                      {enemies.length > 0 && (
+                        <div className="mb-1.5">
+                          <div className="text-xs font-bold text-green-700 uppercase tracking-wide mb-1">Favored Enemies</div>
+                          <div className="flex flex-wrap gap-1">
+                            {enemies.map(e => <span key={e} className="text-xs bg-green-100 text-green-800 rounded px-2 py-0.5">{e}</span>)}
+                          </div>
+                        </div>
+                      )}
+                      {terrains.length > 0 && (
+                        <div>
+                          <div className="text-xs font-bold text-green-700 uppercase tracking-wide mb-1">Favored Terrains</div>
+                          <div className="flex flex-wrap gap-1">
+                            {terrains.map(t => <span key={t} className="text-xs bg-green-100 text-green-800 rounded px-2 py-0.5">{t}</span>)}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })()}
+
+                {/* Monk: Martial Arts + Ki summary */}
+                {cc.classSlug === 'monk' && (() => {
+                  const maDie = `d${cc.level >= 17 ? 10 : cc.level >= 11 ? 8 : cc.level >= 5 ? 6 : 4}`
+                  const kiSaveDC = 8 + profBonus(char) + Math.max(0, abilityModFor(char, 'wis'))
+                  return (
+                    <div className="mb-3 p-3 rounded border border-amber-100 bg-amber-50">
+                      <div className="font-medium text-sm text-amber-800 mb-2">Monk — Martial Arts</div>
+                      <div className="flex gap-4 mb-2 flex-wrap">
+                        <div><div className="text-xs text-parchment-500">Martial Arts die</div><div className="text-lg font-bold text-amber-700">{maDie}</div></div>
+                        <div><div className="text-xs text-parchment-500">Ki save DC</div><div className="text-lg font-bold text-amber-700">{kiSaveDC}</div></div>
+                        <div><div className="text-xs text-parchment-500">Unarmored Movement</div><div className="text-lg font-bold text-amber-700">+{monkSpeedBonus(char)}ft</div></div>
+                      </div>
+                      <div className="text-xs text-parchment-600 space-y-0.5">
+                        <div>• <strong>Flurry of Blows</strong> (2 ki): two bonus-action unarmed strikes</div>
+                        <div>• <strong>Patient Defense</strong> (1 ki): Dodge as bonus action</div>
+                        <div>• <strong>Step of the Wind</strong> (1 ki): Disengage or Dash as bonus action; jump distance doubled</div>
+                        {cc.level >= 4 && <div>• <strong>Slow Fall</strong> (1 ki reaction): reduce fall damage by 5×level</div>}
+                        {cc.level >= 5 && <div>• <strong>Stunning Strike</strong> (1 ki on hit): CON save DC {kiSaveDC} or stunned until end of your next turn</div>}
+                        {cc.level >= 6 && <div>• <strong>Deflect Missiles</strong> (1 ki): after reducing to 0 damage, catch and redirect (30ft, 1d10+DEX+{cc.level})</div>}
+                        {cc.level >= 7 && <div>• <strong>Evasion</strong>: DEX save → no damage on success; half on fail</div>}
+                        {cc.level >= 14 && <div>• <strong>Diamond Soul</strong>: proficient in all saves; 1 ki to reroll a failed save</div>}
+                        {cc.level >= 15 && <div>• <strong>Timeless Body</strong>: immune to magical aging; always have enough food and water</div>}
+                        {cc.level >= 18 && <div>• <strong>Empty Body</strong> (4 ki, 1 min): invisible + resist all dmg except force; 8 ki to cast Astral Projection without components</div>}
+                      </div>
+                    </div>
+                  )
+                })()}
+
+                {/* Monk: Subclass feature cards */}
+                {cc.classSlug === 'monk' && cc.subclassSlug === 'open-hand' && (() => (
+                  <div className="mb-3 p-3 rounded border border-amber-200 bg-amber-50">
+                    <div className="font-medium text-sm text-amber-800 mb-1">Open Hand Technique</div>
+                    <p className="text-xs text-amber-700">When you hit with Flurry of Blows: DEX save or <strong>prone</strong>, STR save or <strong>pushed 15ft</strong>, or <strong>can't take reactions</strong> until end of their next turn (your choice).</p>
+                    {cc.level >= 6 && <p className="text-xs text-amber-600 mt-1"><strong>Wholeness of Body</strong> (1/LR): heal yourself for 3× Monk level HP as an action.</p>}
+                    {cc.level >= 11 && <p className="text-xs text-amber-600 mt-1"><strong>Tranquility</strong>: cast Sanctuary on yourself at end of each rest (lasts until you attack or cast a spell).</p>}
+                    {cc.level >= 17 && <p className="text-xs text-amber-600 mt-1"><strong>Quivering Palm</strong> (3 ki): on unarmed hit, set harmonic vibrations. As an action (any time), force CON save DC {8 + profBonus(char) + Math.max(0, abilityModFor(char, 'wis'))} or drop to 0 HP (half on success).</p>}
+                  </div>
+                ))()}
+
+                {cc.classSlug === 'monk' && cc.subclassSlug === 'four-elements' && (() => {
+                  const fc = char.featuresChosen.find(f => f.key === 'four-elements')
+                  const slugs: string[] = !fc ? [] : Array.isArray(fc.value) ? fc.value : [fc.value]
+                  return (
+                    <div className="mb-3 p-3 rounded border border-orange-100 bg-orange-50">
+                      <div className="font-medium text-sm text-orange-800 mb-2">Elemental Disciplines</div>
+                      {slugs.length === 0 ? (
+                        <p className="text-xs text-orange-600">No disciplines chosen — level up to select them.</p>
+                      ) : (
+                        <div className="space-y-1">
+                          {slugs.map(slug => {
+                            const d = FOUR_ELEMENTS_DISCIPLINES.find(x => x.slug === slug)
+                            return (
+                              <div key={slug} className="text-sm">
+                                <span className="font-medium">{d?.name ?? slug}</span>
+                                <span className="text-xs text-orange-600 ml-1">({d?.ki})</span>
+                                {d?.description && <span className="text-xs text-parchment-500 ml-1">— {d.description}</span>}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })()}
+
+                {cc.classSlug === 'monk' && cc.subclassSlug === 'shadow' && (() => (
+                  <div className="mb-3 p-3 rounded border border-gray-200 bg-gray-50">
+                    <div className="font-medium text-sm text-gray-800 mb-1">Shadow Arts</div>
+                    <p className="text-xs text-gray-700">Spend 2 ki to cast: Darkness, Darkvision, Pass without Trace, or Silence (no spell slot).</p>
+                    {cc.level >= 6 && <p className="text-xs text-gray-600 mt-1"><strong>Shadow Step</strong>: bonus action to teleport between dim-light/darkness areas within 60ft; gain advantage on next melee attack this turn.</p>}
+                    {cc.level >= 11 && <p className="text-xs text-gray-600 mt-1"><strong>Cloak of Shadows</strong> (1 ki): while in darkness/dim light, become invisible until attack, cast, or bright light.</p>}
+                    {cc.level >= 17 && <p className="text-xs text-gray-600 mt-1"><strong>Opportunist</strong>: reaction to attack a creature within 5ft that just took damage from another creature.</p>}
+                  </div>
+                ))()}
+
+                {cc.classSlug === 'monk' && cc.subclassSlug === 'mercy' && (() => (
+                  <div className="mb-3 p-3 rounded border border-teal-100 bg-teal-50">
+                    <div className="font-medium text-sm text-teal-800 mb-1">Hands of Healing/Harm</div>
+                    <p className="text-xs text-teal-700"><strong>Hand of Healing</strong> (1 ki): as part of Flurry of Blows or an action, touch a creature — restore 1d{cc.level >= 17 ? 10 : cc.level >= 11 ? 8 : cc.level >= 5 ? 6 : 4}+WIS HP.</p>
+                    <p className="text-xs text-teal-700 mt-0.5"><strong>Hand of Harm</strong> (1 ki, 1/turn): when you hit with unarmed strike, deal extra 1d{cc.level >= 17 ? 10 : cc.level >= 11 ? 8 : cc.level >= 5 ? 6 : 4}+WIS necrotic and possibly poison the target (CON save).</p>
+                    {cc.level >= 6 && <p className="text-xs text-teal-600 mt-1"><strong>Physician's Touch</strong>: Hand of Healing also ends one disease or condition; Hand of Harm also poisons.</p>}
+                    {cc.level >= 11 && <p className="text-xs text-teal-600 mt-1"><strong>Flurry of Healing/Harm</strong>: use Hand of Healing/Harm with each Flurry hit, spending only 1 ki total.</p>}
+                  </div>
+                ))()}
+
+                {/* Barbarian: subclass feature cards */}
+                {cc.classSlug === 'barbarian' && cc.subclassSlug === 'totem-warrior' && (() => {
+                  const spirit = char.featuresChosen.find(f => f.key === 'totem-spirit')
+                  const aspect = char.featuresChosen.find(f => f.key === 'totem-aspect')
+                  const attunement = char.featuresChosen.find(f => f.key === 'totem-attunement')
+                  const getAnimal = (fc: typeof spirit) => {
+                    const slug = typeof fc?.value === 'string' ? fc.value : null
+                    return slug ? TOTEM_ANIMALS.find(a => a.slug === slug) : null
+                  }
+                  return (
+                    <div className="mb-3 p-3 rounded border border-amber-200 bg-amber-50">
+                      <div className="font-medium text-sm text-amber-800 mb-2">Totem Spirit</div>
+                      {spirit ? (
+                        <div className="mb-1.5">
+                          <span className="text-xs font-semibold text-amber-700">Spirit (L3): </span>
+                          <span className="text-xs font-medium">{getAnimal(spirit)?.name}</span>
+                          <span className="text-xs text-parchment-500 ml-1">— {getAnimal(spirit)?.tierDescs.spirit}</span>
+                        </div>
+                      ) : cc.level >= 3 ? <p className="text-xs text-amber-600 mb-1">No totem spirit chosen — level up to select.</p> : null}
+                      {aspect && cc.level >= 6 && (
+                        <div className="mb-1.5">
+                          <span className="text-xs font-semibold text-amber-700">Aspect (L6): </span>
+                          <span className="text-xs font-medium">{getAnimal(aspect)?.name}</span>
+                          <span className="text-xs text-parchment-500 ml-1">— {getAnimal(aspect)?.tierDescs.aspect}</span>
+                        </div>
+                      )}
+                      {attunement && cc.level >= 14 && (
+                        <div>
+                          <span className="text-xs font-semibold text-amber-700">Attunement (L14): </span>
+                          <span className="text-xs font-medium">{getAnimal(attunement)?.name}</span>
+                          <span className="text-xs text-parchment-500 ml-1">— {getAnimal(attunement)?.tierDescs.attunement}</span>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })()}
+
+                {cc.classSlug === 'barbarian' && cc.subclassSlug === 'storm-herald' && (() => {
+                  const auraFC = char.featuresChosen.find(f => f.key === 'storm-aura')
+                  const auraSlug = typeof auraFC?.value === 'string' ? auraFC.value : null
+                  const auraDef = STORM_AURA_OPTIONS.find(a => a.slug === auraSlug)
+                  return (
+                    <div className="mb-3 p-3 rounded border border-sky-200 bg-sky-50">
+                      <div className="font-medium text-sm text-sky-800 mb-1">Storm Herald</div>
+                      {auraDef ? (
+                        <>
+                          <div className="text-xs font-semibold text-sky-700 mb-0.5">{auraDef.name} Aura</div>
+                          <p className="text-xs text-sky-700">{auraDef.description}</p>
+                          {cc.level >= 6 && <p className="text-xs text-sky-600 mt-1"><strong>Storm Soul:</strong> {auraDef.soulDesc}</p>}
+                          {cc.level >= 10 && <p className="text-xs text-sky-600 mt-1"><strong>Shielding Storm:</strong> allies in your aura gain same resistance type.</p>}
+                        </>
+                      ) : <p className="text-xs text-sky-600">No storm aura chosen — level up to select.</p>}
+                    </div>
+                  )
+                })()}
+
+                {cc.classSlug === 'barbarian' && cc.subclassSlug === 'berserker' && (() => (
+                  <div className="mb-3 p-3 rounded border border-red-200 bg-red-50">
+                    <div className="font-medium text-sm text-red-800 mb-1">Path of the Berserker</div>
+                    <p className="text-xs text-red-700"><strong>Frenzy:</strong> when you enter rage, choose to Frenzy — make one melee weapon attack as a bonus action each turn. <em>Costs 1 exhaustion level when rage ends.</em></p>
+                    {cc.level >= 6 && <p className="text-xs text-red-600 mt-1"><strong>Mindless Rage:</strong> immune to charmed and frightened while raging.</p>}
+                    {cc.level >= 10 && <p className="text-xs text-red-600 mt-1"><strong>Intimidating Presence:</strong> action — frighten one creature within 30ft (WIS save DC {8 + profBonus(char) + Math.max(0, abilityModFor(char, 'cha'))}).</p>}
+                    {cc.level >= 14 && <p className="text-xs text-red-600 mt-1"><strong>Retaliation:</strong> reaction to melee attack a creature within 5ft that damages you.</p>}
+                  </div>
+                ))()}
+
+                {cc.classSlug === 'barbarian' && cc.subclassSlug === 'zealot' && (() => {
+                  const divineDie = `1d6+${Math.floor(cc.level / 2)}`
+                  return (
+                    <div className="mb-3 p-3 rounded border border-yellow-200 bg-yellow-50">
+                      <div className="font-medium text-sm text-yellow-800 mb-1">Path of the Zealot</div>
+                      <p className="text-xs text-yellow-800"><strong>Divine Fury:</strong> first hit each turn adds {divineDie} necrotic or radiant damage while raging.</p>
+                      <p className="text-xs text-yellow-700 mt-0.5"><strong>Warrior of the Gods:</strong> spells that restore you to life need no material components.</p>
+                      {cc.level >= 6 && <p className="text-xs text-yellow-700 mt-0.5"><strong>Fanatical Focus:</strong> 1/rage — reroll a failed save with your rage bonus (+{cc.level >= 16 ? 4 : cc.level >= 9 ? 3 : 2}).</p>}
+                      {cc.level >= 14 && <p className="text-xs text-yellow-700 mt-0.5"><strong>Rage Beyond Death:</strong> while raging, 0 HP doesn't knock you unconscious — you die when rage ends at 0 HP.</p>}
+                    </div>
+                  )
+                })()}
+
+                {cc.classSlug === 'barbarian' && cc.subclassSlug === 'ancestral-guardian' && (() => (
+                  <div className="mb-3 p-3 rounded border border-blue-200 bg-blue-50">
+                    <div className="font-medium text-sm text-blue-800 mb-1">Ancestral Guardian</div>
+                    <p className="text-xs text-blue-700"><strong>Ancestral Protectors:</strong> first creature you hit while raging has disadvantage on attacks vs. others and targets get resistance to its damage (until your next turn).</p>
+                    {cc.level >= 6 && <p className="text-xs text-blue-600 mt-1"><strong>Spirit Shield:</strong> reaction (when ally takes damage within 30ft) — reduce damage by {cc.level >= 14 ? '4d6' : cc.level >= 10 ? '3d6' : '2d6'}.</p>}
+                    {cc.level >= 10 && <p className="text-xs text-blue-600 mt-1"><strong>Consult the Spirits:</strong> cast Clairvoyance 1/SR without a spell slot.</p>}
+                    {cc.level >= 14 && <p className="text-xs text-blue-600 mt-1"><strong>Vengeful Ancestors:</strong> when Spirit Shield reduces damage, attacker takes that much force damage.</p>}
+                  </div>
+                ))()}
+
+                {/* Rogue: Phantom subclass */}
+                {cc.classSlug === 'rogue' && cc.subclassSlug === 'phantom' && (() => (
+                  <div className="mb-3 p-3 rounded border border-purple-200 bg-purple-50">
+                    <div className="font-medium text-sm text-purple-800 mb-1">Phantom</div>
+                    <p className="text-xs text-purple-700"><strong>Wails from the Grave:</strong> after SA, deal half SA dice necrotic to a second creature within 30ft. WIS mod uses/LR.</p>
+                    {cc.level >= 9 && (() => {
+                      const tokens = char.classResources['soul-trinkets'] ?? 0
+                      return <p className="text-xs text-purple-700 mt-0.5"><strong>Tokens of the Departed:</strong> {tokens}/{profBonus(char)} trinkets — advantage on death saves while holding one; can ask one question per trinket.</p>
+                    })()}
+                    {cc.level >= 13 && <p className="text-xs text-purple-600 mt-0.5"><strong>Ghost Walk (1/LR):</strong> bonus action — pass through creatures/objects, fly 10ft, resist B/P/S for 10 min.</p>}
+                    {cc.level >= 17 && <p className="text-xs text-purple-600 mt-0.5"><strong>Death's Friend:</strong> Wails from the Grave now uses full SA dice. If you start a turn with no trinkets, one appears.</p>}
+                  </div>
+                ))()}
+
+                {/* Ranger: Gloom Stalker */}
+                {cc.classSlug === 'ranger' && cc.subclassSlug === 'gloom-stalker' && (() => (
+                  <div className="mb-3 p-3 rounded border border-slate-200 bg-slate-50">
+                    <div className="font-medium text-sm text-slate-800 mb-1">Gloom Stalker</div>
+                    <p className="text-xs text-slate-700"><strong>Dread Ambusher:</strong> +WIS to initiative. Round 1: extra attack that deals +1d8 damage on hit.</p>
+                    <p className="text-xs text-slate-600 mt-0.5"><strong>Umbral Sight:</strong> darkvision 60ft. Invisible in darkness to darkvision-reliant creatures.</p>
+                    {cc.level >= 7 && <p className="text-xs text-slate-600 mt-0.5"><strong>Iron Mind:</strong> proficiency in WIS saves (or INT/CHA if already proficient).</p>}
+                    {cc.level >= 11 && <p className="text-xs text-slate-600 mt-0.5"><strong>Stalker's Flurry:</strong> once per turn on a miss, immediately make another attack.</p>}
+                    {cc.level >= 15 && <p className="text-xs text-slate-600 mt-0.5"><strong>Shadowy Dodge:</strong> reaction to impose disadvantage on attack roll against you (not in bright light).</p>}
+                  </div>
+                ))()}
+
+                {/* Ranger: Horizon Walker */}
+                {cc.classSlug === 'ranger' && cc.subclassSlug === 'horizon-walker' && (() => (
+                  <div className="mb-3 p-3 rounded border border-cyan-200 bg-cyan-50">
+                    <div className="font-medium text-sm text-cyan-800 mb-1">Horizon Walker</div>
+                    <p className="text-xs text-cyan-700"><strong>Detect Portal</strong> (1/SR): sense portals within 1 mile.</p>
+                    <p className="text-xs text-cyan-700 mt-0.5"><strong>Planar Warrior:</strong> bonus action — first hit on chosen target deals +{cc.level >= 11 ? '2d8' : '1d8'} force damage this turn.</p>
+                    {cc.level >= 7 && <p className="text-xs text-cyan-600 mt-0.5"><strong>Ethereal Step</strong> (1/SR): start of turn bonus action — enter Ethereal Plane until end of turn.</p>}
+                    {cc.level >= 11 && <p className="text-xs text-cyan-600 mt-0.5"><strong>Distant Strike:</strong> teleport up to 10ft before each attack. Two different targets → third bonus attack.</p>}
+                    {cc.level >= 15 && <p className="text-xs text-cyan-600 mt-0.5"><strong>Spectral Defense:</strong> reaction to gain resistance to one instance of damage.</p>}
+                  </div>
+                ))()}
+
+                {/* Ranger: Beast Master */}
+                {cc.classSlug === 'ranger' && cc.subclassSlug === 'beast-master' && (() => (
+                  <div className="mb-3 p-3 rounded border border-green-200 bg-green-50">
+                    <div className="font-medium text-sm text-green-800 mb-1">Beast Master</div>
+                    <p className="text-xs text-green-700"><strong>Primal Companion:</strong> bond with a Primal Beast (Air/Land/Sea). HP = 5×Ranger level. Acts on your initiative; attacks on your turn without needing a command.</p>
+                    {cc.level >= 7 && <p className="text-xs text-green-600 mt-0.5"><strong>Exceptional Training:</strong> when companion doesn't attack, bonus action to command Dash/Disengage/Dodge/Help. Attacks are magical.</p>}
+                    {cc.level >= 11 && <p className="text-xs text-green-600 mt-0.5"><strong>Bestial Fury:</strong> companion makes two attacks per turn.</p>}
+                    {cc.level >= 15 && <p className="text-xs text-green-600 mt-0.5"><strong>Share Spells:</strong> self-targeting spells also affect companion within 30ft.</p>}
+                  </div>
+                ))()}
+
+                {/* Druid: Circle of Stars */}
+                {cc.classSlug === 'druid' && cc.subclassSlug === 'stars' && (() => {
+                  const wisStr = Math.max(0, abilityModFor(char, 'wis')) > 0 ? `+${Math.max(0, abilityModFor(char, 'wis'))}` : ''
+                  return (
+                    <div className="mb-3 p-3 rounded border border-indigo-100 bg-indigo-50">
+                      <div className="font-medium text-sm text-indigo-800 mb-1">Circle of Stars</div>
+                      <p className="text-xs text-indigo-700"><strong>Star Map:</strong> Guidance at will; cast Guiding Bolt {profBonus(char)}×/LR without a slot.</p>
+                      <p className="text-xs text-indigo-700 mt-0.5"><strong>Starry Form</strong> (uses Wild Shape): choose Archer (1d8{wisStr} radiant BA), Chalice (1d8{wisStr} HP when healing), or Dragon (min 10 on concentration saves).</p>
+                      {cc.level >= 6 && <p className="text-xs text-indigo-600 mt-0.5"><strong>Cosmic Omen</strong> (WIS mod/LR): reaction — Woe −1d6 or Weal +1d6 to any roll within 30ft.</p>}
+                      {cc.level >= 10 && <p className="text-xs text-indigo-600 mt-0.5"><strong>Twinkling Constellations:</strong> Archer/Chalice deal 2d8; Dragon gives 20ft fly+hover. Can switch form each turn.</p>}
+                    </div>
+                  )
+                })()}
+
+                {/* Druid: Circle of Spores */}
+                {cc.classSlug === 'druid' && cc.subclassSlug === 'spores' && (() => {
+                  const haloDie = cc.level >= 14 ? '1d10' : cc.level >= 10 ? '1d8' : cc.level >= 6 ? '1d6' : '1d4'
+                  return (
+                    <div className="mb-3 p-3 rounded border border-green-200 bg-green-50">
+                      <div className="font-medium text-sm text-green-800 mb-1">Circle of Spores</div>
+                      <p className="text-xs text-green-700"><strong>Halo of Spores:</strong> reaction — creature entering/starting turn within 10ft takes {haloDie} necrotic (CON save negates).</p>
+                      <p className="text-xs text-green-700 mt-0.5"><strong>Symbiotic Entity</strong> (Wild Shape charge): gain {4 * cc.level} temp HP. Halo +1d6 necrotic; weapon hits +1d6 necrotic. Lasts 10 min.</p>
+                      {cc.level >= 6 && <p className="text-xs text-green-600 mt-0.5"><strong>Fungal Infestation</strong> (WIS mod/LR reaction): when creature dies within 10ft, animate as zombie for 1 hr.</p>}
+                      {cc.level >= 14 && <p className="text-xs text-green-600 mt-0.5"><strong>Fungal Body:</strong> immune to blinded/deafened/frightened/poisoned. Critical hits become normal hits.</p>}
+                    </div>
+                  )
+                })()}
+
+                {/* Druid: Circle of Dreams */}
+                {cc.classSlug === 'druid' && cc.subclassSlug === 'dreams' && (() => {
+                  const wisMod = Math.max(0, abilityModFor(char, 'wis'))
+                  return (
+                    <div className="mb-3 p-3 rounded border border-purple-100 bg-purple-50">
+                      <div className="font-medium text-sm text-purple-800 mb-1">Circle of Dreams</div>
+                      <p className="text-xs text-purple-700"><strong>Balm of the Summer Court</strong> ({cc.level}d6 pool/LR): bonus action — expend dice to heal a creature within 120ft, granting that many temp HP too.</p>
+                      {cc.level >= 6 && <p className="text-xs text-purple-600 mt-0.5"><strong>Hearth of Moonlight and Shadow:</strong> during rests, 30ft warded area — no unwanted eavesdropping or scrying.</p>}
+                      {cc.level >= 10 && <p className="text-xs text-purple-600 mt-0.5"><strong>Hidden Paths</strong> (WIS mod/LR): bonus action — teleport 60ft. Or action to teleport a willing creature 30ft.</p>}
+                    </div>
+                  )
+                })()}
+
+                {/* Druid: Circle of the Shepherd */}
+                {cc.classSlug === 'druid' && cc.subclassSlug === 'shepherd' && (() => (
+                  <div className="mb-3 p-3 rounded border border-lime-200 bg-lime-50">
+                    <div className="font-medium text-sm text-lime-800 mb-1">Circle of the Shepherd</div>
+                    <p className="text-xs text-lime-700"><strong>Speech of the Woods:</strong> cast Speak with Animals at will. Know Sylvan.</p>
+                    <p className="text-xs text-lime-700 mt-0.5"><strong>Spirit Totem</strong> (1/SR): bonus action — Bear (HP aura, +5 HP), Hawk (ally reaction for attack advantage), Unicorn (WIS healing bonus; detect magic 60ft).</p>
+                    {cc.level >= 6 && <p className="text-xs text-lime-600 mt-0.5"><strong>Mighty Summoner:</strong> summoned beasts/fey gain +2 HP/HD and natural weapons are magical.</p>}
+                    {cc.level >= 10 && <p className="text-xs text-lime-600 mt-0.5"><strong>Guardian Spirit:</strong> summoned creatures ending turns in totem aura regain 2d6+WIS HP.</p>}
+                  </div>
+                ))()}
+
+                {/* Cleric: Destroy Undead */}
+                {cc.classSlug === 'cleric' && cc.level >= 5 && (() => {
+                  const crThreshold = cc.level >= 17 ? 'CR 4' : cc.level >= 14 ? 'CR 3' : cc.level >= 11 ? 'CR 2' : cc.level >= 8 ? 'CR 1' : 'CR 1/2'
+                  return (
+                    <div className="mb-3 p-3 rounded border border-amber-100 bg-amber-50">
+                      <div className="flex items-center justify-between">
+                        <div className="font-medium text-sm text-amber-800">Turn Undead → Destroy Undead</div>
+                        <div className="text-base font-bold text-amber-700">{crThreshold} or lower</div>
+                      </div>
+                      <p className="text-xs text-amber-600 mt-1">Channel Divinity: undead of {crThreshold} or lower are destroyed outright instead of merely turned.</p>
+                    </div>
+                  )
+                })()}
+
+                {/* Bard: Song of Rest & Countercharm */}
+                {cc.classSlug === 'bard' && cc.level >= 2 && (() => {
+                  const sorDie = cc.level >= 17 ? 'd12' : cc.level >= 13 ? 'd10' : cc.level >= 9 ? 'd8' : 'd6'
+                  return (
+                    <div className="mb-3 p-3 rounded border border-blue-100 bg-blue-50">
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="font-medium text-sm text-blue-800">Song of Rest</div>
+                        <div className="text-base font-bold text-blue-700">{sorDie}</div>
+                      </div>
+                      <p className="text-xs text-blue-600 mb-1">Allies who hear your performance during a short rest regain extra HP equal to one {sorDie} roll when spending hit dice.</p>
+                      {cc.level >= 6 && (
+                        <>
+                          <div className="font-medium text-sm text-blue-800 mt-2 mb-1">Countercharm</div>
+                          <p className="text-xs text-blue-600">Action: friendly creatures within 30ft that can hear you have advantage on saves against being frightened or charmed.</p>
+                        </>
+                      )}
+                    </div>
+                  )
+                })()}
+
+                {/* Fighter: Rune Knight runes */}
+                {cc.classSlug === 'fighter' && cc.subclassSlug === 'rune-knight' && cc.level >= 3 && (() => {
+                  const fc = char.featuresChosen.find(f => f.key === 'runes')
+                  const slugs: string[] = !fc ? [] : Array.isArray(fc.value) ? fc.value : [fc.value]
+                  const maxRunes = cc.level >= 15 ? 5 : cc.level >= 10 ? 4 : cc.level >= 7 ? 3 : 2
+                  if (slugs.length === 0) return (
+                    <div className="mb-3 p-3 rounded border border-stone-100 bg-stone-50 text-xs text-stone-600">No runes inscribed — level up to choose runes ({maxRunes} available).</div>
+                  )
+                  return (
+                    <div className="mb-3 p-3 rounded border border-stone-200 bg-stone-50">
+                      <div className="font-medium text-sm text-stone-800 mb-2">Runes Inscribed ({slugs.length}/{maxRunes})</div>
+                      <div className="space-y-1.5">
+                        {slugs.map(slug => {
+                          const r = RUNE_KNIGHT_RUNES.find(x => x.slug === slug)
+                          return (
+                            <div key={slug} className="text-sm">
+                              <span className="font-medium">{r?.name ?? slug}</span>
+                              {r?.description && <span className="text-xs text-parchment-500 ml-2">— {r.description}</span>}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )
+                })()}
+
+                {/* Ranger: Hunter subclass choices */}
+                {cc.classSlug === 'ranger' && cc.subclassSlug === 'hunter' && (() => {
+                  const choices = ([3, 7, 11, 15] as const).flatMap(lvl => {
+                    const fc = char.featuresChosen.find(f => f.key === `hunter-${lvl}`)
+                    if (!fc || cc.level < lvl) return []
+                    const slug = typeof fc.value === 'string' ? fc.value : ''
+                    const def = HUNTER_CHOICES[lvl]?.find(c => c.slug === slug)
+                    return def ? [{ lvl, def }] : []
+                  })
+                  if (choices.length === 0) return null
+                  return (
+                    <div className="mb-3 p-3 rounded border border-teal-100 bg-teal-50">
+                      <div className="font-medium text-sm text-teal-800 mb-2">Hunter Techniques</div>
+                      <div className="space-y-1.5">
+                        {choices.map(({ lvl, def }) => (
+                          <div key={lvl} className="text-sm">
+                            <span className="font-medium">{def.name}</span>
+                            <span className="text-xs text-parchment-500 ml-2">— {def.description}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })()}
 
                 {/* Eldritch Invocations (Warlock) */}
                 {cc.classSlug === 'warlock' && (() => {
@@ -5782,6 +6431,8 @@ export default function Sheet() {
                     const r = classResources.find(x => x.key === k)!
                     resets[k] = r.max ?? (char.classResources?.[k] ?? 0)
                   })
+                  // Reset custom resources on long rest
+                  ;(char.customResources ?? []).forEach(r => { resets[r.key] = r.max })
                   const freshSlots: Character['spellSlots'] = {}
                   const maxSource = multiclassMaxes ?? Object.fromEntries(
                     Object.entries(char.spellSlots).map(([k, v]) => [k, v.max])
@@ -5807,6 +6458,9 @@ export default function Sheet() {
                     hitDiceUsed: newHitDiceUsed,
                     freeSpellUses: {},
                     pactSlots: char.pactSlots ? { ...char.pactSlots, used: 0 } : undefined,
+                    equipment: char.equipment.map(e =>
+                      e.rechargesOnLongRest && e.chargesMax !== undefined ? { ...e, charges: e.chargesMax } : e
+                    ),
                   })
                   setLongRestOpen(false)
                 }}
@@ -5923,6 +6577,8 @@ export default function Sheet() {
                     const r = classResources.find(x => x.key === k)!
                     resets[k] = r.max ?? (char.classResources?.[k] ?? 0)
                   })
+                  // Reset short-rest custom resources
+                  ;(char.customResources ?? []).filter(r => r.recharge === 'short').forEach(r => { resets[r.key] = r.max })
                   patch({
                     hp: { ...char.hp, current: Math.min(maxHp, char.hp.current + totalHeal) },
                     hitDiceUsed: newHitDiceUsed,

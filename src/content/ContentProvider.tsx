@@ -42,7 +42,7 @@ export function ContentProvider({ children }: { children: ReactNode }) {
         items: mergeItems(official.items, hb.items, ITEM_OVERLAY),
         races: mergeRaces(official.races, hb.races, RACE_OVERLAY),
         classes: mergeClasses(official.classes, hb.classes),
-        backgrounds: mergeBackgrounds(official.backgrounds, [], BACKGROUND_OVERLAY),
+        backgrounds: mergeBackgrounds(official.backgrounds, hb.backgrounds, BACKGROUND_OVERLAY),
         feats: mergeFeats(official.feats, hb.feats, FEAT_OVERLAY),
         meta: official.meta,
         loading: false,

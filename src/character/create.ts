@@ -34,6 +34,7 @@ export function newCharacter(overrides: Partial<Character> = {}): Character {
     freeSpellUses: {},
     campaignBoard: { activeBoard: '', boards: [] },
     summons: [],
+    customResources: [],
     conditions: [],
     exhaustionLevel: 0,
     deathSaves: { successes: 0, failures: 0 },

@@ -1660,6 +1660,7 @@ export interface InvocationDef {
   description: string
   levelRequirement?: number
   prerequisite?: string
+  limitedUse?: { recharge: 'short' | 'long' }
 }
 
 export const ELDRITCH_INVOCATIONS: InvocationDef[] = [
@@ -1668,11 +1669,11 @@ export const ELDRITCH_INVOCATIONS: InvocationDef[] = [
   { slug: 'ascendant-step', name: 'Ascendant Step', description: 'Cast Levitate on yourself at will, without a spell slot.', levelRequirement: 9 },
   { slug: 'beast-speech', name: 'Beast Speech', description: 'Cast Speak with Animals at will, without a spell slot.' },
   { slug: 'beguiling-influence', name: 'Beguiling Influence', description: 'Gain proficiency in Deception and Persuasion.' },
-  { slug: 'bewitching-whispers', name: 'Bewitching Whispers', description: 'Cast Compulsion once using a spell slot. 1/LR without a slot.', levelRequirement: 7 },
+  { slug: 'bewitching-whispers', name: 'Bewitching Whispers', description: 'Cast Compulsion once using a spell slot. 1/LR without a slot.', levelRequirement: 7, limitedUse: { recharge: 'long' } },
   { slug: 'book-of-ancient-secrets', name: 'Book of Ancient Secrets', description: 'Learn two ritual spells from any class. Inscribe new rituals found.', prerequisite: 'Pact of the Tome' },
-  { slug: 'chains-of-carceri', name: 'Chains of Carceri', description: 'Cast Hold Monster at will on celestials, fiends, or elementals — no slot. 1/creature per LR.', levelRequirement: 15, prerequisite: 'Pact of the Chain' },
+  { slug: 'chains-of-carceri', name: 'Chains of Carceri', description: 'Cast Hold Monster at will on celestials, fiends, or elementals — no slot. 1/creature per LR.', levelRequirement: 15, prerequisite: 'Pact of the Chain', limitedUse: { recharge: 'long' } },
   { slug: 'devils-sight', name: "Devil's Sight", description: 'See normally in darkness (magical and nonmagical) out to 120ft.' },
-  { slug: 'dreadful-word', name: 'Dreadful Word', description: 'Cast Confusion once using a spell slot. 1/LR without a slot.', levelRequirement: 7 },
+  { slug: 'dreadful-word', name: 'Dreadful Word', description: 'Cast Confusion once using a spell slot. 1/LR without a slot.', levelRequirement: 7, limitedUse: { recharge: 'long' } },
   { slug: 'eldritch-sight', name: 'Eldritch Sight', description: 'Cast Detect Magic at will, without a spell slot.' },
   { slug: 'eldritch-spear', name: 'Eldritch Spear', description: 'Eldritch Blast has a range of 300ft.', prerequisite: 'Eldritch Blast cantrip' },
   { slug: 'eyes-of-the-rune-keeper', name: 'Eyes of the Rune Keeper', description: 'You can read all writing.' },
@@ -1683,15 +1684,15 @@ export const ELDRITCH_INVOCATIONS: InvocationDef[] = [
   { slug: 'lifedrinker', name: 'Lifedrinker', description: 'Your pact weapon deals extra necrotic damage equal to your CHA modifier.', levelRequirement: 12, prerequisite: 'Pact of the Blade' },
   { slug: 'mask-of-many-faces', name: 'Mask of Many Faces', description: 'Cast Disguise Self at will, without a spell slot.' },
   { slug: 'master-of-myriad-forms', name: 'Master of Myriad Forms', description: 'Cast Alter Self at will, without a spell slot.', levelRequirement: 15 },
-  { slug: 'minions-of-chaos', name: 'Minions of Chaos', description: 'Cast Conjure Elemental once using a spell slot. 1/LR without a slot.', levelRequirement: 9 },
-  { slug: 'mire-the-mind', name: 'Mire the Mind', description: 'Cast Slow once using a spell slot. 1/LR without a slot.', levelRequirement: 5 },
+  { slug: 'minions-of-chaos', name: 'Minions of Chaos', description: 'Cast Conjure Elemental once using a spell slot. 1/LR without a slot.', levelRequirement: 9, limitedUse: { recharge: 'long' } },
+  { slug: 'mire-the-mind', name: 'Mire the Mind', description: 'Cast Slow once using a spell slot. 1/LR without a slot.', levelRequirement: 5, limitedUse: { recharge: 'long' } },
   { slug: 'misty-visions', name: 'Misty Visions', description: 'Cast Silent Image at will, without a spell slot.' },
   { slug: 'one-with-shadows', name: 'One with Shadows', description: 'While in dim light or darkness, become invisible as an action. Ends when you move or act.', levelRequirement: 5 },
   { slug: 'otherworldly-leap', name: 'Otherworldly Leap', description: 'Cast Jump on yourself at will, without a spell slot.', levelRequirement: 9 },
   { slug: 'repelling-blast', name: 'Repelling Blast', description: 'When you hit with Eldritch Blast, push the target up to 10ft away.', prerequisite: 'Eldritch Blast cantrip' },
-  { slug: 'sculptor-of-flesh', name: 'Sculptor of Flesh', description: 'Cast Polymorph once using a spell slot. 1/LR without a slot.', levelRequirement: 7 },
-  { slug: 'sign-of-ill-omen', name: 'Sign of Ill Omen', description: 'Cast Bestow Curse once using a spell slot. 1/LR without a slot.', levelRequirement: 5 },
-  { slug: 'thief-of-five-fates', name: 'Thief of Five Fates', description: 'Cast Bane once using a spell slot. 1/LR without a slot.' },
+  { slug: 'sculptor-of-flesh', name: 'Sculptor of Flesh', description: 'Cast Polymorph once using a spell slot. 1/LR without a slot.', levelRequirement: 7, limitedUse: { recharge: 'long' } },
+  { slug: 'sign-of-ill-omen', name: 'Sign of Ill Omen', description: 'Cast Bestow Curse once using a spell slot. 1/LR without a slot.', levelRequirement: 5, limitedUse: { recharge: 'long' } },
+  { slug: 'thief-of-five-fates', name: 'Thief of Five Fates', description: 'Cast Bane once using a spell slot. 1/LR without a slot.', limitedUse: { recharge: 'long' } },
   { slug: 'thirsting-blade', name: 'Thirsting Blade', description: 'Attack twice with your pact weapon when you take the Attack action.', levelRequirement: 5, prerequisite: 'Pact of the Blade' },
   { slug: 'visions-of-distant-realms', name: 'Visions of Distant Realms', description: 'Cast Arcane Eye at will, without a spell slot.', levelRequirement: 15 },
   { slug: 'voice-of-the-chain-master', name: 'Voice of the Chain Master', description: 'Communicate telepathically, perceive through, and speak through your familiar (within 100 miles).', prerequisite: 'Pact of the Chain' },
@@ -1719,3 +1720,247 @@ export const METAMAGIC_OPTIONS: MetamagicDef[] = [
   { slug: 'transmuted', name: 'Transmuted Spell', description: '1 SP: change the spell\'s damage type among acid/cold/fire/lightning/poison/thunder. (Tasha\'s)' },
   { slug: 'twinned', name: 'Twinned Spell', description: '1 SP per spell level (min 1): target a second creature with a single-target spell.' },
 ]
+
+// ── Battle Master Maneuvers ──────────────────────────────────────────────────
+
+export interface ManeuverDef {
+  slug: string
+  name: string
+  description: string
+}
+
+export const BATTLE_MASTER_MANEUVERS: ManeuverDef[] = [
+  { slug: 'ambush', name: 'Ambush', description: 'Add a Superiority Die to a DEX (Stealth) or initiative roll.' },
+  { slug: 'bait-and-switch', name: 'Bait and Switch', description: 'Swap places with a willing ally within 5ft (no OA). One of you gains +AC equal to the die until start of your next turn.' },
+  { slug: 'brace', name: 'Brace', description: 'Reaction: when a creature enters your reach, make one weapon attack against it and add the die to damage.' },
+  { slug: 'commanders-strike', name: "Commander's Strike", description: 'Forgo one attack; use a bonus action to direct an ally to attack, adding the Superiority Die to damage.' },
+  { slug: 'disarming-attack', name: 'Disarming Attack', description: 'Add die to damage; target STR/DEX save or drops one held item.' },
+  { slug: 'distracting-strike', name: 'Distracting Strike', description: 'Add die to damage; next attack against this target before your next turn has advantage.' },
+  { slug: 'evasive-footwork', name: 'Evasive Footwork', description: 'Add die to AC while you move.' },
+  { slug: 'feinting-attack', name: 'Feinting Attack', description: 'Bonus action: feint a creature within 5ft, add die + advantage to next attack against it this turn.' },
+  { slug: 'goading-attack', name: 'Goading Attack', description: 'Add die to damage; WIS save or target has disadvantage attacking anyone other than you until your next turn.' },
+  { slug: 'lunging-attack', name: 'Lunging Attack', description: 'Increase reach by 5ft for one attack; add die to damage.' },
+  { slug: 'maneuvering-attack', name: 'Maneuvering Attack', description: 'Add die to damage; ally can use reaction to move half speed without provoking OA from target.' },
+  { slug: 'menacing-attack', name: 'Menacing Attack', description: 'Add die to damage; WIS save or target is frightened until your next turn.' },
+  { slug: 'parry', name: 'Parry', description: 'Reaction: reduce damage from a melee hit by die + DEX mod.' },
+  { slug: 'precision-attack', name: 'Precision Attack', description: 'Add die to an attack roll (before or after roll, before outcome known).' },
+  { slug: 'pushing-attack', name: 'Pushing Attack', description: 'Add die to damage; STR save or pushed up to 15ft away.' },
+  { slug: 'quick-toss', name: 'Quick Toss', description: 'Bonus action: draw and make a ranged attack with a thrown weapon, adding die to damage.' },
+  { slug: 'rally', name: 'Rally', description: 'Bonus action: ally gains temporary HP = die + CHA mod.' },
+  { slug: 'riposte', name: 'Riposte', description: 'Reaction: when a creature misses you in melee, make one attack and add die to damage.' },
+  { slug: 'sweeping-attack', name: 'Sweeping Attack', description: 'After hitting one creature, deal die damage to a second creature within 5ft (no attack roll, same weapon).' },
+  { slug: 'tactical-assessment', name: 'Tactical Assessment', description: 'Add die to a History, Insight, or Perception check.' },
+  { slug: 'trip-attack', name: 'Trip Attack', description: 'Add die to damage; Large-or-smaller target STR save or knocked prone.' },
+]
+
+// ── Multiclass Proficiency Grants (PHB p.164) ────────────────────────────────
+// What proficiencies a character gains when MULTICLASSING INTO a class for the first time.
+// These are the restricted subset, not the full starting proficiencies.
+
+export interface MulticlassProfGrant {
+  armor?: string[]
+  weapons?: string[]
+  tools?: string[]
+  skills?: { count: number; from: string[] }  // pick N from list
+}
+
+export const MULTICLASS_PROF_GRANTS: Record<string, MulticlassProfGrant> = {
+  artificer:  { armor: ['Light Armor', 'Medium Armor', 'Shields'], weapons: ['Simple Weapons'], tools: ["Thieves' Tools"] },
+  barbarian:  { armor: ['Light Armor', 'Medium Armor', 'Shields'], weapons: ['Simple Weapons', 'Martial Weapons'] },
+  bard:       { armor: ['Light Armor'], skills: { count: 1, from: [] } }, // any skill
+  cleric:     { armor: ['Light Armor', 'Medium Armor', 'Shields'] },
+  druid:      { armor: ['Light Armor', 'Medium Armor', 'Shields'] },
+  fighter:    { armor: ['Light Armor', 'Medium Armor', 'Shields'], weapons: ['Simple Weapons', 'Martial Weapons'] },
+  monk:       { weapons: ['Simple Weapons', 'Shortswords'] },
+  paladin:    { armor: ['Light Armor', 'Medium Armor', 'Shields'], weapons: ['Simple Weapons', 'Martial Weapons'] },
+  ranger:     { armor: ['Light Armor', 'Medium Armor', 'Shields'], weapons: ['Simple Weapons', 'Martial Weapons'], skills: { count: 1, from: ['Animal Handling', 'Athletics', 'Insight', 'Investigation', 'Nature', 'Perception', 'Stealth', 'Survival'] } },
+  rogue:      { armor: ['Light Armor'], tools: ["Thieves' Tools"], skills: { count: 1, from: ['Acrobatics', 'Athletics', 'Deception', 'Insight', 'Intimidation', 'Investigation', 'Perception', 'Performance', 'Persuasion', 'Sleight of Hand', 'Stealth'] } },
+  sorcerer:   {},
+  warlock:    { armor: ['Light Armor'], weapons: ['Simple Weapons'] },
+  wizard:     {},
+}
+
+// ── Circle of the Land spells ─────────────────────────────────────────────
+
+export const LAND_CIRCLE_SPELLS: Record<string, SubclassGrantedSpell[]> = {
+  arctic: [
+    gs(3, 2, 'Hold Person'), gs(3, 2, 'Spike Growth'),
+    gs(5, 3, 'Sleet Storm'), gs(5, 3, 'Slow'),
+    gs(7, 4, 'Freedom of Movement'), gs(7, 4, 'Ice Storm'),
+    gs(9, 5, 'Commune with Nature'), gs(9, 5, 'Cone of Cold'),
+  ],
+  coast: [
+    gs(3, 2, 'Mirror Image'), gs(3, 2, 'Misty Step'),
+    gs(5, 3, 'Water Breathing'), gs(5, 3, 'Water Walk'),
+    gs(7, 4, 'Control Water'), gs(7, 4, 'Freedom of Movement'),
+    gs(9, 5, 'Conjure Elemental'), gs(9, 5, 'Scrying'),
+  ],
+  desert: [
+    gs(3, 2, 'Blur'), gs(3, 2, 'Silence'),
+    gs(5, 3, 'Create Food and Water'), gs(5, 3, 'Protection from Energy'),
+    gs(7, 4, 'Blight'), gs(7, 4, 'Hallucinatory Terrain'),
+    gs(9, 5, 'Insect Plague'), gs(9, 5, 'Wall of Stone'),
+  ],
+  forest: [
+    gs(3, 2, 'Barkskin'), gs(3, 2, 'Spider Climb'),
+    gs(5, 3, 'Call Lightning'), gs(5, 3, 'Plant Growth'),
+    gs(7, 4, 'Divination'), gs(7, 4, 'Freedom of Movement'),
+    gs(9, 5, 'Commune with Nature'), gs(9, 5, 'Tree Stride'),
+  ],
+  grassland: [
+    gs(3, 2, 'Invisibility'), gs(3, 2, 'Pass without Trace'),
+    gs(5, 3, 'Daylight'), gs(5, 3, 'Haste'),
+    gs(7, 4, 'Divination'), gs(7, 4, 'Wind Wall'),
+    gs(9, 5, 'Dream'), gs(9, 5, 'Insect Plague'),
+  ],
+  mountain: [
+    gs(3, 2, 'Spider Climb'), gs(3, 2, 'Spike Growth'),
+    gs(5, 3, 'Lightning Bolt'), gs(5, 3, 'Meld into Stone'),
+    gs(7, 4, 'Stone Shape'), gs(7, 4, 'Stoneskin'),
+    gs(9, 5, 'Passwall'), gs(9, 5, 'Wall of Stone'),
+  ],
+  swamp: [
+    gs(3, 2, 'Darkness'), gs(3, 2, "Melf's Acid Arrow"),
+    gs(5, 3, 'Water Walk'), gs(5, 3, 'Stinking Cloud'),
+    gs(7, 4, 'Freedom of Movement'), gs(7, 4, 'Locate Creature'),
+    gs(9, 5, 'Insect Plague'), gs(9, 5, 'Scrying'),
+  ],
+  underdark: [
+    gs(3, 2, 'Spider Climb'), gs(3, 2, 'Web'),
+    gs(5, 3, 'Gaseous Form'), gs(5, 3, 'Stinking Cloud'),
+    gs(7, 4, 'Greater Invisibility'), gs(7, 4, 'Stone Shape'),
+    gs(9, 5, 'Cloudkill'), gs(9, 5, 'Insect Plague'),
+  ],
+}
+
+// ── Rune Knight runes ─────────────────────────────────────────────────────
+
+export interface RuneDef {
+  slug: string
+  name: string
+  description: string
+}
+
+export const RUNE_KNIGHT_RUNES: RuneDef[] = [
+  { slug: 'cloud', name: 'Cloud Rune', description: 'Reaction: redirect an attack that hit you or an ally to a different creature. Passive: advantage on Sleight of Hand and Deception.' },
+  { slug: 'fire', name: 'Fire Rune', description: 'On weapon hit: restrain target and deal extra 2d6 fire damage. Passive: proficiency with all artisan tools.' },
+  { slug: 'frost', name: 'Frost Rune', description: 'Bonus action (10 min): +2 to STR/CON ability checks and STR saves. Passive: proficiency in Athletics and Intimidation.' },
+  { slug: 'hill', name: 'Hill Rune', description: 'Reaction (1 min): resistance to bludgeoning, piercing, and slashing damage. Passive: advantage on saves vs. poison.' },
+  { slug: 'stone', name: 'Stone Rune', description: 'Reaction: charm and incapacitate a creature (WIS save, 1 min). Passive: darkvision 120ft and advantage on WIS (Insight).' },
+  { slug: 'storm', name: 'Storm Rune', description: 'Bonus action (1 min): enter prescient state — impose advantage/disadvantage on any roll within 60ft as a reaction. Passive: proficiency in Arcana.' },
+]
+
+// ── Hunter subclass feature choices ───────────────────────────────────────
+
+export interface HunterChoiceDef {
+  slug: string
+  name: string
+  description: string
+}
+
+// ── Barbarian Totem Warrior choices ───────────────────────────────────────
+
+export interface TotemAnimalDef {
+  slug: string
+  name: string
+  tierDescs: Record<'spirit' | 'aspect' | 'attunement', string>
+}
+
+export const TOTEM_ANIMALS: TotemAnimalDef[] = [
+  { slug: 'bear', name: 'Bear', tierDescs: {
+    spirit: 'Resistance to all damage except psychic while raging.',
+    aspect: 'Carrying capacity doubled; advantage on STR checks for pushing/dragging/lifting.',
+    attunement: 'While raging, creatures within 5ft have disadvantage on attacks vs. targets other than you.',
+  }},
+  { slug: 'eagle', name: 'Eagle', tierDescs: {
+    spirit: 'Disengage and Dash as bonus actions while raging; ascend at half speed while raging.',
+    aspect: 'See up to 1 mile clearly. Dim light treats as bright light for you.',
+    attunement: 'Reaction while raging to make one melee attack against a creature that misses you.',
+  }},
+  { slug: 'wolf', name: 'Wolf', tierDescs: {
+    spirit: 'Allies have advantage on melee attack rolls vs. creatures within 5ft of you while raging.',
+    aspect: 'Track at fast pace without penalty; move stealthily at normal pace.',
+    attunement: 'While raging, bonus action to knock a Large or smaller creature prone on a hit.',
+  }},
+  { slug: 'elk', name: 'Elk', tierDescs: {
+    spirit: '+15ft walking speed while raging.',
+    aspect: 'Carry 5× STR for push/drag; ignore non-magical difficult terrain while mounted.',
+    attunement: 'While raging, melee attack deals extra 1d12 damage and creature must make STR save or be knocked prone.',
+  }},
+  { slug: 'tiger', name: 'Tiger', tierDescs: {
+    spirit: 'Proficiency in two skills from Athletics, Acrobatics, Stealth, Survival while raging.',
+    aspect: '+10ft jump distance; proficiency in two skills from the above list (always active).',
+    attunement: 'While raging, move up to half speed as part of your turn before making a melee attack.',
+  }},
+]
+
+// Tier keys match featuresChosen keys: 'totem-spirit' (L3), 'totem-aspect' (L6), 'totem-attunement' (L14)
+export const TOTEM_TIER_LEVELS: Record<string, number> = {
+  'totem-spirit': 3,
+  'totem-aspect': 6,
+  'totem-attunement': 14,
+}
+
+// ── Barbarian Storm Herald aura choices ───────────────────────────────────
+
+export interface StormAuraDef {
+  slug: string
+  name: string
+  description: string
+  soulDesc: string
+}
+
+export const STORM_AURA_OPTIONS: StormAuraDef[] = [
+  { slug: 'desert', name: 'Desert', description: 'Aura (10ft): each enemy in the aura takes 1d6 fire damage at start of their turn while you rage.', soulDesc: 'Fire resistance; can ignite flammable objects.' },
+  { slug: 'sea', name: 'Sea', description: 'Aura (10ft): choose one creature in aura, it makes STR save (DC 8+PB+CON) or takes 1d6 lightning + 1d6 thunder damage.', soulDesc: 'Lightning resistance; breathe water; 30ft swim speed.' },
+  { slug: 'tundra', name: 'Tundra', description: 'Aura (10ft): each ally gains 2 temp HP at the start of their turn while you rage.', soulDesc: 'Cold resistance; water around you doesn\'t freeze.' },
+]
+
+// ── Monk Way of the Four Elements disciplines ──────────────────────────────
+
+export interface FourElementsDisciplineDef {
+  slug: string
+  name: string
+  ki: string
+  description: string
+}
+
+export const FOUR_ELEMENTS_DISCIPLINES: FourElementsDisciplineDef[] = [
+  { slug: 'breath-of-winter', name: 'Breath of Winter', ki: '6 ki', description: 'Cast Cone of Cold.' },
+  { slug: 'clench-of-north-wind', name: 'Clench of the North Wind', ki: '3 ki', description: 'Cast Hold Person.' },
+  { slug: 'eternal-mountain-defense', name: 'Eternal Mountain Defense', ki: '5 ki', description: 'Cast Stoneskin on yourself.' },
+  { slug: 'fangs-of-fire-snake', name: 'Fangs of the Fire Snake', ki: '1 ki', description: 'Unarmed strike extends 10ft and deals fire damage, or spend 1 additional ki after hitting to deal 3d10 extra fire.' },
+  { slug: 'fist-of-four-thunders', name: 'Fist of Four Thunders', ki: '2 ki', description: 'Cast Thunderwave.' },
+  { slug: 'fist-of-unbroken-air', name: 'Fist of Unbroken Air', ki: '2 ki', description: '30ft ranged strike: 3d10 bludgeoning + knock back 20ft + knock prone (STR save DC = Ki save DC).' },
+  { slug: 'flames-of-the-phoenix', name: 'Flames of the Phoenix', ki: '4 ki', description: 'Cast Fireball.' },
+  { slug: 'gong-of-the-summit', name: 'Gong of the Summit', ki: '3 ki', description: 'Cast Shatter.' },
+  { slug: 'mist-stance', name: 'Mist Stance', ki: '4 ki', description: 'Cast Gaseous Form on yourself.' },
+  { slug: 'ride-the-wind', name: 'Ride the Wind', ki: '4 ki', description: 'Cast Fly on yourself.' },
+  { slug: 'river-of-hungry-flame', name: 'River of Hungry Flame', ki: '5 ki', description: 'Cast Wall of Fire.' },
+  { slug: 'rush-of-the-gale-spirits', name: 'Rush of the Gale Spirits', ki: '2 ki', description: 'Cast Gust of Wind.' },
+  { slug: 'shape-the-flowing-river', name: 'Shape the Flowing River', ki: '1 ki', description: 'Action: reshape ice/water in 120ft cone (30ft × 10ft). Freeze, thaw, or redirect water up to 10ft deep.' },
+  { slug: 'sweeping-cinder-strike', name: 'Sweeping Cinder Strike', ki: '2 ki', description: 'Cast Burning Hands.' },
+  { slug: 'water-whip', name: 'Water Whip', ki: '2 ki', description: '30ft whip: 3d10 bludgeoning + pull up to 25ft toward you or knock prone (DEX save DC = Ki save DC).' },
+  { slug: 'wave-of-rolling-earth', name: 'Wave of Rolling Earth', ki: '6 ki', description: 'Cast Wall of Stone.' },
+]
+
+export const HUNTER_CHOICES: Record<number, HunterChoiceDef[]> = {
+  3: [
+    { slug: 'colossus-slayer', name: 'Colossus Slayer', description: 'Once per turn, deal an extra 1d8 damage when you hit a creature that is below its hit point maximum.' },
+    { slug: 'giant-killer', name: 'Giant Killer', description: 'Reaction: attack a Large or larger creature within 5ft immediately after it misses you.' },
+    { slug: 'horde-breaker', name: 'Horde Breaker', description: 'Once per turn, make a second attack against a different creature adjacent to your primary target.' },
+  ],
+  7: [
+    { slug: 'escape-the-horde', name: 'Escape the Horde', description: 'Opportunity attacks against you are made with disadvantage.' },
+    { slug: 'multiattack-defense', name: 'Multiattack Defense', description: 'When a creature hits you, gain +4 AC against all subsequent attacks from that creature this turn.' },
+    { slug: 'steel-will', name: 'Steel Will', description: 'Advantage on saving throws against being frightened.' },
+  ],
+  11: [
+    { slug: 'volley', name: 'Volley', description: 'Attack any number of creatures within 10ft of a chosen point within ranged weapon range.' },
+    { slug: 'whirlwind-attack', name: 'Whirlwind Attack', description: 'Make a melee attack against any number of creatures within 5ft of you.' },
+  ],
+  15: [
+    { slug: 'evasion', name: 'Evasion', description: 'DEX save: take no damage on success, half damage on failure.' },
+    { slug: 'stand-against-the-tide', name: 'Stand Against the Tide', description: 'Reaction: when a creature misses you with a melee attack, force it to repeat the attack against a creature of your choice within range.' },
+  ],
+}

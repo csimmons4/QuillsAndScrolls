@@ -90,6 +90,9 @@ const EquipmentItemSchema = z.object({
   attuned: z.boolean(),
   isHomebrew: z.boolean(),
   notes: z.string(),
+  charges: z.number().int().min(0).optional(),
+  chargesMax: z.number().int().min(1).optional(),
+  rechargesOnLongRest: z.boolean().optional(),
 })
 export type EquipmentItem = z.infer<typeof EquipmentItemSchema>
 
@@ -211,7 +214,14 @@ export const CharacterSchema = z.object({
   }).default({ activeBoard: '', boards: [] }),
 
   summons: z.array(SummonSchema).default([]),
+
+  customResources: z.array(z.object({
+    key: z.string(),
+    name: z.string(),
+    max: z.number().int().min(1),
+    recharge: z.enum(['short', 'long']),
+  })).default([]),
 })
 
 export type Character = z.infer<typeof CharacterSchema>
-export const SCHEMA_VERSION = 1
+export const SCHEMA_VERSION = 3

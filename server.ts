@@ -7,7 +7,7 @@ import { fileURLToPath } from 'url'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const CHARS_DIR = path.join(__dirname, 'characters')
 const HOMEBREW_DIR = path.join(__dirname, 'homebrew')
-const CATEGORIES = ['spells', 'items', 'feats', 'races', 'classes'] as const
+const CATEGORIES = ['spells', 'items', 'feats', 'races', 'classes', 'backgrounds'] as const
 type HBCategory = typeof CATEGORIES[number]
 
 fs.mkdirSync(CHARS_DIR, { recursive: true })
