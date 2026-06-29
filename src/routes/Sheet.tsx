@@ -945,7 +945,7 @@ export default function Sheet() {
   useEffect(() => {
     if (!id) return
     listCharactersFromDisk()
-      .then(chars => {
+      .then(({ characters: chars }) => {
         const found = chars.find(c => c.id === id)
         if (found) { setChar(found); charRef.current = found }
         else setLoadError('Character not found — it may have been deleted.')

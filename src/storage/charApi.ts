@@ -9,16 +9,57 @@ async function apiFetch(path: string, options?: RequestInit) {
 
 // ── Characters ───────────────────────────────────────────────────────────────
 
-export async function listCharactersFromDisk(): Promise<Character[]> {
+/** A character file the server returned but that couldn't be migrated/parsed. */
+export interface CharacterLoadFailure {
+  /** Best-effort identity pulled from the raw object (may be missing if badly malformed). */
+  id?: string
+  name?: string
+  /** Short, human-readable reason (Zod issues summarized, or the raw error message). */
+  error: string
+}
+
+export interface CharacterListResult {
+  characters: Character[]
+  failures: CharacterLoadFailure[]
+}
+
+/** Summarize a parse error into a short, display-friendly string. */
+function describeLoadError(err: unknown): string {
+  const issues = (err as { issues?: { path: (string | number)[]; message: string }[] })?.issues
+  if (Array.isArray(issues) && issues.length) {
+    const head = issues
+      .slice(0, 3)
+      .map(i => `${i.path.join('.') || '(root)'}: ${i.message}`)
+      .join('; ')
+    return issues.length > 3 ? `${head}; +${issues.length - 3} more` : head
+  }
+  return err instanceof Error ? err.message : String(err)
+}
+
+/**
+ * Load every character file from disk. Files that fail to migrate/parse are not
+ * silently dropped — they're returned in `failures` so the UI can tell the user
+ * which characters are hidden and why. The underlying files are left untouched.
+ */
+export async function listCharactersFromDisk(): Promise<CharacterListResult> {
   const raw: unknown[] = await apiFetch('/api/characters')
-  return raw.flatMap(r => {
+  const characters: Character[] = []
+  const failures: CharacterLoadFailure[] = []
+  for (const r of raw) {
     try {
-      return [migrate(r)]
+      characters.push(migrate(r))
     } catch (err) {
+      const o = (r ?? {}) as Record<string, unknown>
+      failures.push({
+        id: typeof o.id === 'string' ? o.id : undefined,
+        name: typeof o.name === 'string' ? o.name : undefined,
+        error: describeLoadError(err),
+      })
       console.warn('[storage] skipping unreadable character from disk:', err)
-      return []
     }
-  }).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+  }
+  characters.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+  return { characters, failures }
 }
 
 export async function saveCharacterToDisk(char: Character): Promise<void> {

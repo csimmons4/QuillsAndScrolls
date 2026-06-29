@@ -124,7 +124,7 @@ export default function LevelUp() {
 
   useEffect(() => {
     if (!id) return
-    listCharactersFromDisk().then(chars => {
+    listCharactersFromDisk().then(({ characters: chars }) => {
       setChar(chars.find(c => c.id === id) ?? null)
     })
   }, [id])

@@ -2,13 +2,14 @@ import { useEffect, useState, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Character } from '../character/model'
 import { importCharacter } from '../storage/ioFile'
-import { listCharactersFromDisk, saveCharacterToDisk, deleteCharacterFromDisk } from '../storage/charApi'
+import { listCharactersFromDisk, saveCharacterToDisk, deleteCharacterFromDisk, type CharacterLoadFailure } from '../storage/charApi'
 import { totalLevel } from '../character/derive'
 import { useContent } from '../content/ContentProvider'
 import { v4 as uuidv4 } from 'uuid'
 
 export default function Vault() {
   const [characters, setCharacters] = useState<Character[]>([])
+  const [failures, setFailures] = useState<CharacterLoadFailure[]>([])
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -17,8 +18,9 @@ export default function Vault() {
 
   async function refresh() {
     try {
-      const chars = await listCharactersFromDisk()
-      setCharacters(chars)
+      const { characters, failures } = await listCharactersFromDisk()
+      setCharacters(characters)
+      setFailures(failures)
     } catch {
       setError('Could not reach the character server. Make sure you started the app with "npm run dev".')
     } finally {
@@ -89,6 +91,24 @@ export default function Vault() {
 
       {error && (
         <div className="mb-4 p-3 bg-red-50 border border-red-300 rounded text-red-800 text-sm">{error}</div>
+      )}
+
+      {failures.length > 0 && (
+        <div className="mb-4 p-3 bg-amber-50 border border-amber-300 rounded text-amber-900 text-sm">
+          <p className="font-semibold">
+            {failures.length} character{failures.length > 1 ? 's' : ''} couldn’t be loaded and{' '}
+            {failures.length > 1 ? 'were' : 'was'} hidden:
+          </p>
+          <ul className="mt-1 list-disc list-inside space-y-0.5">
+            {failures.map((f, i) => (
+              <li key={f.id ?? i}>
+                <span className="font-medium">{f.name || f.id || 'Unknown character'}</span>
+                <span className="text-amber-700"> — {f.error}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-1 text-amber-700">The file is still on disk; nothing was deleted.</p>
+        </div>
       )}
 
       {loading ? (

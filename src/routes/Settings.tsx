@@ -131,8 +131,8 @@ export default function Settings() {
   const content = useContent()
 
   async function handleBackup() {
-    const [chars, hb] = await Promise.all([listCharactersFromDisk(), loadHomebrewFromDisk()])
-    await exportEverything(chars, hb)
+    const [{ characters }, hb] = await Promise.all([listCharactersFromDisk(), loadHomebrewFromDisk()])
+    await exportEverything(characters, hb)
   }
 
   return (
