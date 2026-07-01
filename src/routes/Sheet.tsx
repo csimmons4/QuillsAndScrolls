@@ -437,7 +437,7 @@ function CampaignBoardManager({
         {boards.map(b => (
           <div key={b.id}
             className={`flex items-center gap-1 px-3 py-2 border-r border-parchment-200 cursor-pointer shrink-0 group ${
-              b.id === activeId ? 'bg-white border-b-white text-parchment-900 font-semibold' : 'text-parchment-500 hover:bg-parchment-100'
+              b.id === activeId ? 'bg-parchment-50 border-b-white text-parchment-900 font-semibold' : 'text-parchment-500 hover:bg-parchment-100'
             }`}
             onClick={() => { setActiveId(b.id); onChange(boards, b.id) }}
           >
@@ -778,7 +778,7 @@ function CampaignBoard({
             <input
               autoFocus
               style={{ position: 'absolute', left: lx - 60, top: ly - 11, zIndex: 20, width: 120 }}
-              className="text-xs bg-white border border-red-400 rounded px-1.5 py-0.5 text-red-900 text-center outline-none shadow-md font-serif italic"
+              className="text-xs bg-parchment-50 border border-red-400 rounded px-1.5 py-0.5 text-red-900 text-center outline-none shadow-md font-serif italic"
               value={editingConn.val}
               placeholder="Label…"
               onChange={e => setEditingConn({ ...editingConn, val: e.target.value })}
@@ -1251,7 +1251,7 @@ export default function Sheet() {
             <input
               type="number"
               min={1}
-              className="w-16 text-center text-xl font-bold border border-parchment-200 rounded py-0.5 bg-white focus:border-parchment-400 focus:outline-none"
+              className="w-16 text-center text-xl font-bold border border-parchment-200 rounded py-0.5 bg-parchment-50 focus:border-parchment-400 focus:outline-none"
               placeholder="0"
               value={damageInput}
               onChange={e => setDamageInput(e.target.value)}
@@ -1320,27 +1320,6 @@ export default function Sheet() {
           <div className="mb-3">
             <h3 className="section-header mb-0">Class Resources</h3>
           </div>
-          {/* Hit Dice */}
-          <div className="mb-3 flex flex-wrap gap-4 items-center">
-            <span className="text-xs font-semibold text-parchment-600 uppercase">Hit Dice</span>
-            {char.classes.map(cc => {
-              const hd = CLASS_OPTIONS[cc.classSlug]?.hitDie ?? content.classes.find(c => c.slug === cc.classSlug)?.hitDie ?? 8
-              const used = (char.hitDiceUsed ?? {})[cc.classSlug] ?? 0
-              const remaining = cc.level - used
-              return (
-                <div key={cc.classSlug} className="flex items-center gap-1.5 text-sm">
-                  <span className="font-medium text-parchment-700">d{hd}</span>
-                  <button className="btn-ghost px-1.5 py-0.5 text-xs" onClick={() => {
-                    if (used > 0) patch({ hitDiceUsed: { ...(char.hitDiceUsed ?? {}), [cc.classSlug]: used - 1 } })
-                  }}>+</button>
-                  <span className={`font-bold min-w-[2.5rem] text-center ${remaining === 0 ? 'text-red-500' : ''}`}>{remaining}/{cc.level}</span>
-                  <button className="btn-ghost px-1.5 py-0.5 text-xs" onClick={() => {
-                    if (remaining > 0) patch({ hitDiceUsed: { ...(char.hitDiceUsed ?? {}), [cc.classSlug]: used + 1 } })
-                  }}>−</button>
-                </div>
-              )
-            })}
-          </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
             {classResources.map(r => {
               const isPool = (r.max ?? 0) > 6  // large pools get a number input
@@ -1357,27 +1336,41 @@ export default function Sheet() {
                   {r.display && <div className="text-xs text-parchment-400 mb-1">{r.display}</div>}
 
                   {isPool ? (
-                    // Number input for large pools (Ki, Sorcery Points, Lay on Hands)
-                    <div className="flex items-center gap-1">
-                      <button className="btn-ghost px-1 text-sm" onClick={() => {
-                        const next = Math.max(0, current - 1)
-                        patch({ classResources: { ...char.classResources, [r.key]: next } })
-                      }}>−</button>
-                      <input
-                        type="number" min={0} max={max ?? 9999}
-                        className="w-12 text-center text-sm font-bold bg-transparent border border-parchment-300 rounded py-0.5"
-                        value={current}
-                        onChange={e => {
-                          const v = Math.max(0, Math.min(max ?? 9999, parseInt(e.target.value, 10) || 0))
-                          patch({ classResources: { ...char.classResources, [r.key]: v } })
-                        }}
-                      />
-                      <span className="text-xs text-parchment-400">/ {max ?? '∞'}</span>
-                      <button className="btn-ghost px-1 text-sm" onClick={() => {
-                        const next = Math.min(max ?? 9999, current + 1)
-                        patch({ classResources: { ...char.classResources, [r.key]: next } })
-                      }}>+</button>
-                    </div>
+                    // Filled gauge + controls for large pools (Ki, Sorcery Points, Lay on Hands)
+                    (() => {
+                      const cap = max ?? 9999
+                      const pct = cap > 0 ? Math.min(100, Math.round((current / cap) * 100)) : 0
+                      const setVal = (v: number) =>
+                        patch({ classResources: { ...char.classResources, [r.key]: Math.max(0, Math.min(cap, v)) } })
+                      return (
+                        <div>
+                          <div
+                            className="relative h-4 rounded-full bg-parchment-200 border border-parchment-300 overflow-hidden cursor-pointer"
+                            title="Click to set remaining"
+                            onClick={e => {
+                              const rect = e.currentTarget.getBoundingClientRect()
+                              setVal(Math.round(((e.clientX - rect.left) / rect.width) * cap))
+                            }}
+                          >
+                            <div
+                              className="absolute inset-y-0 left-0 bg-gradient-to-r from-parchment-500 to-parchment-700 transition-all duration-200"
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                          <div className="flex items-center gap-1 mt-1">
+                            <button className="btn-ghost px-1 text-sm" onClick={() => setVal(current - 1)}>−</button>
+                            <input
+                              type="number" min={0} max={max ?? 9999}
+                              className="w-12 text-center text-sm font-bold bg-transparent border border-parchment-300 rounded py-0.5"
+                              value={current}
+                              onChange={e => setVal(parseInt(e.target.value, 10) || 0)}
+                            />
+                            <span className="text-xs text-parchment-400">/ {max ?? '∞'}</span>
+                            <button className="btn-ghost px-1 text-sm" onClick={() => setVal(current + 1)}>+</button>
+                          </div>
+                        </div>
+                      )
+                    })()
                   ) : max === null ? (
                     // Unlimited (Barbarian L20 rage)
                     <div className="text-sm font-bold text-green-600">Unlimited</div>
@@ -2043,7 +2036,7 @@ export default function Sheet() {
                   placeholder="Name"
                   value={newResourceName}
                   onChange={e => setNewResourceName(e.target.value)}
-                  className="border border-parchment-300 rounded px-2 py-1 text-sm flex-1 min-w-0 bg-white"
+                  className="border border-parchment-300 rounded px-2 py-1 text-sm flex-1 min-w-0 bg-parchment-50"
                 />
                 <input
                   type="number"
@@ -2051,12 +2044,12 @@ export default function Sheet() {
                   min={1}
                   value={newResourceMax}
                   onChange={e => setNewResourceMax(e.target.value)}
-                  className="border border-parchment-300 rounded px-2 py-1 text-sm w-16 bg-white"
+                  className="border border-parchment-300 rounded px-2 py-1 text-sm w-16 bg-parchment-50"
                 />
                 <select
                   value={newResourceRecharge}
                   onChange={e => setNewResourceRecharge(e.target.value as 'short' | 'long')}
-                  className="border border-parchment-300 rounded px-2 py-1 text-sm bg-white"
+                  className="border border-parchment-300 rounded px-2 py-1 text-sm bg-parchment-50"
                 >
                   <option value="long">Long Rest</option>
                   <option value="short">Short Rest</option>
@@ -2426,7 +2419,7 @@ export default function Sheet() {
                                         ? isCtip
                                           ? 'bg-amber-500 border-amber-500 text-white shadow-sm'
                                           : 'bg-dungeon-900 border-dungeon-900 text-parchment-100 shadow-sm'
-                                        : 'border-parchment-200 text-parchment-600 hover:border-parchment-400 bg-white'
+                                        : 'border-parchment-200 text-parchment-600 hover:border-parchment-400 bg-parchment-50'
                                     }`}
                                   >
                                     {ordinals[lvl]}
@@ -2458,7 +2451,7 @@ export default function Sheet() {
                                 return (
                                   <div key={s.spellSlug}
                                     style={{ borderLeftColor: isConcentrating ? '#f59e0b' : schoolBorderColor(def?.school) }}
-                                    className={`rounded-lg border transition-colors ${isConcentrating ? 'border-l-[4px] border-amber-300 bg-amber-50/60 conc-active' : 'border-l-[3px] border-parchment-200 bg-white hover:bg-parchment-50/60'}`}
+                                    className={`rounded-lg border transition-colors ${isConcentrating ? 'border-l-[4px] border-amber-300 bg-amber-50/60 conc-active' : 'border-l-[3px] border-parchment-200 bg-parchment-50 hover:bg-parchment-50/60'}`}
                                   >
                                     <button
                                       type="button"
@@ -2772,7 +2765,7 @@ export default function Sheet() {
                                 const isOpen = expandedInnate === spell.key
                                 const accentClass = isSpent ? 'border-l-parchment-300' : isAlwaysPrepared ? 'border-l-indigo-400' : 'border-l-green-400'
                                 return (
-                                  <div key={spell.key} className={`rounded-lg border-l-[3px] border border-parchment-200 transition-colors ${isSpent ? 'opacity-50 bg-parchment-50' : 'bg-white hover:bg-parchment-50/60'} ${accentClass}`}>
+                                  <div key={spell.key} className={`rounded-lg border-l-[3px] border border-parchment-200 transition-colors ${isSpent ? 'opacity-50 bg-parchment-50' : 'bg-parchment-50 hover:bg-parchment-50/60'} ${accentClass}`}>
                                     <button type="button" className="w-full text-left px-3 py-2"
                                       onClick={() => setExpandedInnate(isOpen ? null : spell.key)}>
                                       <div className="flex items-center gap-2">
@@ -2842,7 +2835,7 @@ export default function Sheet() {
                   className={`w-full py-2 rounded-lg border text-sm font-semibold transition-colors ${
                     showSpellLibrary
                       ? 'bg-dungeon-900 border-dungeon-900 text-parchment-100'
-                      : 'bg-white border-parchment-300 text-parchment-600 hover:border-parchment-500 hover:text-parchment-900'
+                      : 'bg-parchment-50 border-parchment-300 text-parchment-600 hover:border-parchment-500 hover:text-parchment-900'
                   }`}
                 >
                   {showSpellLibrary ? '▲ Close Spell Library' : `▼ ${isPrepared ? 'Prepare Spells' : 'Learn Spells'}`}
@@ -2899,7 +2892,7 @@ export default function Sheet() {
                             <div key={s.slug}
                               ref={isOpen ? (el) => { if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' }) } : undefined}
                               style={{ borderLeftColor: isOpen ? '#8b5cf6' : schoolBorderColor(s.school) }}
-                              className={`rounded-lg border-l-[3px] border ${isOpen ? 'border-violet-200 bg-violet-50' : 'border-parchment-100 bg-white hover:bg-parchment-50/50'} transition-colors`}
+                              className={`rounded-lg border-l-[3px] border ${isOpen ? 'border-violet-200 bg-violet-50' : 'border-parchment-100 bg-parchment-50 hover:bg-parchment-50/50'} transition-colors`}
                             >
                               <button type="button" className="w-full text-left px-3 py-2.5"
                                 onClick={() => setBrowserSelectedSpell(isOpen ? null : s.slug)}>
@@ -4328,7 +4321,7 @@ export default function Sheet() {
                                           <div className="grid grid-cols-2 gap-1">
                                             {items.map(name => (
                                               <button key={name} type="button"
-                                                className="text-left px-2 py-1 rounded border border-parchment-200 hover:border-parchment-400 hover:bg-white text-sm transition-colors"
+                                                className="text-left px-2 py-1 rounded border border-parchment-200 hover:border-parchment-400 hover:bg-parchment-50 text-sm transition-colors"
                                                 onClick={() => { patch({ equipment: [...char.equipment, { itemSlug: `gear-${name.toLowerCase().replace(/[^a-z0-9]/g,'-')}`, name, quantity: 1, equipped: false, attuned: false, isHomebrew: false, notes: '' }] }) }}
                                               >{name}</button>
                                             ))}
@@ -5793,7 +5786,7 @@ export default function Sheet() {
                               {SKILLS.filter(s => char.skillProficiencies.includes(s) && !char.skillExpertise.includes(s) && !chosen.includes(s)).map(s => (
                                 <button
                                   key={s}
-                                  className="text-xs bg-white border border-amber-300 text-amber-800 rounded px-2 py-0.5 hover:bg-amber-100"
+                                  className="text-xs bg-parchment-50 border border-amber-300 text-amber-800 rounded px-2 py-0.5 hover:bg-amber-100"
                                   onClick={() => {
                                     const next = [...chosen, s]
                                     const fc: typeof char.featuresChosen[0] = { key: expertiseKey, value: next }
@@ -5884,7 +5877,7 @@ export default function Sheet() {
                       <div className="flex flex-wrap gap-1.5 mb-2.5">
                         {college.cantrips.map(c => (
                           <button key={c} type="button" onClick={() => setPick('strixhaven-cantrip', 0, c)}
-                            className={`text-xs rounded px-2 py-1 border transition-colors ${chosenCantrip === c ? 'bg-violet-600 text-white border-violet-600' : 'bg-white text-violet-700 border-violet-200 hover:border-violet-400'}`}>
+                            className={`text-xs rounded px-2 py-1 border transition-colors ${chosenCantrip === c ? 'bg-violet-600 text-white border-violet-600' : 'bg-parchment-50 text-violet-700 border-violet-200 hover:border-violet-400'}`}>
                             {chosenCantrip === c ? '✓ ' : ''}{c}
                           </button>
                         ))}
@@ -5895,7 +5888,7 @@ export default function Sheet() {
                       <div className="flex flex-wrap gap-1.5 mb-2">
                         {firstLevelOptions.map(s => (
                           <button key={s} type="button" onClick={() => setPick('strixhaven-spell', 1, s)}
-                            className={`text-xs rounded px-2 py-1 border transition-colors ${chosenSpell === s ? 'bg-violet-600 text-white border-violet-600' : 'bg-white text-violet-700 border-violet-200 hover:border-violet-400'}`}>
+                            className={`text-xs rounded px-2 py-1 border transition-colors ${chosenSpell === s ? 'bg-violet-600 text-white border-violet-600' : 'bg-parchment-50 text-violet-700 border-violet-200 hover:border-violet-400'}`}>
                             {chosenSpell === s ? '✓ ' : ''}{s}
                           </button>
                         ))}
@@ -6365,7 +6358,7 @@ export default function Sheet() {
                       className={`text-xs px-2.5 py-1 rounded border transition-colors ${
                         char.alignment === a
                           ? 'bg-parchment-700 text-parchment-100 border-parchment-700'
-                          : 'bg-white text-parchment-600 border-parchment-200 hover:border-parchment-400'
+                          : 'bg-parchment-50 text-parchment-600 border-parchment-200 hover:border-parchment-400'
                       }`}
                     >{a}</button>
                   ))}
@@ -6609,7 +6602,7 @@ export default function Sheet() {
                 autoFocus
                 type="text"
                 placeholder="Search feats..."
-                className="w-full border border-parchment-300 rounded px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-parchment-500"
+                className="w-full border border-parchment-300 rounded px-3 py-2 text-sm bg-parchment-50 focus:outline-none focus:ring-1 focus:ring-parchment-500"
                 value={addFeatSearch}
                 onChange={e => setAddFeatSearch(e.target.value)}
               />
@@ -6634,7 +6627,7 @@ export default function Sheet() {
                       className={`w-full text-left px-3 py-2 rounded mb-1 transition-colors ${
                         alreadyHas
                           ? 'opacity-40 cursor-not-allowed bg-parchment-100'
-                          : 'hover:bg-parchment-200 bg-white border border-parchment-100'
+                          : 'hover:bg-parchment-200 bg-parchment-50 border border-parchment-100'
                       }`}
                       onClick={() => {
                         if (alreadyHas) return
