@@ -22,8 +22,10 @@ Quills&Scrolls/
     │   └── sword-of-the-plan.json
     ├── feats/
     │   └── iron-will.json
-    └── races/
-        └── stoneling.json
+    ├── races/
+    │   └── stoneling.json
+    ├── classes/
+    └── backgrounds/
 ```
 
 You can open, copy, move, or delete these files directly in Finder (Mac) or File Explorer (Windows) — no special tools needed.
@@ -163,10 +165,11 @@ Eight steps that walk you through building a Level 1 character:
 
 ### Character Sheet
 The main play screen. Tabs for:
-- **Stats** — ability scores, saving throws, skills, conditions, inspiration
+- **Stats** — ability scores, saving throws, skills, conditions, inspiration, class resources, rests, death saves
 - **Spells** — known/prepared spells, spell slot tracker, cast & recover
 - **Inventory** — equipment list, currency (cp/sp/ep/gp/pp), attunement
 - **Features** — all race, class, and background features with descriptions
+- **Summons** — track summoned or companion creatures with their own HP and stats
 - **Notes** — personality traits, ideals, bonds, flaws, backstory, free notes
 
 Every change auto-saves to disk within a second. No manual save needed during play.
@@ -186,10 +189,16 @@ Add your own custom content that appears alongside official options everywhere i
 - **Spells** — homebrew spells with full stat blocks
 - **Feats** — custom feats with prerequisites
 - **Races** — homebrew races with ability bonuses and traits
+- **Classes** — homebrew classes with features and subclasses
+- **Backgrounds** — homebrew backgrounds with proficiencies and features
 
 Each entry is saved as its own `.json` file so you can share individual pieces with players (see below).
 
+### Compendium
+A searchable, filterable reference browser for **all** game content — spells, items, feats, races, backgrounds, and classes (official plus your homebrew). Filter by category and search by name or description without opening a character.
+
 ### Settings
+- Choose a display theme — **Parchment** (warm classic), **Light** (clean white), or **Dark**
 - See when data was last scraped and how many entries exist
 - Download a full backup `.zip` of all characters + homebrew
 - Re-scrape instructions
@@ -208,14 +217,16 @@ Characters auto-save to the `characters/` folder as you play. Each character is 
 **Import via the app:** on the Vault page, click **Import .json** to load a character file through the browser.
 
 ### Homebrew
-Each homebrew spell, item, feat, and race is saved as its own file inside the `homebrew/` folder:
+Each homebrew spell, item, feat, race, class, and background is saved as its own file inside the `homebrew/` folder:
 
 ```
 homebrew/
-├── spells/   ← e.g. orb-of-destruction.json
-├── items/    ← e.g. sword-of-the-plan.json
-├── feats/    ← e.g. iron-will.json
-└── races/    ← e.g. stoneling.json
+├── spells/       ← e.g. orb-of-destruction.json
+├── items/        ← e.g. sword-of-the-plan.json
+├── feats/        ← e.g. iron-will.json
+├── races/        ← e.g. stoneling.json
+├── classes/      ← e.g. spellblade.json
+└── backgrounds/  ← e.g. hedge-mage.json
 ```
 
 **Share a single spell with a player:** send them the `.json` file from `homebrew/spells/`. They drop it into their own `homebrew/spells/` folder and it appears in their app automatically — no import button needed.
