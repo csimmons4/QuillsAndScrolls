@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, NavLink, Link } from 'react-router-dom'
 import { ContentProvider } from './content/ContentProvider'
+import { ThemeProvider } from './theme/theme'
 import Vault from './routes/Vault'
 import Creator from './routes/Creator'
 import Sheet from './routes/Sheet'
@@ -10,14 +11,12 @@ import Settings from './routes/Settings'
 
 function NavBar() {
   const linkClass = ({ isActive }: { isActive: boolean }) =>
-    isActive
-      ? 'text-parchment-800 font-bold border-b-2 border-parchment-600 pb-0.5'
-      : 'text-parchment-600 hover:text-parchment-800 transition-colors'
+    isActive ? 'nav-link nav-link-active' : 'nav-link'
 
   return (
-    <header className="bg-parchment-900 text-parchment-100 shadow-lg">
+    <header className="app-header shadow-lg">
       <div className="max-w-7xl mx-auto px-4 py-3 flex items-center gap-6">
-        <Link to="/" className="text-xl font-bold tracking-wide text-parchment-200 hover:text-white">
+        <Link to="/" className="nav-brand text-xl font-bold tracking-wide">
           Quills &amp; Scrolls
         </Link>
         <nav className="flex gap-5 text-sm ml-4">
@@ -33,6 +32,7 @@ function NavBar() {
 
 export default function App() {
   return (
+    <ThemeProvider>
     <BrowserRouter>
       <ContentProvider>
         <div className="min-h-screen flex flex-col">
@@ -51,5 +51,6 @@ export default function App() {
         </div>
       </ContentProvider>
     </BrowserRouter>
+    </ThemeProvider>
   )
 }

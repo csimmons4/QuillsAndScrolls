@@ -423,7 +423,7 @@ export default function Lookup() {
             className={`text-xs px-3 py-1 rounded-full border transition-colors font-medium ${
               category === cat.id
                 ? 'bg-parchment-800 text-parchment-100 border-parchment-800'
-                : 'bg-white text-parchment-600 border-parchment-300 hover:border-parchment-500 hover:text-parchment-800'
+                : 'bg-parchment-50 text-parchment-600 border-parchment-300 hover:border-parchment-500 hover:text-parchment-800'
             }`}
           >
             {cat.label}

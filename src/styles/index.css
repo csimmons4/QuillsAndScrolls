@@ -2,9 +2,79 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Theme palettes ──────────────────────────────────────────────────────────
+   RGB channel triplets consumed by the parchment/dungeon Tailwind colors
+   (see tailwind.config.js). Swap at runtime via `data-theme` on <html>.
+   Low parchment indices = surfaces/borders, high = text; --accent/--header are
+   decoupled so buttons and the top bar stay readable in every theme. */
+:root,
+[data-theme='parchment'] {
+  --p-50: 253 250 243;
+  --p-100: 250 243 224;
+  --p-200: 245 230 192;
+  --p-300: 237 212 154;
+  --p-400: 226 188 110;
+  --p-500: 212 164 76;
+  --p-600: 184 136 58;
+  --p-700: 149 107 46;
+  --p-800: 116 82 40;
+  --p-900: 90 64 34;
+  --d-800: 30 27 24;
+  --d-900: 20 18 16;
+  --accent: 184 136 58;
+  --accent-hover: 149 107 46;
+  --accent-fg: 255 255 255;
+  --header-bg: 90 64 34;
+  --header-fg: 250 243 224;
+  color-scheme: light;
+}
+
+[data-theme='light'] {
+  --p-50: 255 255 255;
+  --p-100: 246 247 249;
+  --p-200: 232 235 239;
+  --p-300: 214 219 226;
+  --p-400: 156 163 175;
+  --p-500: 107 114 128;
+  --p-600: 75 85 99;
+  --p-700: 55 65 81;
+  --p-800: 31 41 55;
+  --p-900: 17 24 39;
+  --d-800: 31 41 55;
+  --d-900: 17 24 39;
+  --accent: 184 136 58;
+  --accent-hover: 149 107 46;
+  --accent-fg: 255 255 255;
+  --header-bg: 31 41 55;
+  --header-fg: 249 250 251;
+  color-scheme: light;
+}
+
+[data-theme='dark'] {
+  --p-50: 32 28 23;
+  --p-100: 23 19 15;
+  --p-200: 45 39 31;
+  --p-300: 61 53 42;
+  --p-400: 92 80 62;
+  --p-500: 168 152 132;
+  --p-600: 190 172 140;
+  --p-700: 210 194 162;
+  --p-800: 226 214 190;
+  --p-900: 236 224 200;
+  --d-800: 226 214 190;
+  --d-900: 236 224 200;
+  --accent: 212 164 76;
+  --accent-hover: 226 188 110;
+  --accent-fg: 23 19 15;
+  --header-bg: 15 12 9;
+  --header-fg: 236 224 200;
+  color-scheme: dark;
+}
+
 @layer base {
   body {
     @apply bg-parchment-100 text-dungeon-900 font-serif;
+    transition: background-color 0.25s ease, color 0.25s ease;
   }
 
   h1, h2, h3, h4 {
@@ -17,7 +87,12 @@
     @apply inline-flex items-center justify-center px-4 py-2 rounded font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1;
   }
   .btn-primary {
-    @apply btn bg-parchment-600 text-white hover:bg-parchment-700 focus:ring-parchment-500;
+    @apply btn focus:ring-parchment-500;
+    background-color: rgb(var(--accent));
+    color: rgb(var(--accent-fg));
+  }
+  .btn-primary:hover {
+    background-color: rgb(var(--accent-hover));
   }
   .btn-secondary {
     @apply btn bg-parchment-200 text-dungeon-900 hover:bg-parchment-300 focus:ring-parchment-400;
@@ -30,11 +105,35 @@
   }
 
   .card {
-    @apply bg-white rounded-lg shadow border border-parchment-200 p-4;
+    @apply bg-parchment-50 rounded-lg shadow border border-parchment-200 p-4;
+    transition: background-color 0.25s ease, border-color 0.25s ease;
+  }
+
+  .app-header {
+    background-color: rgb(var(--header-bg));
+    color: rgb(var(--header-fg));
+    transition: background-color 0.25s ease, color 0.25s ease;
+  }
+  .nav-brand {
+    color: rgb(var(--header-fg));
+  }
+  .nav-link {
+    color: rgb(var(--header-fg) / 0.72);
+    border-bottom: 2px solid transparent;
+    padding-bottom: 2px;
+    transition: color 0.15s;
+  }
+  .nav-link:hover {
+    color: rgb(var(--header-fg));
+  }
+  .nav-link-active {
+    color: rgb(var(--header-fg));
+    font-weight: 700;
+    border-bottom-color: rgb(var(--accent));
   }
 
   .input {
-    @apply block w-full rounded border border-parchment-300 bg-white px-3 py-2 text-sm focus:border-parchment-500 focus:outline-none focus:ring-1 focus:ring-parchment-500;
+    @apply block w-full rounded border border-parchment-300 bg-parchment-50 px-3 py-2 text-sm focus:border-parchment-500 focus:outline-none focus:ring-1 focus:ring-parchment-500;
   }
 
   .label {
@@ -146,7 +245,7 @@
   }
 
   .input-coin {
-    @apply block w-auto rounded border border-parchment-300 bg-white px-1 py-1 text-sm text-center focus:border-parchment-500 focus:outline-none focus:ring-1 focus:ring-parchment-500;
+    @apply block w-auto rounded border border-parchment-300 bg-parchment-50 px-1 py-1 text-sm text-center focus:border-parchment-500 focus:outline-none focus:ring-1 focus:ring-parchment-500;
     -moz-appearance: textfield;
   }
   .input-coin::-webkit-outer-spin-button,

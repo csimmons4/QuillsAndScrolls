@@ -60,7 +60,7 @@ export function SpellChooser({ prompt, value, onChange, label }: Props) {
               key={spell.slug}
               className={`flex items-center gap-2 p-1.5 rounded border text-sm cursor-pointer transition-colors ${
                 picked
-                  ? 'border-parchment-600 bg-white font-medium'
+                  ? 'border-parchment-600 bg-parchment-50 font-medium'
                   : disabled
                     ? 'border-parchment-100 opacity-40 cursor-not-allowed'
                     : 'border-parchment-100 hover:border-parchment-400'

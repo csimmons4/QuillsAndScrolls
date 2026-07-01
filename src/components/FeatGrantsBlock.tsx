@@ -30,7 +30,7 @@ export function FeatGrantsBlock({ feat, spells, classChoice, setClassChoice, pic
               key={c}
               type="button"
               onClick={() => setClassChoice(c)}
-              className="text-sm px-3 py-1.5 rounded border border-parchment-300 hover:border-parchment-500 hover:bg-white capitalize"
+              className="text-sm px-3 py-1.5 rounded border border-parchment-300 hover:border-parchment-500 hover:bg-parchment-50 capitalize"
             >
               {c}
             </button>
