@@ -2118,6 +2118,14 @@ export default function Sheet() {
               .filter(s => s.level === 0 || s.level <= Math.max(maxSlotLevel, 1))
             const preparedSpells = char.spells.filter(s => s.prepared)
             const atPrepCap = isPrepared && prepLimit !== null && preparedCount >= prepLimit
+            // Spells-known cap for known casters (Bard/Sorcerer/Warlock/Ranger — they learn a
+            // fixed number of spells rather than preparing from a list each day).
+            const knownMax = !isPrepared ? classOpts?.spellsKnownTable?.[classLevel - 1] : undefined
+            const knownCount = char.spells.filter(s => {
+              const def = content.spells.find(d => d.slug === s.spellSlug)
+              return s.classSlug === primarySlug && (def?.level ?? 0) > 0
+            }).length
+            const atKnownCap = !!knownMax && knownCount >= knownMax
             const ordinals = ['Cantrips','1st','2nd','3rd','4th','5th','6th','7th','8th','9th']
 
             // School → left-border accent color (hex, used via inline style to avoid Tailwind class conflicts)
@@ -2189,6 +2197,11 @@ export default function Sheet() {
                       <div className={`flex flex-col items-center py-2 px-2 rounded-lg border ${preparedCount >= prepLimit ? 'border-amber-300 bg-amber-50' : 'border-parchment-200 bg-parchment-50'}`}>
                         <span className={`text-[9px] font-bold uppercase tracking-widest mb-0.5 ${preparedCount >= prepLimit ? 'text-amber-500' : 'text-parchment-400'}`}>Prepared</span>
                         <span className={`text-2xl font-bold leading-none ${preparedCount >= prepLimit ? 'text-amber-700' : 'text-parchment-800'}`}>{preparedCount}<span className="text-sm text-parchment-400">/{prepLimit}</span></span>
+                      </div>
+                    ) : knownMax ? (
+                      <div className={`flex flex-col items-center py-2 px-2 rounded-lg border ${atKnownCap ? 'border-amber-300 bg-amber-50' : 'border-parchment-200 bg-parchment-50'}`}>
+                        <span className={`text-[9px] font-bold uppercase tracking-widest mb-0.5 ${atKnownCap ? 'text-amber-500' : 'text-parchment-400'}`}>Known</span>
+                        <span className={`text-2xl font-bold leading-none ${atKnownCap ? 'text-amber-700' : 'text-parchment-800'}`}>{knownCount}<span className="text-sm text-parchment-400">/{knownMax}</span></span>
                       </div>
                     ) : (
                       <div className="flex flex-col items-center py-2 px-2 rounded-lg border border-parchment-200 bg-parchment-50">
