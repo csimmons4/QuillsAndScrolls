@@ -336,7 +336,7 @@ export function deriveClassResources(char: Character): ClassResource[] {
           if (cc.subclassSlug === 'moon') {
             crThreshold = `CR ${Math.max(1, Math.floor(lvl / 3))}`
           } else {
-            crThreshold = lvl >= 18 ? 'CR ∞' : lvl >= 8 ? 'CR 1' : lvl >= 4 ? 'CR 1/2' : 'CR 1/4'
+            crThreshold = lvl >= 8 ? 'CR 1' : lvl >= 4 ? 'CR 1/2' : 'CR 1/4'
           }
           resources.push({
             key: 'wild-shape', name: 'Wild Shape', classSlug: slug,
