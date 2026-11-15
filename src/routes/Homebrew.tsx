@@ -964,6 +964,8 @@ function EntryList({ category, entries, onEdit, onDelete }: {
   onEdit: (idx: number) => void
   onDelete: (idx: number) => void
 }) {
+  // ✕ asks first: deleting removes the entry's file from disk
+  const [confirmIdx, setConfirmIdx] = useState<number | null>(null)
   const rarityColor = (r: string) => {
     const rl = String(r ?? '').toLowerCase()
     if (rl === 'uncommon') return 'text-green-600'
@@ -1007,8 +1009,18 @@ function EntryList({ category, entries, onEdit, onDelete }: {
               <span className="text-[10px] text-parchment-300 font-mono">{String(entry.slug ?? '')}</span>
             </div>
           </div>
-          <button className="btn-secondary text-xs shrink-0" onClick={() => onEdit(idx)}>Edit</button>
-          <button className="text-xs text-red-400 hover:text-red-600 transition-colors shrink-0 px-1" onClick={() => onDelete(idx)}>✕</button>
+          {confirmIdx === idx ? (
+            <>
+              <span className="text-xs text-red-700 shrink-0">Delete?</span>
+              <button className="btn-danger text-xs shrink-0" onClick={() => { setConfirmIdx(null); onDelete(idx) }}>Delete</button>
+              <button className="btn-secondary text-xs shrink-0" onClick={() => setConfirmIdx(null)}>Keep</button>
+            </>
+          ) : (
+            <>
+              <button className="btn-secondary text-xs shrink-0" onClick={() => onEdit(idx)}>Edit</button>
+              <button className="text-xs text-red-400 hover:text-red-600 transition-colors shrink-0 px-1" title="Delete" onClick={() => setConfirmIdx(idx)}>✕</button>
+            </>
+          )}
         </div>
       ))}
     </div>

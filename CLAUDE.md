@@ -137,6 +137,7 @@ Literal Tailwind hues (amber, green, violet, red, …) are used widely for seman
 `Sheet.tsx` is the largest file (~6.7k lines): pure helpers at the top (`computeFullAC`, `resolveWeapon`/`resolveArmor`, `deriveResistances`, `deriveSkillSources`, upcast parsing), then `CampaignBoard` (used in the Notes tab), then the `Sheet` component with each tab rendered inline as `{tab === '…' && …}`. Key patterns:
 
 - Loading — fetches the full character list from disk and finds the one matching `:id`.
+- Damage while concentrating opens the in-app Concentration Save dialog (`concCheck`: DC, CON save, War Caster advantage); the player reports Made it / Failed. Prefer in-app dialogs to native `confirm`/`alert`/`prompt`, which freeze the page until answered.
 - At 0 HP the death screen replaces the tabs and is a fixed, full-window overlay (`z-50`, covers the nav too); page scrolling is locked while it's up. Death saves are marked by clicking pips — never rolled in-app.
 - `patch(partial)` → `save(next)` — updates state immediately and debounces a disk write (800 ms). `save()` also applies rules side effects: healing from 0 HP resets death saves; dropping to 0 HP ends concentration. Cmd/Ctrl+S forces an immediate save.
 - `raceDef` — the merged `RaceDef` from `useContent()` for the current character's race; same object accessed as `race` inside the Features tab IIFE

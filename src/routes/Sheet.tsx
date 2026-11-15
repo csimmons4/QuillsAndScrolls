@@ -1094,6 +1094,8 @@ export default function Sheet() {
   const [shortRestDice, setShortRestDice] = useState<Record<string, number>>({})
   const [shortRestRolls, setShortRestRolls] = useState<Record<string, string>>({})
   const [longRestOpen, setLongRestOpen] = useState(false)
+  // Concentration save owed after taking damage; the player rolls and reports the result
+  const [concCheck, setConcCheck] = useState<{ spellName: string; dc: number; damage: number } | null>(null)
   const [activeSummonId, setActiveSummonId] = useState<string | null>(null)
   const [newSummonForm, setNewSummonForm] = useState<{ name: string; hp: string; ac: string } | null>(null)
   const [addFeatOpen, setAddFeatOpen] = useState(false)
@@ -1428,12 +1430,8 @@ export default function Sheet() {
       const spellName = content.spells.find(s => s.slug === char.concentratingOn)?.name ?? char.concentratingOn
       if (newCurrent === 0) {
         update.concentratingOn = undefined
-        setTimeout(() => alert(`Dropped concentration on ${spellName} (knocked to 0 HP).`), 0)
       } else {
-        const dc = Math.max(10, Math.floor(amount / 2))
-        if (!confirm(`Concentration save vs ${spellName} — DC ${dc}. Click OK if you succeeded, Cancel to drop.`)) {
-          update.concentratingOn = undefined
-        }
+        setConcCheck({ spellName, dc: Math.max(10, Math.floor(amount / 2)), damage: amount })
       }
     }
 
@@ -7188,6 +7186,37 @@ export default function Sheet() {
         )
       })()}
       </>
+      )}
+
+      {/* Concentration save after taking damage */}
+      {concCheck && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="card max-w-sm w-full p-5">
+            <h2 className="section-header">Concentration Save</h2>
+            <p className="text-sm text-parchment-600 mb-4">
+              You took {concCheck.damage} damage while concentrating on <strong>{concCheck.spellName}</strong>. Roll a Constitution saving throw.
+            </p>
+            <div className="flex justify-center gap-6 mb-5 text-center">
+              <div>
+                <div className="text-xs uppercase tracking-wider text-parchment-500">DC</div>
+                <div className="text-3xl font-bold text-parchment-900">{concCheck.dc}</div>
+              </div>
+              <div>
+                <div className="text-xs uppercase tracking-wider text-parchment-500">CON save</div>
+                <div className="text-3xl font-bold text-parchment-900">{formatMod(saveMod(effectiveChar, 'con') + itemBonuses.savingThrowBonus + paladinAura)}</div>
+              </div>
+            </div>
+            {featBonuses.concentrationAdvantage && (
+              <p className="text-xs text-center text-green-700 -mt-3 mb-4">Roll with advantage (War Caster)</p>
+            )}
+            <div className="flex gap-2 justify-end">
+              <button type="button" className="btn-secondary" onClick={() => { patch({ concentratingOn: undefined }); setConcCheck(null) }}>
+                Failed — drop it
+              </button>
+              <button type="button" className="btn-primary" onClick={() => setConcCheck(null)}>Made it</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Long Rest modal */}
