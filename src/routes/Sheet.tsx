@@ -39,6 +39,7 @@ import { CoinEmblem, PouchIcon, ScaleIcon, QuillIcon } from '../components/Purse
 import { useRecentCharacter } from '../storage/recentCharacter'
 import { applyFeatAbilityIncrease, featAbilityPick, resolveFeatGrants, applyGrantPicks, withFeatClassChoice } from '../character/grants'
 import { FeatGrantsBlock } from '../components/FeatGrantsBlock'
+import { useConfirm } from '../components/ConfirmDialog'
 import { runningPotions, sumPotionEffects, describePotionEffects } from '../character/potionEffects'
 import { FeatAbilityPicker } from '../components/FeatAbilityPicker'
 import { BATTLE_MASTER_MANEUVERS } from '../data/classData'
@@ -1094,6 +1095,7 @@ export default function Sheet() {
   const [shortRestDice, setShortRestDice] = useState<Record<string, number>>({})
   const [shortRestRolls, setShortRestRolls] = useState<Record<string, string>>({})
   const [longRestOpen, setLongRestOpen] = useState(false)
+  const { askConfirm, confirmDialog } = useConfirm()
   // Concentration save owed after taking damage; the player rolls and reports the result
   const [concCheck, setConcCheck] = useState<{ spellName: string; dc: number; damage: number } | null>(null)
   const [activeSummonId, setActiveSummonId] = useState<string | null>(null)
@@ -1380,8 +1382,8 @@ export default function Sheet() {
       skillExpertise: restore(char.skillExpertise, skillBaseExpert),
     })
   }
-  const resetAllSkills = () => {
-    if (!confirm('Reset all hand-changed skills back to what creation and level-ups gave you?')) return
+  const resetAllSkills = async () => {
+    if (!(await askConfirm({ title: 'Reset Skills', message: 'Put every hand-changed skill back to what creation and level-ups gave you?', confirmLabel: 'Reset' }))) return
     patch({ skillProficiencies: [...skillBaseProf], skillExpertise: [...skillBaseExpert] })
   }
   const classResources = deriveClassResources(char)
@@ -1623,8 +1625,8 @@ export default function Sheet() {
           })
           setNewResourceName(''); setNewResourceMax(''); setNewResourceRecharge('long'); setAddResourceOpen(false)
         }
-        const removeCustomResource = (key: string, name: string) => {
-          if (!confirm(`Stop tracking "${name}"?`)) return
+        const removeCustomResource = async (key: string, name: string) => {
+          if (!(await askConfirm({ title: 'Stop Tracking', message: `Remove “${name}” from your resources?`, confirmLabel: 'Remove', danger: true }))) return
           const newClassRes = { ...char.classResources }
           delete newClassRes[key]
           patch({ customResources: (char.customResources ?? []).filter(x => x.key !== key), classResources: newClassRes })
@@ -3069,14 +3071,14 @@ export default function Sheet() {
                                           if (slotLevels.length === 0) {
                                             return <p className="text-xs italic text-parchment-400 pt-1">No spell slots available to cast this.</p>
                                           }
-                                          const castAt = (lvl: number) => {
+                                          const castAt = async (lvl: number) => {
                                             const max = multiclassMaxes ? (multiclassMaxes[String(lvl)] ?? 0) : (char.spellSlots[String(lvl)]?.max ?? 0)
                                             const used = char.spellSlots[String(lvl)]?.used ?? 0
                                             if (used >= max) return
                                             const startConc = !!def.concentration && char.concentratingOn !== s.spellSlug
                                             if (startConc && char.concentratingOn) {
                                               const prev = content.spells.find(sp => sp.slug === char.concentratingOn)?.name ?? char.concentratingOn
-                                              if (!confirm(`Casting ${s.name} will end your concentration on ${prev}. Continue?`)) return
+                                              if (!(await askConfirm({ title: 'End Concentration?', message: `Casting ${s.name} ends your concentration on ${prev}.`, confirmLabel: `Cast ${s.name}` }))) return
                                             }
                                             patch({
                                               spellSlots: { ...char.spellSlots, [String(lvl)]: { max, used: used + 1 } },
@@ -3105,13 +3107,13 @@ export default function Sheet() {
                                         <div className="flex items-center gap-2 pt-1 flex-wrap">
                                           {def?.concentration && (
                                             <button type="button"
-                                              onClick={() => {
+                                              onClick={async () => {
                                                 if (char.concentratingOn === s.spellSlug) {
                                                   patch({ concentratingOn: undefined })
                                                 } else {
                                                   if (char.concentratingOn) {
                                                     const prev = content.spells.find(sp => sp.slug === char.concentratingOn)?.name ?? char.concentratingOn
-                                                    if (!confirm(`Drop concentration on ${prev}?`)) return
+                                                    if (!(await askConfirm({ title: 'End Concentration?', message: `Concentrating on ${s.name} ends your concentration on ${prev}.`, confirmLabel: 'Switch' }))) return
                                                   }
                                                   patch({ concentratingOn: s.spellSlug })
                                                 }
@@ -3715,7 +3717,7 @@ export default function Sheet() {
                     </button>
                     {ledgerOpen && char.purseLog.length > 0 && (
                       <button type="button" className="text-[10px] text-parchment-400 hover:text-red-600 shrink-0"
-                        onClick={() => { if (confirm('Clear the purse ledger? Your balance stays the same.')) patch({ purseLog: [] }) }}
+                        onClick={async () => { if (await askConfirm({ title: 'Clear Ledger', message: 'Clear the purse ledger? Your balance stays the same.', confirmLabel: 'Clear', danger: true })) patch({ purseLog: [] }) }}
                       >clear</button>
                     )}
                   </div>
@@ -4980,13 +4982,28 @@ export default function Sheet() {
                       <div className="card">
                         {cardHeader('Other', SUPPLY_CATS,
                           <button type="button"
-                            className="text-xs rounded-full px-2.5 py-0.5 border border-parchment-200 text-parchment-500 hover:border-parchment-500 hover:text-parchment-800 transition-colors"
-                            onClick={() => {
-                              const name = prompt('Item name:')
-                              if (!name) return
-                              patch({ equipment: [...char.equipment, { itemSlug: `custom-${Date.now()}`, name, quantity: 1, equipped: false, attuned: false, isHomebrew: true, notes: '' }] })
-                            }}>+ Custom</button>
+                            className={`text-xs rounded-full px-2.5 py-0.5 border transition-colors ${addPanel === 'add-custom' ? 'bg-parchment-700 text-white border-parchment-700' : 'border-parchment-200 text-parchment-500 hover:border-parchment-500 hover:text-parchment-800'}`}
+                            onClick={() => { setAddPanel(addPanel === 'add-custom' ? null : 'add-custom'); setAddPanelSearch('') }}>
+                            {addPanel === 'add-custom' ? '✕ Custom' : '+ Custom'}
+                          </button>
                         )}
+                        {/* Custom item: any name, added as plain gear */}
+                        {addPanel === 'add-custom' && (() => {
+                          const name = addPanelSearch.trim()
+                          const addCustom = () => {
+                            if (!name) return
+                            patch({ equipment: [...char.equipment, { itemSlug: `custom-${Date.now()}`, name, quantity: 1, equipped: false, attuned: false, isHomebrew: true, notes: '' }] })
+                            setAddPanel(null); setAddPanelSearch('')
+                          }
+                          return (
+                            <div className="mb-3 p-3 rounded-lg border border-parchment-200 bg-parchment-50 flex gap-2">
+                              <input className="input text-sm flex-1" placeholder="Item name, e.g. Grappling hook" value={addPanelSearch} autoFocus
+                                onChange={e => setAddPanelSearch(e.target.value)}
+                                onKeyDown={e => { if (e.key === 'Enter') addCustom(); if (e.key === 'Escape') setAddPanel(null) }} />
+                              <button type="button" className="btn-primary text-sm disabled:opacity-50" disabled={!name} onClick={addCustom}>Add</button>
+                            </div>
+                          )
+                        })()}
                         <div className="divide-y divide-parchment-100">
 
                           {catVisible('potion') && (
@@ -7187,6 +7204,8 @@ export default function Sheet() {
       })()}
       </>
       )}
+
+      {confirmDialog}
 
       {/* Concentration save after taking damage */}
       {concCheck && (

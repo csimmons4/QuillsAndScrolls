@@ -6,6 +6,7 @@ import { listCharactersFromDisk, saveCharacterToDisk, deleteCharacterFromDisk, t
 import { totalLevel } from '../character/derive'
 import { useContent } from '../content/ContentProvider'
 import { useRecentCharacter } from '../storage/recentCharacter'
+import { useConfirm } from '../components/ConfirmDialog'
 import { v4 as uuidv4 } from 'uuid'
 
 export default function Vault() {
@@ -17,6 +18,7 @@ export default function Vault() {
   const { races, classes } = useContent()
   const { recent, setRecent } = useRecentCharacter()
   const navigate = useNavigate()
+  const { askConfirm, confirmDialog } = useConfirm()
 
   async function refresh() {
     try {
@@ -48,7 +50,7 @@ export default function Vault() {
   }
 
   async function handleDelete(id: string, name: string) {
-    if (!confirm(`Delete "${name}"? This cannot be undone.`)) return
+    if (!(await askConfirm({ title: 'Delete Character', message: `Delete “${name}”? This cannot be undone.`, confirmLabel: 'Delete', danger: true }))) return
     await deleteCharacterFromDisk(id)
     if (recent?.id === id) setRecent(null)
     await refresh()
@@ -82,6 +84,7 @@ export default function Vault() {
 
   return (
     <div>
+      {confirmDialog}
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-3xl font-bold text-parchment-800">Character Vault</h1>
         <div className="flex gap-2">

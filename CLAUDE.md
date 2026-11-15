@@ -95,7 +95,7 @@ To add a new enrichment field: add it (optional) to the schema in `loaders.ts`, 
 - `src/data/spellMeta.ts` — Cantrip damage scaling (`cantripDiceAtLevel`) and ritual spell slug set (`RITUAL_SLUGS`). Everything else now lives on `SpellDef` directly after derivation.
 - `src/data/startingGear.ts` — `CLASS_STARTING_GEAR` with fixed items and choice groups for the Creator wizard. Items with `pick` ("Martial Weapon (your choice)") get a dropdown per unit on the Equipment step (`gearPickOptions()`). On finish the Creator equips the best armor and shield the character is proficient with and its best melee weapon.
 - `src/data/strixhavenSpells.ts` — `STRIXHAVEN_COLLEGES` (`CollegeSpells` per college), keyed by background slug, for the Strixhaven Initiate benefit. Consumed by Creator (granted-spell picks) and Sheet.
-- `src/components/` — Shared UI pieces reused across routes: `FeatPicker` (+ `cleanFeatDesc`, `FeatEffectBadges`), `SpellChooser`, `FeatGrantsBlock`, `InlinePicker`, `ItemStatBlock` (`WeaponStatBlock`, `ArmorStatBlock`, `MagicItemStatBlock`), `SpellStatBlock`.
+- `src/components/` — Shared UI pieces reused across routes: `ConfirmDialog` (`useConfirm()`), `FeatPicker` (+ `cleanFeatDesc`, `FeatEffectBadges`), `SpellChooser`, `FeatGrantsBlock`, `InlinePicker`, `ItemStatBlock` (`WeaponStatBlock`, `ArmorStatBlock`, `MagicItemStatBlock`), `SpellStatBlock`.
 
 ## Character data conventions
 
@@ -137,7 +137,7 @@ Literal Tailwind hues (amber, green, violet, red, …) are used widely for seman
 `Sheet.tsx` is the largest file (~6.7k lines): pure helpers at the top (`computeFullAC`, `resolveWeapon`/`resolveArmor`, `deriveResistances`, `deriveSkillSources`, upcast parsing), then `CampaignBoard` (used in the Notes tab), then the `Sheet` component with each tab rendered inline as `{tab === '…' && …}`. Key patterns:
 
 - Loading — fetches the full character list from disk and finds the one matching `:id`.
-- Damage while concentrating opens the in-app Concentration Save dialog (`concCheck`: DC, CON save, War Caster advantage); the player reports Made it / Failed. Prefer in-app dialogs to native `confirm`/`alert`/`prompt`, which freeze the page until answered.
+- Damage while concentrating opens the in-app Concentration Save dialog (`concCheck`: DC, CON save, War Caster advantage); the player reports Made it / Failed. Never use native `confirm`/`alert`/`prompt` (they freeze the page until answered): use `useConfirm()` from `components/ConfirmDialog` (`if (!(await askConfirm({ title, message, confirmLabel, danger })) ) return`, render `{confirmDialog}` once) or an inline input.
 - At 0 HP the death screen replaces the tabs and is a fixed, full-window overlay (`z-50`, covers the nav too); page scrolling is locked while it's up. Death saves are marked by clicking pips — never rolled in-app.
 - `patch(partial)` → `save(next)` — updates state immediately and debounces a disk write (800 ms). `save()` also applies rules side effects: healing from 0 HP resets death saves; dropping to 0 HP ends concentration. Cmd/Ctrl+S forces an immediate save.
 - `raceDef` — the merged `RaceDef` from `useContent()` for the current character's race; same object accessed as `race` inside the Features tab IIFE
