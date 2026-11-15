@@ -130,6 +130,41 @@ const SKILL_MAP: Record<string, string> = {
   'sleight of hand': 'sleightOfHand', 'stealth': 'stealth', 'survival': 'survival',
 }
 
+/** Split on commas outside parentheses: "a trophy (a dagger, broken blade), a quill" → 2 parts. */
+function splitTopLevel(s: string): string[] {
+  const parts: string[] = []
+  let depth = 0
+  let cur = ''
+  for (const ch of s) {
+    if (ch === '(') depth++
+    else if (ch === ')') depth = Math.max(0, depth - 1)
+    if (ch === ',' && depth === 0) { parts.push(cur); cur = '' }
+    else cur += ch
+  }
+  parts.push(cur)
+  return parts
+}
+
+/**
+ * The "Equipment:" line, read from the HTML: from its <strong> label to the next <br> or the
+ * end of the paragraph. Item names carry hover tooltips
+ * (<span class="hover">crowbar<span>Value:2gp Weight:5lbs</span></span>), which are dropped.
+ */
+function equipmentLine($: cheerio.CheerioAPI, content: cheerio.Cheerio<any>): string {
+  const label = content.find('strong').filter((_, el) => /^equipment:?$/i.test($(el).text().trim())).first()
+  if (!label.length) return ''
+  const nodes = label.parent().contents().toArray()
+  let text = ''
+  for (const node of nodes.slice(nodes.indexOf(label[0]) + 1)) {
+    if (node.type === 'tag' && node.name === 'br') break
+    const $node = $(node).clone()
+    if ($node.is('.hover')) $node.children('span').remove()
+    $node.find('.hover').children('span').remove()
+    text += $node.text()
+  }
+  return text.replace(/\s+/g, ' ').trim()
+}
+
 function pageTitle($: cheerio.CheerioAPI): string {
   return $('.page-title span, .page-title').first().text().trim()
     || $('h1').first().text().replace(/- DND 5th Edition/i, '').trim()
@@ -149,7 +184,7 @@ async function parseBackground(url: string, book: string, force: boolean): Promi
     const skillMatch = text.match(/skill proficiencies?:([^\n.]+)/i)
     const skillProficiencies: string[] = []
     if (skillMatch) {
-      skillMatch[1].split(/,|and/).forEach(s => {
+      skillMatch[1].split(/,|\band\b/).forEach(s => {
         const key = SKILL_MAP[s.trim().toLowerCase()]
         if (key) skillProficiencies.push(key)
       })
@@ -161,14 +196,17 @@ async function parseBackground(url: string, book: string, force: boolean): Promi
       : []
 
     const langMatch = text.match(/languages?:([^\n.]+)/i)
-    const languageCount = langMatch
-      ? (langMatch[1].toLowerCase().includes('two') || langMatch[1].includes('2') ? 2 : 1)
-      : 0
+    const langText = langMatch?.[1].toLowerCase() ?? ''
+    const languageCount = !langMatch || /\bnone\b/.test(langText) ? 0
+      : /\btwo\b|\b2\b/.test(langText) ? 2
+      : 1
 
-    const equipSection = text.match(/equipment:([^\n]+(?:\n(?!\n)[^\n]+)*)/i)
-    const startingEquipment: string[] = equipSection
-      ? equipSection[1].split(/[,•]/).map(s => s.trim()).filter(s => s.length > 2 && s.length < 80).slice(0, 8)
-      : []
+    // "A crowbar, a set of dark common clothes including a hood, and a pouch containing 15gp"
+    // → ["A crowbar", "a set of dark common clothes including a hood", "a pouch"]
+    // (the gold comes from backgroundOverlay's startingGold)
+    const startingEquipment = splitTopLevel(equipmentLine($, content))
+      .map(s => s.trim().replace(/^and\s+/i, '').replace(/\s+containing\s+\d+\s*gp\.?$/i, '').replace(/\.$/, '').trim())
+      .filter(s => s.length > 2 && !/^\d+\s*(?:gp|sp|cp)$/i.test(s))
 
     let featureName = ''
     let featureDesc = ''

@@ -61,7 +61,8 @@ async function parseRace(url: string, force: boolean): Promise<Record<string, un
       }
     }
 
-    const speedMatch = text.match(/(\d+)\s*feet?\s*(?:per\s*round|walking|speed|base)/i) || text.match(/speed[:\s]+(\d+)/i)
+    // "Speed. Your base walking speed is 25 feet." (first match = the page's first listed version)
+    const speedMatch = text.match(/walking speed is (\d+)\s*feet/i)
     const speed = speedMatch ? parseInt(speedMatch[1], 10) : 30
 
     const sizeMatch = text.match(/\b(Tiny|Small|Medium|Large|Huge|Gargantuan)\b/i)
@@ -77,7 +78,7 @@ async function parseRace(url: string, force: boolean): Promise<Record<string, un
 
     const langMatch = text.match(/languages[:\s]+([^\n.]+)/i)
     const languages: string[] = langMatch
-      ? langMatch[1].split(/,|and/).map(l => l.trim()).filter(Boolean).slice(0, 6)
+      ? langMatch[1].split(/,|\band\b/).map(l => l.trim()).filter(Boolean).slice(0, 6)
       : ['Common']
 
     return {

@@ -15,11 +15,9 @@
       "A holy symbol (a gift to you when you entered the priesthood)",
       "a prayer book or prayer wheel",
       "5 sticks of incense",
-      "vestmentsValue:0 Weight:0",
-      "a set of common clothesValue:5sp Weight:3lbs",
-      "you command the respect of those who share your faith",
-      "shrine",
-      "or other established presence of your faith"
+      "vestments",
+      "a set of common clothes",
+      "a pouch"
     ],
     "feature": {
       "name": "Acolyte Feature",
@@ -40,19 +38,19 @@
     "name": "Charlatan",
     "book": "Player's Handbook",
     "skillProficiencies": [
-      "deception"
+      "deception",
+      "sleightOfHand"
     ],
     "toolProficiencies": [
       "Disguise kit",
       "forgery kit"
     ],
-    "languages": 1,
+    "languages": 0,
     "startingEquipment": [
-      "A set of fine clothesValue:15gp Weight:6lbs",
-      "a disguise kitValue:25gp Weight:3lbs",
-      "a set of weighted diceValue:1sp Weight:0",
-      "a deck of marked cardsValue:5sp Weight:0",
-      "or a signet ringValue:5gp Weight:0 of an imaginary duke)"
+      "A set of fine clothes",
+      "a disguise kit",
+      "tools of the con of your choice (ten stoppered bottles filled with colored liquid, a set of weighted dice, a deck of marked cards, or a signet ring of an imaginary duke)",
+      "a pouch"
     ],
     "feature": {
       "name": "Charlatan Feature",
@@ -80,12 +78,11 @@
       "One type of gaming set",
       "thieves' tools"
     ],
-    "languages": 1,
+    "languages": 0,
     "startingEquipment": [
-      "A crowbarValue:2gp Weight:5lbs",
-      "a set of dark common clothesValue:5sp Weight:3lbs including a hood",
-      "and within a thieves' guild or similar criminal organization",
-      "or roll on the table below."
+      "A crowbar",
+      "a set of dark common clothes including a hood",
+      "a pouch"
     ],
     "feature": {
       "name": "Criminal Feature",
@@ -113,13 +110,12 @@
       "Disguise kit",
       "one type of musical instrument"
     ],
-    "languages": 1,
+    "languages": 0,
     "startingEquipment": [
       "A musical instrument (one of your choice)",
-      "the favor of an admirer (love letter",
-      "lock of hair",
-      "or trinket)",
-      "a costumeValue:5gp Weight:4lbs"
+      "the favor of an admirer (love letter, lock of hair, or trinket)",
+      "a costume",
+      "a pouch"
     ],
     "feature": {
       "name": "Entertainer Feature",
@@ -140,22 +136,20 @@
     "name": "Folk Hero",
     "book": "Player's Handbook",
     "skillProficiencies": [
+      "animalHandling",
       "survival"
     ],
     "toolProficiencies": [
       "One type of artisan's tools",
       "vehicles (land)"
     ],
-    "languages": 1,
+    "languages": 0,
     "startingEquipment": [
       "A set of artisan's tools (one of your choice)",
-      "a shovelValue:2gp Weight:5lbs",
-      "an iron potValue:2gp Weight:10lbs",
-      "a set of common clothesValue:5sp Weight:3lbs",
-      "perhaps as a farmer",
-      "miner",
-      "servant",
-      "shepherd"
+      "a shovel",
+      "an iron pot",
+      "a set of common clothes",
+      "a pouch"
     ],
     "feature": {
       "name": "Folk Hero Feature",
@@ -186,12 +180,8 @@
     "startingEquipment": [
       "A set of artisan's tools (one of your choice)",
       "a letter of introduction from your guild",
-      "a set of traveler's clothesValue:2gp Weight:4lbs",
-      "you might belong to a guild of traders",
-      "caravan masters",
-      "by ship",
-      "wagon",
-      "or caravan"
+      "a set of traveler's clothes",
+      "a pouch"
     ],
     "feature": {
       "name": "Guild Artisan Feature",
@@ -220,10 +210,10 @@
     ],
     "languages": 1,
     "startingEquipment": [
-      "a winter blanketValue:5sp Weight:3lbs",
-      "a set of common clothesValue:5sp Weight:3lbs",
-      "an herbalism kitValue:5gp Weight:3lbs",
-      "and 5gp\nFeatures\nLife of Seclusion\nWhat was the reason for your isolation"
+      "A scroll case stuffed full of notes from your studies or prayers",
+      "a winter blanket",
+      "a set of common clothes",
+      "an herbalism kit"
     ],
     "feature": {
       "name": "Hermit Feature",
@@ -252,14 +242,10 @@
     ],
     "languages": 1,
     "startingEquipment": [
-      "A set of fine clothesValue:15gp Weight:6lbs",
-      "a signet ringValue:5gp Weight:0",
+      "A set of fine clothes",
+      "a signet ring",
       "a scroll of pedigree",
-      "but it can be a path to higher status. If you wish to be a knight",
-      "but they do not fight for you",
-      "will not follow you into obviously dangerous areas (such as dungeons)",
-      "people are inclined to think the best of you. You are welcome in high society",
-      "to other nobles (including the sovereign)"
+      "a purse"
     ],
     "feature": {
       "name": "Noble Feature",
@@ -288,11 +274,11 @@
     ],
     "languages": 1,
     "startingEquipment": [
-      "A staffValue:2sp Weight:4lbs",
-      "a hunting trapValue:5gp Weight:25lbs",
+      "A staff",
+      "a hunting trap",
       "a trophy from an animal you killed",
-      "a set of traveler's clothesValue:2gp Weight:4lbs",
-      "or choose one that best fits your character."
+      "a set of traveler's clothes",
+      "a pouch"
     ],
     "feature": {
       "name": "Outlander Feature",
@@ -321,11 +307,12 @@
     ],
     "languages": 2,
     "startingEquipment": [
-      "A bottle of inkValue:10gp Weight:0.0625lb",
-      "a quillValue:2cp Weight:0",
-      "a small knifeValue:0 Weight:0",
-      "a set of common clothesValue:5sp Weight:3lbs",
-      "roll a d8 or choose from the options in the table below."
+      "A bottle of ink",
+      "a quill",
+      "a small knife",
+      "a letter from a dead colleague posing a question you have not yet been able to answer",
+      "a set of common clothes",
+      "a pouch"
     ],
     "feature": {
       "name": "Sage Feature",
@@ -353,12 +340,13 @@
       "Navigator's tools",
       "vehicles (water)"
     ],
-    "languages": 1,
+    "languages": 0,
     "startingEquipment": [
-      "A belaying pin (clubValue:1sp Weight:2lbs)",
-      "50 feet of silk ropeValue:10gp Weight:5lbs",
-      "a set of common clothesValue:5sp Weight:3lbs",
-      "you can get away with minor criminal offenses"
+      "A belaying pin (club)",
+      "50 feet of silk rope",
+      "a lucky charm such as a rabbit foot or a small stone with a hole in the center (or you may roll for a random trinket on the Trinkets table in chapter 5)",
+      "a set of common clothes",
+      "a pouch"
     ],
     "feature": {
       "name": "Sailor Feature",
@@ -386,14 +374,13 @@
       "One type of gaming set",
       "vehicles (land)"
     ],
-    "languages": 1,
+    "languages": 0,
     "startingEquipment": [
       "An insignia of rank",
-      "a trophy taken from a fallen enemy (a daggerValue:2gp Weight:1lb",
-      "broken blade",
-      "or piece of a banner)",
-      "a set of bone diceValue:1sp Weight:0 or a deck of cardsValue:5sp Weight:0",
-      "a set of common clothesValue:5sp Weight:3lbs"
+      "a trophy taken from a fallen enemy (a dagger, broken blade, or piece of a banner)",
+      "a set of bone dice or a deck of cards",
+      "a set of common clothes",
+      "a pouch"
     ],
     "feature": {
       "name": "Soldier Feature",
@@ -414,19 +401,21 @@
     "name": "Urchin",
     "book": "Player's Handbook",
     "skillProficiencies": [
+      "sleightOfHand",
       "stealth"
     ],
     "toolProficiencies": [
       "Disguise kit",
       "thieves' tools"
     ],
-    "languages": 1,
+    "languages": 0,
     "startingEquipment": [
-      "A small knifeValue:0 Weight:0",
+      "A small knife",
       "a map of the city you grew up in",
       "a pet mouse",
       "a token to remember your parents by",
-      "a set of common clothesValue:5sp Weight:3lbs"
+      "a set of common clothes",
+      "a pouch"
     ],
     "feature": {
       "name": "Urchin Feature",
@@ -456,10 +445,9 @@
     "languages": 2,
     "startingEquipment": [
       "A uniform in the style of your unit and indicative of your rank",
-      "a hornValue:3gp Weight:2lbs with which to summon help",
-      "a set of manaclesValue:2gp Weight:6lbs",
-      "and dealing with lawbreakers",
-      "and just as easily pick out the dens of criminal activity in a community"
+      "a horn with which to summon help",
+      "a set of manacles",
+      "a pouch"
     ],
     "feature": {
       "name": "City Watch Feature",
@@ -489,8 +477,9 @@
     "languages": 1,
     "startingEquipment": [
       "A set of artisan's tools with which you are proficient",
-      "a set of traveler's clothesValue:2gp Weight:4lbs",
-      "modifying the entries when appropriate to suit your identity. (For instance"
+      "a maker's mark chisel used to mark your handiwork with the symbol of the clan of crafters you learned your skill from",
+      "a set of traveler's clothes",
+      "a pouch containing 5gp and a gem worth 10gp"
     ],
     "feature": {
       "name": "Clan Crafter Feature",
@@ -520,14 +509,10 @@
     ],
     "languages": 2,
     "startingEquipment": [
-      "The scholar's robesValue:1gp Weight:4lbs of your cloister",
-      "a writing kit (small pouchValue:5sp Weight:1lb with a quillValue:2cp Weight:0",
-      "a bottle of inkValue:10gp Weight:0.0625lb",
-      "folded parchmentValue:1sp Weight:0",
-      "and a small penknifeValue:0 Weight:0)",
-      "a borrowed bookValue:25gp Weight:5lbs on the subject of your current study",
-      "you have free and easy access to the majority of the library",
-      "though it might also have repositories of lore that are too valuable"
+      "The scholar's robes of your cloister",
+      "a writing kit (small pouch with a quill, a bottle of ink, folded parchment, and a small penknife)",
+      "a borrowed book on the subject of your current study",
+      "a pouch"
     ],
     "feature": {
       "name": "Cloistered Scholar Feature",
@@ -556,7 +541,7 @@
     ],
     "languages": 2,
     "startingEquipment": [
-      "whom to go to for the favors you seek"
+      "A set of fine clothes and a pouch"
     ],
     "feature": {
       "name": "Courtier Feature",
@@ -584,14 +569,10 @@
     ],
     "languages": 2,
     "startingEquipment": [
-      "The badge or emblemValue:5gp Weight:0 of your faction",
+      "The badge or emblem of your faction",
       "a copy of a seminal faction text (or a code-book for a covert faction)",
-      "a set of common clothesValue:5sp Weight:3lbs",
-      "here are some possibilities.\nThe Harpers\nFounded more than a millennium ago",
-      "disbanded and reorganized several times",
-      "the Harpers remain a powerful",
-      "behind-the-scenes agency",
-      "which acts to thwart evil and promote fairness through knowledge"
+      "a set of common clothes",
+      "a pouch"
     ],
     "feature": {
       "name": "Faction Agent Feature",
@@ -621,11 +602,11 @@
     ],
     "languages": 1,
     "startingEquipment": [
-      "One set of traveler's clothesValue:2gp Weight:4lbs",
+      "One set of traveler's clothes",
       "any one musical instrument or gaming set you are proficient with",
       "poorly wrought maps from your homeland that depict where you are in Faerûn",
-      "discussing possible homelands",
-      "includes some suggested reasons that are appropriate for each location."
+      "a small piece of jewelry worth 10gp in the style of your homeland's craftsmanship",
+      "a pouch"
     ],
     "feature": {
       "name": "Far Traveler Feature",
@@ -656,10 +637,9 @@
     "languages": 1,
     "startingEquipment": [
       "Your inheritance",
-      "a set of traveler's clothesValue:2gp Weight:4lbs",
+      "a set of traveler's clothes",
       "the tool you choose for this background’s tool proficiency",
-      "sending you on quests to learn more about its history or true nature",
-      "the object might be a minor magic item"
+      "a pouch"
     ],
     "feature": {
       "name": "Inheritor Feature",
@@ -690,14 +670,11 @@
     ],
     "languages": 1,
     "startingEquipment": [
-      "A set of traveler's clothesValue:2gp Weight:4lbs",
+      "A set of traveler's clothes",
       "a signet",
       "banner",
       "or seal representing your place or rank in the order",
-      "royal family",
-      "or are the elite military of a feudal state",
-      "or consider themselves a kind of extended family",
-      "similar to an order of monks. Although there are organizations"
+      "a pouch"
     ],
     "feature": {
       "name": "Knight Of The Order Feature",
@@ -725,16 +702,12 @@
       "One type of gaming set",
       "vehicles (land)"
     ],
-    "languages": 1,
+    "languages": 0,
     "startingEquipment": [
-      "A uniform of your company (traveler's clothesValue:2gp Weight:4lbs in quality)",
+      "A uniform of your company (traveler's clothes in quality)",
       "an insignia of your rank",
       "a gaming set of your choice",
-      "hunt monsters and brigands",
-      "or go to war in exchange for gold. Some organizations",
-      "such as the Zhentarim",
-      "Flaming Fist",
-      "but several are happy to quietly pay the Chill to battle the Uthgardt"
+      "a pouch containing the remainder of your last wages (10gp)"
     ],
     "feature": {
       "name": "Mercenary Veteran Feature",
@@ -764,10 +737,9 @@
       "one musical instrument",
       "and thieves' tools"
     ],
-    "languages": 1,
+    "languages": 0,
     "startingEquipment": [
-      "the rough-and-tumble folk of the streets",
-      "modifying the entries when appropriate to suit your identity.\nFor instance"
+      "A set of clothes appropriate to your duties and a pouch"
     ],
     "feature": {
       "name": "Urban Bounty Hunter Feature",
@@ -796,14 +768,10 @@
     ],
     "languages": 1,
     "startingEquipment": [
-      "A hunting trapValue:5gp Weight:25lbs",
-      "a set of traveler's clothesValue:2gp Weight:4lbs",
-      "though they don't venture near Hellgate Keep",
-      "in the Glimmering Wood",
-      "is Beorunna's Well",
-      "they consider Beorunna's Well their holy site",
-      "so they launch raids on the settlement",
-      "burning as much of it as they can and then escaping"
+      "A hunting trap",
+      "a totemic token or set of tattoos marking your loyalty to Uthgar and your tribal totem",
+      "a set of traveler's clothes",
+      "a pouch"
     ],
     "feature": {
       "name": "Uthgardt Tribe Member Feature",
@@ -832,12 +800,11 @@
     ],
     "languages": 1,
     "startingEquipment": [
-      "A set of fine clothesValue:15gp Weight:6lbs",
-      "a signet ringValue:5gp Weight:0 or brooch",
+      "A set of fine clothes",
+      "a signet ring or brooch",
       "a scroll of pedigree",
-      "a skinValue:2sp Weight:1lb (for the empty skin itself) of fine zzar or wine",
-      "taverns",
-      "modifying the entries when appropriate to suit your identity.\nLike other nobles"
+      "a skin of fine zzar or wine",
+      "a purse"
     ],
     "feature": {
       "name": "Waterdhavian Noble Feature",
@@ -864,14 +831,14 @@
     "toolProficiencies": [],
     "languages": 2,
     "startingEquipment": [
-      "A bottle of black inkValue: 10gp Weight: 0",
-      "an ink penValue: 2cp Weight: 0",
-      "a hammerValue: 1gp Weight: 3lbs",
-      "a hooded lanternValue: 5gp Weight: 2lb",
-      "a tinderboxValue: 5cp Weight: 1lb",
+      "A bottle of black ink",
+      "an ink pen",
+      "a hammer",
+      "a hooded lantern",
+      "a tinderbox",
       "a tome of history",
       "a school uniform",
-      "if you have the Spellcasting or Pact Magic feature"
+      "a pouch"
     ],
     "feature": {
       "name": "Lorehold Student Feature",
@@ -900,12 +867,11 @@
     ],
     "languages": 1,
     "startingEquipment": [
-      "A bottle of black inkValue: 10gp Weight: 0",
-      "an ink penValue: 2cp Weight: 0",
+      "A bottle of black ink",
+      "an ink pen",
       "a set of artisan's tools or a musical instrument (one of your choice)",
       "a school uniform",
-      "if you have the Spellcasting or Pact Magic feature",
-      "these spells are added to all of them.)"
+      "a pouch"
     ],
     "feature": {
       "name": "Prismari Student Feature",
@@ -934,13 +900,12 @@
     ],
     "languages": 1,
     "startingEquipment": [
-      "A bottle of black inkValue: 10gp Weight: 0",
-      "an ink penValue: 2cp Weight: 0",
-      "an abacusValue: 2gp Weight: 2lb",
+      "A bottle of black ink",
+      "an ink pen",
+      "an abacus",
       "a book of arcane theory",
       "a school uniform",
-      "if you have the Spellcasting or Pact Magic feature",
-      "these spells are added to all of them.)"
+      "a pouch"
     ],
     "feature": {
       "name": "Quandrix Student Feature",
@@ -967,12 +932,11 @@
     "toolProficiencies": [],
     "languages": 2,
     "startingEquipment": [
-      "A bottle of black inkValue: 10gp Weight: 0",
-      "an ink penValue: 2cp Weight: 0",
+      "A bottle of black ink",
+      "an ink pen",
       "a book of poetry",
       "a school uniform",
-      "if you have the Spellcasting or Pact Magic feature",
-      "these spells are added to all of them.)"
+      "a pouch"
     ],
     "feature": {
       "name": "Silverquill Student Feature",
@@ -1001,14 +965,13 @@
     ],
     "languages": 1,
     "startingEquipment": [
-      "A bottle of black inkValue: 10gp Weight: 0",
-      "an ink penValue: 2cp Weight: 0",
+      "A bottle of black ink",
+      "an ink pen",
       "a book about plant identification",
-      "an iron potValue: 2gp Weight: 10lbs",
-      "a herbalism kitValue: 5gp Weight: 3lbs",
+      "an iron pot",
+      "a herbalism kit",
       "a school uniform",
-      "if you have the Spellcasting or Pact Magic feature",
-      "these spells are added to all of them.)"
+      "a pouch"
     ],
     "feature": {
       "name": "Witherbloom Student Feature",
@@ -1037,11 +1000,10 @@
     "startingEquipment": [
       "An Azorius insignia",
       "a scroll containing the text of a law important to you",
-      "a bottle of blue inkValue:10gp Weight:0.0625lb",
-      "an ink penValue:2cp Weight:0",
-      "a set of fine clothesValue:15gp Weight:6lbs",
-      "though",
-      "these spells are added to all of them.)\nAzorius Guild Spells"
+      "a bottle of blue ink",
+      "an ink pen",
+      "a set of fine clothes",
+      "a pouch containing 10gp (Azorius-minted 1-zino coins)"
     ],
     "feature": {
       "name": "Azorius Functionary Feature",
@@ -1073,9 +1035,8 @@
       "A Boros insignia",
       "a feather from an angel's wing",
       "a tattered piece of a Boros banner (a souvenir from a famous battle)",
-      "a set of common clothesValue:5sp Weight:3lbs",
-      "and you can gain access to any Boros garrison in Ravnica",
-      "these spells are added to all of them.)\nBoros Guild Spells"
+      "a set of common clothes",
+      "a pouch containing 2gp (Boros-minted 1-zino coins)"
     ],
     "feature": {
       "name": "Boros Legionnaire Feature",
@@ -1105,10 +1066,9 @@
     "languages": 1,
     "startingEquipment": [
       "A Dimir insignia",
-      "three small knivesValue:0 Weight:0 (individually)",
-      "a set of dark-colored common clothesValue:5sp Weight:3lbs",
-      "established acquaintances",
-      "inspired by rolling on the following table or choosing a reason that suits you."
+      "three small knives",
+      "a set of dark-colored common clothes",
+      "the starting equipment of the background described in this chapter for your secondary guild"
     ],
     "feature": {
       "name": "Dimir Operative Feature",
@@ -1138,13 +1098,10 @@
     "languages": 1,
     "startingEquipment": [
       "A Golgari insignia",
-      "a poisoner's kitValue:50gp Weight:2lbs",
+      "a poisoner's kit",
       "a pet beetle or spider",
-      "a set of common clothesValue:5sp Weight:3lbs",
-      "underground pathways that you can use to bypass crowds",
-      "obstacles",
-      "and observation as you move through the city. When you aren't in combat",
-      "these spells are added to all of them.)\nGolgari Guild Spells"
+      "a set of common clothes",
+      "a pouch containing 10gp worth of mixed coins"
     ],
     "feature": {
       "name": "Golgari Agent Feature",
@@ -1165,6 +1122,7 @@
     "name": "Gruul Anarch",
     "book": "Guildmasters' Guide to Ravnica",
     "skillProficiencies": [
+      "animalHandling",
       "athletics"
     ],
     "toolProficiencies": [
@@ -1173,13 +1131,12 @@
     "languages": 1,
     "startingEquipment": [
       "A Gruul insignia",
-      "a hunting trapValue:5gp Weight:25lbs",
-      "an herbalism kitValue:5gp Weight:3lbs",
+      "a hunting trap",
+      "an herbalism kit",
       "the skull of a boar",
       "a beast-hide cloak",
-      "a set of traveler's clothesValue:2gp Weight:4lbs",
-      "overgrown parks that no hand has tended in decades",
-      "and the vast"
+      "a set of traveler's clothes",
+      "a pouch containing 10gp (Azorius 1-zino coins)"
     ],
     "feature": {
       "name": "Gruul Anarch Feature",
@@ -1211,11 +1168,10 @@
       "An Izzet insignia",
       "one set of artisan's tools",
       "the charred and twisted remains of a failed experiment",
-      "a hammerValue:1gp Weight:3lbs",
-      "a block and tackleValue:1gp Weight:5lbs",
-      "a set of common clothesValue:5sp Weight:3lbs",
-      "dangerous experiments",
-      "and explosive blasts. Much of that perception is accurate"
+      "a hammer",
+      "a block and tackle",
+      "a set of common clothes",
+      "a pouch containing 5gp (Azorius 1-zino coins)"
     ],
     "feature": {
       "name": "Izzet Engineer Feature",
@@ -1244,12 +1200,9 @@
     "startingEquipment": [
       "An Orzhov insignia",
       "a foot-long chain made of ten gold coins",
-      "vestmentsValue:0 Weight:0",
-      "a set of fine clothesValue:15gp Weight:6lbs",
-      "you can have a message carried across a neighborhood",
-      "procure a short carriage ride without paying",
-      "you gain influence over more people",
-      "these spells are added to all of them.)\nOrzhov Guild Spells"
+      "vestments",
+      "a set of fine clothes",
+      "a pouch containing 1pp (an Orzhov-minted 10-zino coin)"
     ],
     "feature": {
       "name": "Orzhov Representative Feature",
@@ -1280,12 +1233,15 @@
     "startingEquipment": [
       "A Rakdos insignia",
       "a musical instrument (one of your choice)",
-      "a costumeValue:5gp Weight:4lbs",
-      "a hooded lanternValue:5gp Weight:2lbs made of wrought iron",
+      "a costume",
+      "a hooded lantern made of wrought iron",
       "a 10-foot length of chain with sharply spiked links",
-      "a tinderboxValue:5sp Weight:1lb",
-      "10 torchesValue:1cp Weight:1lb (individually)",
-      "a set of common clothesValue:5sp Weight:3lbs"
+      "a tinderbox",
+      "10 torches",
+      "a set of common clothes",
+      "a pouch containing 10gp (a mix of Azorius and Boros 1-zino coins)",
+      "a bottle of sweet",
+      "red juice"
     ],
     "feature": {
       "name": "Rakdos Cultist Feature",
@@ -1315,12 +1271,10 @@
     "languages": 1,
     "startingEquipment": [
       "A Selesnya insignia",
-      "a healer's kitValue:5gp Weight:3lbs",
-      "robesValue:1gp Weight:4lbs",
-      "a set of common clothesValue:5sp Weight:3lbs",
-      "though they will not risk their lives in this effort.\nIn addition",
-      "as a guild member you can receive free healing and care at a Selesnya enclave",
-      "these spells are added to all of them.)\nSelesnya Guild Spells"
+      "a healer's kit",
+      "robes",
+      "a set of common clothes",
+      "a pouch containing 5gp (Azorius 1-zino coins)"
     ],
     "feature": {
       "name": "Selesnya Initiate Feature",
@@ -1348,13 +1302,17 @@
     "languages": 2,
     "startingEquipment": [
       "A Simic insignia",
-      "a set of commoner's clothesValue:5sp Weight:3lbs",
-      "a bookValue:25gp Weight:5lbs of research notes",
-      "an ink penValue:2cp Weight:0",
-      "a bottle of squid inkValue:10gp Weight:0",
-      "a flask of oilValue:1sp Weight:1lb (made from blubber)",
-      "a vial of acidValue:25gp Weight:1lb (derived from digestive juices)",
-      "a vial of fish scales"
+      "a set of commoner's clothes",
+      "a book of research notes",
+      "an ink pen",
+      "a bottle of squid ink",
+      "a flask of oil (made from blubber)",
+      "a vial of acid (derived from digestive juices)",
+      "a vial of fish scales",
+      "a vial of seaweed",
+      "a vial of jellyfish stingers",
+      "a glass bottle of unidentified slime",
+      "a pouch containing 10gp (Azorius 1-zino coins)"
     ],
     "feature": {
       "name": "Simic Scientist Feature",
@@ -1384,9 +1342,9 @@
     "languages": 1,
     "startingEquipment": [
       "A musical instrument (one of your choice)",
-      "a set of traveler's clothesValue:2gp Weight:4lbs",
+      "a set of traveler's clothes",
       "three trinkets (each determind by rolling on the Feywild Trinkets table)",
-      "determined by rolling on the Fey Mark table."
+      "a pouch"
     ],
     "feature": {
       "name": "Feylost Feature",
@@ -1407,18 +1365,19 @@
     "name": "Witchlight Hand",
     "book": "The Wild Beyond the Witchlight",
     "skillProficiencies": [
-      "performance"
+      "performance",
+      "sleightOfHand"
     ],
     "toolProficiencies": [
       "Disguise kit or one type of musical instrument"
     ],
     "languages": 1,
     "startingEquipment": [
-      "A disguise kitValue: 25gp Weight: 3lbs or a musical instrument of your choice",
-      "a deck of cardsValue: 5sp Weight: 0",
-      "a carnival uniform or costumeValue: 5gp Weight: 4lbs",
+      "A disguise kit or a musical instrument of your choice",
+      "a deck of cards",
+      "a carnival uniform or costume",
       "one trinket (determind by rolling on the Feywild Trinkets table)",
-      "performers"
+      "a pouch"
     ],
     "feature": {
       "name": "Witchlight Hand Feature",
@@ -1451,8 +1410,7 @@
       "a hunting trap",
       "a gaming set (matching your chosen proficiency)",
       "a set of traveler’s clothes",
-      "and you possess hidden reserves others don’t expect. You gain the Alert",
-      "Skilled"
+      "a pouch"
     ],
     "feature": {
       "name": "Ruined Feature",
@@ -1483,10 +1441,7 @@
       "a net",
       "a favorite fishing lure or oiled leather wading boots",
       "a set of traveler's clothes",
-      "you can maintain a moderate lifestyle while working as a fisher",
-      "whether tall or true",
-      "to impress and entertain others. Once a day",
-      "you can tell your story to willing listeners. At the DM's discretion"
+      "a belt pouch"
     ],
     "feature": {
       "name": "Fisher Feature",
@@ -1513,11 +1468,12 @@
     "toolProficiencies": [
       "Vehicles (land & water)"
     ],
-    "languages": 1,
+    "languages": 0,
     "startingEquipment": [
-      "A daggerValue:2gp Weight:1lb that belonged to a fallen comrade",
+      "A dagger that belonged to a fallen comrade",
       "a folded rag emblazoned with the symbol of your ship or company",
-      "a set of traveler's clothesValue:2gp Weight:4lbs"
+      "a set of traveler's clothes",
+      "a pouch"
     ],
     "feature": {
       "name": "Marine Feature",
@@ -1552,7 +1508,7 @@
       "1 ounce of ink",
       "an ink pen",
       "a set of traveler's clothes",
-      "you can perform repairs on a water vehicle. When you use this ability"
+      "a leather pouch with 10 gp"
     ],
     "feature": {
       "name": "I'll patch it!",
@@ -1583,10 +1539,7 @@
     "startingEquipment": [
       "A fancy leather vest or a pair of leather boots",
       "a set of common clothes",
-      "city",
-      "or other similarly sized community (DM's discretion)",
-      "sailing skill",
-      "or a silver tongue"
+      "a leather pouch with 15 gp"
     ],
     "feature": {
       "name": "Down Low",
@@ -1614,12 +1567,13 @@
       "One type of musical instrument",
       "thieves' tools"
     ],
-    "languages": 1,
+    "languages": 0,
     "startingEquipment": [
-      "A set of fine clothesValue:15gp Weight:6lbs",
-      "a disguise kitValue:25gp Weight:3lbs",
+      "A set of fine clothes",
+      "a disguise kit",
       "a musical instrument of your choice",
-      "a gold-plated ring depicting a smiling face"
+      "a gold-plated ring depicting a smiling face",
+      "a pouch"
     ],
     "feature": {
       "name": "Grinner Feature",
@@ -1648,10 +1602,10 @@
     ],
     "languages": 1,
     "startingEquipment": [
-      "A set of common clothesValue:5sp Weight:3lbs",
+      "A set of common clothes",
       "a black cloak with a hood",
-      "a poisoner's kitValue:50gp Weight:2lbs",
-      "or roll on the Tragedies table."
+      "a poisoner's kit",
+      "a pouch"
     ],
     "feature": {
       "name": "Volstrucker Agent Feature",
@@ -1682,7 +1636,8 @@
     "startingEquipment": [
       "A bronze discus or leather ball",
       "a lucky charm or past trophy",
-      "a set of traveler's clothes"
+      "a set of traveler's clothes",
+      "a pouch"
     ],
     "feature": {
       "name": "Echoes of Victory",
@@ -1709,12 +1664,12 @@
     "toolProficiencies": [
       "Two proficiencies from the House Tool Proficiencies table"
     ],
-    "languages": 1,
+    "languages": 0,
     "startingEquipment": [
-      "A set of fine clothesValue:15gp Weight:6lbs",
-      "the signet ringValue:5gp Weight:0 of your house",
+      "A set of fine clothes",
+      "the signet ring of your house",
       "identification papers",
-      "and a purse containing 20gp"
+      "a purse"
     ],
     "feature": {
       "name": "House Agent Feature",
@@ -1744,13 +1699,11 @@
     "languages": 2,
     "startingEquipment": [
       "A leather-bound diary",
-      "a bottle of inkValue:10gp Weight:0.0625lb",
-      "an ink penValue:2cp Weight:0",
-      "a set of traveler's clothesValue:2gp Weight:4lbs",
+      "a bottle of ink",
+      "an ink pen",
+      "a set of traveler's clothes",
       "one trinket of special significance",
-      "you spent much of your adult life away from your homeland",
-      "after which you learn a handful of important words",
-      "expressions"
+      "a pouch"
     ],
     "feature": {
       "name": "Anthropologist Feature",
@@ -1779,14 +1732,14 @@
     ],
     "languages": 1,
     "startingEquipment": [
-      "A wooden caseValue:1gp Weight:1lb containing a map to a ruin or dungeon",
-      "a bullseye lanternValue:10gp Weight:2lbs",
-      "a miner's pickValue:2gp Weight:10lbs",
-      "a set of traveler's clothesValue:2gp Weight:4lbs",
-      "a shovelValue:2gp Weight:5lbs",
-      "a two-person tentValue:2gp Weight:20lbs",
+      "A wooden case containing a map to a ruin or dungeon",
+      "a bullseye lantern",
+      "a miner's pick",
+      "a set of traveler's clothes",
+      "a shovel",
+      "a two-person tent",
       "a trinket recovered from a dig site",
-      "you spent most of your young life crawling around in the dust"
+      "a pouch"
     ],
     "feature": {
       "name": "Archaeologist Feature",
@@ -1815,10 +1768,8 @@
     ],
     "languages": 2,
     "startingEquipment": [
-      "your path in life was defined by one dark moment",
-      "one fateful decision",
-      "or one tragedy. Now you feel a darkness threatening to consume you",
-      "or roll one on the Harrowing Events table."
+      "A monster hunter’s pack",
+      "one trinket of special significance (choose one or roll on the Gothic Trinkets table). Also gain a set of common clothes and 1sp"
     ],
     "feature": {
       "name": "Haunted One Feature",
@@ -1847,9 +1798,9 @@
     ],
     "languages": 1,
     "startingEquipment": [
-      "A disguise kitValue:25gp Weight:3lbs",
-      "a costumeValue:5gp Weight:4lbs",
-      "true face"
+      "A disguise kit",
+      "a costume",
+      "a pouch"
     ],
     "feature": {
       "name": "Faceless Feature",
@@ -1878,10 +1829,9 @@
     ],
     "languages": 2,
     "startingEquipment": [
-      "A disguise kitValue:25gp Weight:3lb",
-      "a set of fine clothesValue:15gp Weight:6lbs",
-      "at the DM's discretion. Additionally",
-      "the common folk treat you with deference"
+      "A disguise kit",
+      "a set of fine clothes",
+      "a belt pouch"
     ],
     "feature": {
       "name": "Name Dropping",
@@ -1911,12 +1861,9 @@
     "languages": 1,
     "startingEquipment": [
       "One set of artisan's tools",
-      "merchant's scaleValue:5gp Weight:3lbs",
-      "a set of fine clothesValue:15gp Weight:6lbs",
-      "you retain connections with wholesalers",
-      "suppliers",
-      "a strong personality. the ability to make deals with hostile adversaries",
-      "a strong sword arm to fight off bandits"
+      "merchant's scale",
+      "a set of fine clothes",
+      "a belt pouch"
     ],
     "feature": {
       "name": "Supply Chain",
@@ -1947,8 +1894,8 @@
     "startingEquipment": [
       "One gaming set",
       "a lucky charm",
-      "a set of fine clothesValue:15gp Weight:6lbs",
-      "and the worst gamblers sometimes win. Regardless"
+      "a set of fine clothes",
+      "a belt pouch"
     ],
     "feature": {
       "name": "Never Tell Me the Odds",
@@ -1978,7 +1925,7 @@
     "languages": 1,
     "startingEquipment": [
       "One set of artisan's tools",
-      "a set of fine clothesValue:15gp Weight:6lbs"
+      "a set of fine clothes"
     ],
     "feature": {
       "name": "Legalese",
@@ -2008,9 +1955,9 @@
     "languages": 1,
     "startingEquipment": [
       "One set of artisan's tools",
-      "a set of fine clothesValue:15gp Weight:6lbs",
-      "it might have left you a blend of seething rage",
-      "practiced nonchalance"
+      "a ledger from your previous employer containing a small piece of useful information",
+      "a set of fine clothes",
+      "a belt pouch"
     ],
     "feature": {
       "name": "Inside Informant",
@@ -2037,11 +1984,11 @@
     "toolProficiencies": [],
     "languages": 2,
     "startingEquipment": [
-      "A set of traveler's clothesValue: 2gp Weight: 4lbs",
+      "A set of traveler's clothes",
       "a diary",
-      "an ink penValue: 2cp Weight: 0",
-      "a bottle of inkValue: 10gp Weight: 0",
-      "or work with your DM to identify a more suitable choice."
+      "an ink pen",
+      "a bottle of ink",
+      "a pouch"
     ],
     "feature": {
       "name": "Astral Drifter Feature",
@@ -2071,11 +2018,11 @@
     ],
     "languages": 0,
     "startingEquipment": [
-      "A belaying pin (club)Value: 1sp Weight: 2lbs",
-      "a set of traveler's clothesValue: 2gp Weight: 4lbs",
-      "a grappling hookValue: 2gp Weight: 4lbs",
-      "50 feet of hempen ropeValue: 1gp Weight: 10lbs",
-      "but the encounter left you with a scar or two"
+      "A belaying pin (club)",
+      "a set of traveler's clothes",
+      "a grappling hook",
+      "50 feet of hempen rope",
+      "a pouch"
     ],
     "feature": {
       "name": "Wildspacer Feature",
@@ -2103,11 +2050,11 @@
     "languages": 2,
     "startingEquipment": [
       "A ring of keys to unknown locks",
-      "a blank bookValue: 25gp Weight: 5lbs",
-      "an ink pen or quillValue: 2cp Weight: 0",
-      "a bottle of black inkValue: 10gp Weight: 0",
-      "a set of traveler’s clothesValue: 2gp Weight: 4lbs",
-      "you know where to find free"
+      "a blank book",
+      "an ink pen or quill",
+      "a bottle of black ink",
+      "a set of traveler’s clothes",
+      "a pouch"
     ],
     "feature": {
       "name": "Gate Warden Feature",
@@ -2133,8 +2080,10 @@
     "toolProficiencies": [],
     "languages": 2,
     "startingEquipment": [
+      "A portal key (such as a bag of golden tea leaves or the tooth of a planar beast)",
       "a manifesto of your guiding philosophy",
-      "a set of common clothesValue: 5sp Weight: 3lbs in your faction's style"
+      "a set of common clothes in your faction's style",
+      "a pouch containing 10 gp worth of coins from different worlds and planes"
     ],
     "feature": {
       "name": "Planar Philospher Feature",
@@ -2161,14 +2110,13 @@
     "toolProficiencies": [],
     "languages": 1,
     "startingEquipment": [
-      "A bottle of black inkValue: 10gp Weight: 0",
-      "an ink penValue: 2cp Weight: 0",
+      "A bottle of black ink",
+      "an ink pen",
       "five sheets of paper",
       "a gaming set (matching your chosen proficiency)",
-      "a signet ringValue:5gp Weight:0",
-      "a set of fine clothesValue:15gp Weight:6lbs",
-      "Magic Initiate",
-      "you might be Lucky instead. Alternatively"
+      "a signet ring",
+      "a set of fine clothes",
+      "a pouch"
     ],
     "feature": {
       "name": "Rewarded Feature",
@@ -2196,12 +2144,9 @@
     "languages": 2,
     "startingEquipment": [
       "An insignia of rank",
-      "a deck of cardsValue: 5sp Weight: 0",
-      "a set of common clothesValue: 5sp Weight: 3lbs",
-      "the Knights of Solamnia provide you free",
-      "you may roll once on the Knight of Solamnia Trinkets table",
-      "instead of on the Trinkets table in the Player's Handbook",
-      "for your starting trinket.\nKnight of Solamnia Trinkets"
+      "a deck of cards",
+      "a set of common clothes",
+      "a pouch"
     ],
     "feature": {
       "name": "Knight of Solamnia Feature",
@@ -2228,14 +2173,10 @@
     "toolProficiencies": [],
     "languages": 2,
     "startingEquipment": [
-      "A bottle of colored inkValue: 10gp Weight: 0",
-      "an ink penValue: 2cp Weight: 0",
-      "a set of common clothesValue: 5sp Weight: 3lbs",
-      "the Mages of High Sorcery provide you with free",
-      "Warlocks",
-      "the Mages of High Sorcery are shrewd",
-      "you may roll once on the Mage of High Sorcery Trinkets table",
-      "instead of on the Trinkets table in the Player's Handbook"
+      "A bottle of colored ink",
+      "an ink pen",
+      "a set of common clothes",
+      "a pouch"
     ],
     "feature": {
       "name": "Mage of High Sorcery Feature",
@@ -2264,8 +2205,8 @@
     ],
     "languages": 0,
     "startingEquipment": [
-      "A magnifying glassValue:100gp",
-      "personal"
+      "A magnifying glass",
+      "evidence from a past case (choose one or roll for a trinket from the Horror Trinkets table) a set of common clothes"
     ],
     "feature": {
       "name": "Investigator Feature",

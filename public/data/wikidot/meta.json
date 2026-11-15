@@ -1,6 +1,8 @@
 {
-  "scrapedAt": "2026-06-14T16:22:25.933Z",
+  "scrapedAt": "2026-11-15T04:16:30.278Z",
   "counts": {
-    "backgrounds": 68
+    "backgrounds": 68,
+    "spells": 574,
+    "races": 60
   }
 }

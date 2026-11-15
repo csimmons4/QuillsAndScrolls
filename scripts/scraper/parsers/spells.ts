@@ -72,6 +72,8 @@ async function parseSpell(url: string, force: boolean): Promise<Record<string, u
       const schoolMatch = text.match(/(\w+)\s+cantrip/i)
       if (schoolMatch) school = schoolMatch[1]
     }
+    // "1st-level divination (ritual)" — the tag sits on the level/school line
+    const ritual = /(?:\d+(?:st|nd|rd|th)[- ]level\s+\w+|\w+\s+cantrip)\s*\(ritual\)/i.test(text)
     // Normalize school to Title Case
     if (school) school = school.charAt(0).toUpperCase() + school.slice(1).toLowerCase()
 
@@ -97,8 +99,10 @@ async function parseSpell(url: string, force: boolean): Promise<Record<string, u
       components,
       duration,
       description: description.replace(/\s*Spell Lists?\..*$/is, '').trim().slice(0, 5000),
-      higherLevels: higherLevels.slice(0, 1000) || undefined,
+      // Drop the "At Higher Levels." label (the UI adds its own) and the trailing class list
+      higherLevels: higherLevels.replace(/^At Higher Levels[.:]?\s*/i, '').replace(/\s*Spell Lists?[.:].*$/is, '').trim().slice(0, 1000) || undefined,
       classes,
+      ...(ritual ? { ritual: true } : {}),
       source: { ...SOURCE, url },
     }
   } catch (err) {

@@ -38,7 +38,7 @@
     "name": "Dwarf",
     "abilityBonuses": {},
     "size": "Medium",
-    "speed": 30,
+    "speed": 25,
     "traits": [
       "Ability Score Increase.",
       "Alignment.",
@@ -106,7 +106,7 @@
     "name": "Gnome",
     "abilityBonuses": {},
     "size": "Small",
-    "speed": 30,
+    "speed": 25,
     "traits": [
       "Ability Score Increase.",
       "Alignment.",
@@ -204,7 +204,7 @@
     "name": "Halfling",
     "abilityBonuses": {},
     "size": "small",
-    "speed": 30,
+    "speed": 25,
     "traits": [
       "Ability Score Increase.",
       "Alignment.",
@@ -539,7 +539,7 @@
     "name": "Air Genasi",
     "abilityBonuses": {},
     "size": "Medium",
-    "speed": 30,
+    "speed": 35,
     "traits": [
       "A typical genasi has a life span of 120 years",
       "Ability Score Increase.",
@@ -837,7 +837,7 @@
     "name": "Satyr",
     "abilityBonuses": {},
     "size": "Medium",
-    "speed": 30,
+    "speed": 35,
     "traits": [
       "Ability Score Increase.",
       "Creature Type.",
@@ -1054,7 +1054,7 @@
     "name": "Centaur",
     "abilityBonuses": {},
     "size": "Medium",
-    "speed": 30,
+    "speed": 40,
     "traits": [
       "Ability Score Increase.",
       "Creature Type.",
@@ -1392,7 +1392,7 @@
     "name": "Dhampir",
     "abilityBonuses": {},
     "size": "Medium",
-    "speed": 30,
+    "speed": 35,
     "traits": [
       "Dhampir Hungers",
       "Dhampir Origins",
@@ -1695,7 +1695,7 @@
     "name": "Leonin",
     "abilityBonuses": {},
     "size": "Medium",
-    "speed": 30,
+    "speed": 35,
     "traits": [
       "Ability Score Increase.",
       "Alignment.",
