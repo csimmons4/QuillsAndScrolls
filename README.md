@@ -32,93 +32,25 @@ You can open, copy, move, or delete these files directly in Finder (Mac) or File
 
 ---
 
-## Setup — Mac
+## Setup — just double-click
 
-### 1. Install Node.js
-1. Go to [nodejs.org](https://nodejs.org) and download the **LTS** version
-2. Open the downloaded `.pkg` file and follow the installer
-3. To confirm it worked, open **Terminal** and run:
-   ```
-   node --version
-   ```
-   You should see a version number like `v20.x.x`
+There is **nothing to install by hand** — no Node.js download, no Terminal commands. The game content already ships inside this folder.
 
-### 2. Open Terminal in the project folder
-- Open **Finder**, navigate to the `Quills&Scrolls` folder
-- Right-click the folder and choose **New Terminal at Folder**
-  - *(or open Terminal and drag the folder onto the Terminal window)*
+**Mac:** Double-click **`Start (Mac).command`** in the `Quills&Scrolls` folder.
 
-### 3. Run these two commands in order
+**Windows:** Double-click **`Start (Windows).bat`** in the `Quills&Scrolls` folder.
 
-**Install dependencies** *(first time only)*
-```bash
-npm install
-```
+The **first time** you run it, the launcher automatically installs everything it needs (a private copy of Node.js if your computer doesn't already have one, then the app files) and then opens the app in your browser. This first run takes a minute or two; after that it starts in seconds.
 
-**Download D&D content from wikidot** *(first time only — takes 10–20 minutes)*
-```bash
-npm run scrape
-```
+Keep the launcher's window open while you're using the app — closing it stops the server. To stop, close that window; to use it again later, just double-click the launcher.
 
-### 4. Start the app — two options
+**First-run notes:**
 
-**Option A: Double-click launcher** *(recommended after first setup)*
-Double-click **`Start (Mac).command`** in the `Quills&Scrolls` folder. It starts the server and opens your browser automatically.
+- **Mac:** The Mac may warn the file is from an unidentified developer. Right-click **`Start (Mac).command`** → **Open** → **Open**. After that it opens normally on a plain double-click.
+- **Windows:** If a firewall popup appears, click **Allow access**. It's just Node.js opening a local port on your own machine.
+- You need to be **online** the first time so the launcher can download what it needs. After that it works offline.
 
-> First time only: Mac may warn the file is from an unidentified developer. Right-click it → **Open** → **Open**. After that it opens normally.
-
-**Option B: Terminal**
-```bash
-npm run dev
-```
-Then open **http://localhost:5173** in your browser.
-
-Keep the Terminal window open while you're using the app — closing it stops the server.
-
----
-
-## Setup — Windows
-
-### 1. Install Node.js
-1. Go to [nodejs.org](https://nodejs.org) and download the **LTS** version (`.msi` installer)
-2. Run the installer — keep all default options, make sure **"Add to PATH"** is checked
-3. To confirm it worked, open **Command Prompt** (search "cmd" in the Start menu) and run:
-   ```
-   node --version
-   ```
-   You should see a version number like `v20.x.x`
-
-### 2. Open Command Prompt in the project folder
-- Open **File Explorer**, navigate to the `Quills&Scrolls` folder
-- Click the address bar at the top, type `cmd`, and press Enter
-  - This opens Command Prompt already pointed at that folder
-
-### 3. Run these two commands in order
-
-**Install dependencies** *(first time only)*
-```
-npm install
-```
-
-**Download D&D content from wikidot** *(first time only — takes 10–20 minutes)*
-```
-npm run scrape
-```
-
-### 4. Start the app — two options
-
-**Option A: Double-click launcher** *(recommended after first setup)*
-Double-click **`Start (Windows).bat`** in the `Quills&Scrolls` folder. It starts the server and opens your browser automatically.
-
-**Option B: Command Prompt**
-```
-npm run dev
-```
-Then open **http://localhost:5173** in your browser (Chrome or Edge recommended).
-
-Keep the Command Prompt window open while you're using the app — closing it stops the server.
-
-> **Windows Defender / Firewall note:** If you get a firewall popup, click **Allow access**. It's just Node.js opening a local port on your own machine.
+> Prefer the command line? You can still run `npm install` once and then `npm run dev`, opening **http://localhost:5173** yourself.
 
 ---
 
