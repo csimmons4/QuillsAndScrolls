@@ -7,21 +7,21 @@ import {
   abilityModFor, profBonus, skillMod, saveMod, hpMax,
   totalLevel, passivePerception, formatMod,
   spellSaveDC, spellAttackBonus,
-  deriveClassResources, shortRestResourceKeys, longRestResourceKeys,
+  deriveClassResources, shortRestResourceKeys, longRestResourceKeys, featureKey, resourceMatchesFeature,
   hasBardJackOfAllTrades, monkSpeedBonus, sneakAttackDice, paladinAuraBonus,
   initiativeBonus, spellcastingAbilityFor,
   type ClassResource,
 } from '../character/derive'
 import { touchUpdated } from '../character/create'
 import {
-  CLASS_OPTIONS, ELDRITCH_INVOCATIONS, METAMAGIC_OPTIONS, ARTIFICER_INFUSIONS,
+  CLASS_OPTIONS, ELDRITCH_INVOCATIONS, METAMAGIC_OPTIONS, ARTIFICER_INFUSIONS, infusionBonus, findInfusion,
   LAND_CIRCLE_SPELLS, RUNE_KNIGHT_RUNES, HUNTER_CHOICES,
   TOTEM_ANIMALS, STORM_AURA_OPTIONS, FOUR_ELEMENTS_DISCIPLINES,
   isMulticlassSpellcaster, multiclassSpellSlotsMax, CASTER_TYPE, effectiveCasterLevel, resolveCasterType,
   MULTICLASS_PROF_GRANTS, spellProgression, cantripsKnownAt, maxSpellLevelAt,
   MYSTIC_ARCANUM_LEVELS, mysticArcanumKey, mysticArcanumEntry,
 } from '../data/classData'
-import { asiLevelsForClass } from '../character/levelUp'
+import { asiLevelsForClass, shiftBaselines } from '../character/levelUp'
 import {
   DRACONIC_ANCESTRIES, RACE_OPTIONS, LANGUAGES_STANDARD, LANGUAGES_EXOTIC,
   languageChoiceCount, languageChoicePlaceholder, splitRaceLanguages,
@@ -40,6 +40,10 @@ import { useRecentCharacter } from '../storage/recentCharacter'
 import { applyFeatAbilityIncrease, featAbilityPick, resolveFeatGrants, applyGrantPicks, withFeatClassChoice } from '../character/grants'
 import { FeatGrantsBlock } from '../components/FeatGrantsBlock'
 import { useConfirm } from '../components/ConfirmDialog'
+import { InspirationToken } from '../components/InspirationToken'
+import { ARMOR_KINDS, ARTISAN_TOOLS, MUSICAL_INSTRUMENTS, GAMING_SETS, OTHER_TOOLS, armorKindsOf, profKey, isToolItem, featArmorKinds, proficiencySources, type ArmorKind } from '../character/proficiencies'
+import { HourglassIcon, MoonIcon, LevelUpIcon, SaveIcon, CheckIcon, ExportIcon } from '../components/SheetIcons'
+import { PortraitPicker } from '../components/PortraitPicker'
 import { runningPotions, sumPotionEffects, describePotionEffects } from '../character/potionEffects'
 import { FeatAbilityPicker } from '../components/FeatAbilityPicker'
 import { BATTLE_MASTER_MANEUVERS } from '../data/classData'
@@ -117,10 +121,13 @@ function detectBodySlot(name: string, description?: string): BodySlotKey | null 
 }
 
 // +1/+2/+3 bonus from magic weapon name ("Longsword +1", "+2 Longsword")
-function magicBonus(name: string): number {
-  const m = name.match(/\+(\d)\b/)
-  return m ? parseInt(m[1]) : 0
+// "+1 Longsword", or an artificer infusion's bonus (infusions only go on nonmagical items, so the
+// two never stack)
+function magicBonus(item: { name: string; infusion?: string; attuned: boolean }, artificerLevel: number): number {
+  const m = item.name.match(/\+(\d)\b/)
+  return Math.max(m ? parseInt(m[1]) : 0, infusionBonus(item, artificerLevel))
 }
+const artificerLevelOf = (char: Character) => char.classes.find(c => c.classSlug === 'artificer')?.level ?? 0
 
 // Any skill spelling ("Animal Handling", "animal-handling", "animalHandling") → its SKILLS key,
 // so granted skills from backgrounds/races/feats/items line up with char.skillProficiencies.
@@ -191,17 +198,19 @@ function computeFullAC(
   const dex = abilityModFor(char, 'dex')
   const equipped = char.equipment.filter(e => e.equipped)
 
+  const artificerLevel = artificerLevelOf(char)
   let armorStat: ArmorStats | null = null
-  let armorName = ''
+  let armorItem: Character['equipment'][number] | null = null
   let shieldAcBase = 0
-  let shieldItemName = ''
+  let shieldItem: Character['equipment'][number] | null = null
 
   for (const item of equipped) {
     const a = resolveArmor(item, items)
     if (!a) continue
-    if (a.type === 'shield') { shieldAcBase = a.acBase; shieldItemName = item.name; continue }
-    if (!armorStat) { armorStat = a; armorName = item.name }
+    if (a.type === 'shield') { shieldAcBase = a.acBase; shieldItem = item; continue }
+    if (!armorStat) { armorStat = a; armorItem = item }
   }
+  const armorName = armorItem?.name ?? ''
   const hasShield = shieldAcBase > 0
 
   let baseAC: number
@@ -209,7 +218,7 @@ function computeFullAC(
   let stealthDisadv = armorStat?.stealthDisadvantage ?? false
 
   if (armorStat) {
-    const mb = magicBonus(armorName)
+    const mb = armorItem ? magicBonus(armorItem, artificerLevel) : 0
     if (armorStat.type === 'light')       { baseAC = armorStat.acBase + dex + mb;             source = armorName }
     else if (armorStat.type === 'medium') { baseAC = armorStat.acBase + Math.min(dex, mediumDexCap) + mb; source = armorName }
     else                                  { baseAC = armorStat.acBase + mb;                    source = armorName }
@@ -260,7 +269,7 @@ function computeFullAC(
     source = best.label
   }
 
-  if (hasShield) { baseAC += shieldAcBase + magicBonus(shieldItemName); source += ' + Shield' }
+  if (hasShield) { baseAC += shieldAcBase + (shieldItem ? magicBonus(shieldItem, artificerLevel) : 0); source += ' + Shield' }
   if (itemAcBonus > 0) { baseAC += itemAcBonus; source += ` +${itemAcBonus} item` }
   return { ac: baseAC, source, stealthDisadv }
 }
@@ -290,14 +299,15 @@ function isWeaponProficient(char: Character, item: { itemSlug: string; name: str
   return false
 }
 
-function isArmorProficient(char: Character, as_: ArmorStats): boolean {
-  // Stored as "light" / "Light Armor" / "all" / "shields (non-metal)" depending on the source
-  const profs = char.armorProficiencies.map(p => p.toLowerCase())
-  const has = (kind: string) => profs.some(p => p.startsWith(kind))
-  if (as_.type === 'shield') return has('shield')
-  if (has('all') || has('heavy')) return true
-  if (has('medium') && (as_.type === 'medium' || as_.type === 'light')) return true
-  return has('light') && as_.type === 'light'
+function isArmorProficient(char: Character, as_: ArmorStats, featArmor: Map<ArmorKind, string>): boolean {
+  // Stored as "light" / "Light Armor" / "all" / "shields (non-metal)" depending on the source; armor
+  // feats (Heavily Armored, …) count too. Heavy proficiency covers lighter armor, medium covers light.
+  const kinds = armorKindsOf(char.armorProficiencies)
+  for (const k of featArmor.keys()) kinds.add(k)
+  if (as_.type === 'shield') return kinds.has('shields')
+  if (kinds.has('heavy')) return true
+  if (kinds.has('medium') && (as_.type === 'medium' || as_.type === 'light')) return true
+  return kinds.has('light') && as_.type === 'light'
 }
 
 // Aggregate all resistances, immunities, condition immunities and advantages
@@ -1096,6 +1106,14 @@ export default function Sheet() {
   const [shortRestRolls, setShortRestRolls] = useState<Record<string, string>>({})
   const [longRestOpen, setLongRestOpen] = useState(false)
   const { askConfirm, confirmDialog } = useConfirm()
+  // All Proficiencies card: edit mode and the "Other…" boxes
+  const [profEditing, setProfEditing] = useState(false)
+  const [newToolText, setNewToolText] = useState('')
+  const [newLangText, setNewLangText] = useState('')
+  // Resistant Armor: the damage type picked before choosing the item to infuse
+  const [infuseResistType, setInfuseResistType] = useState('fire')
+  // Resource pips that just changed (pips from..to-1 of one resource) play the spend/restore animation
+  const [pipFx, setPipFx] = useState<{ key: string; from: number; to: number; kind: 'spend' | 'restore' } | null>(null)
   // Concentration save owed after taking damage; the player rolls and reports the result
   const [concCheck, setConcCheck] = useState<{ spellName: string; dc: number; damage: number } | null>(null)
   const [activeSummonId, setActiveSummonId] = useState<string | null>(null)
@@ -1126,10 +1144,15 @@ export default function Sheet() {
     listCharactersFromDisk()
       .then(({ characters: chars }) => {
         let found = chars.find(c => c.id === id)
-        // Characters made before skill tracking existed: their current skills become the baseline
-        if (found && !found.skillBaseline) {
-          found = { ...found, skillBaseline: { proficiencies: [...found.skillProficiencies], expertise: [...found.skillExpertise] } }
-          saveCharacterToDisk(found).catch(err => console.warn('Saving skill baseline failed:', err))
+        // Characters made before skill/score/save tracking existed: their current values become the baseline
+        if (found && (!found.skillBaseline || !found.abilityBaseline || !found.saveBaseline)) {
+          found = {
+            ...found,
+            skillBaseline: found.skillBaseline ?? { proficiencies: [...found.skillProficiencies], expertise: [...found.skillExpertise] },
+            abilityBaseline: found.abilityBaseline ?? { ...found.abilityScores },
+            saveBaseline: found.saveBaseline ?? [...found.saveProficiencies],
+          }
+          saveCharacterToDisk(found).catch(err => console.warn('Saving baselines failed:', err))
         }
         if (found) { setChar(found); charRef.current = found }
         else setLoadError('Character not found — it may have been deleted.')
@@ -1154,9 +1177,35 @@ export default function Sheet() {
     charRef.current = updated
     if (diskSaveTimer.current) clearTimeout(diskSaveTimer.current)
     diskSaveTimer.current = setTimeout(() => {
+      diskSaveTimer.current = null  // nothing waiting to be saved
       saveCharacterToDisk(updated).catch(err => console.warn('Auto-save failed:', err))
     }, 800)
   }, [])
+
+  // Another tab (or an outside edit) may have saved this character since this tab loaded it. When the
+  // tab comes back into view, pick up the newer copy rather than later saving the stale one over it.
+  useEffect(() => {
+    if (!id) return
+    const refresh = () => {
+      if (document.visibilityState !== 'visible' || diskSaveTimer.current) return  // own edits still unsaved
+      listCharactersFromDisk()
+        .then(({ characters }) => {
+          const disk = characters.find(c => c.id === id)
+          const mine = charRef.current
+          if (disk && mine && !diskSaveTimer.current && disk.updatedAt > mine.updatedAt) {
+            setChar(disk)
+            charRef.current = disk
+          }
+        })
+        .catch(() => {})
+    }
+    document.addEventListener('visibilitychange', refresh)
+    window.addEventListener('focus', refresh)
+    return () => {
+      document.removeEventListener('visibilitychange', refresh)
+      window.removeEventListener('focus', refresh)
+    }
+  }, [id])
 
   function saveToFile() {
     if (!charRef.current) return
@@ -1239,7 +1288,20 @@ export default function Sheet() {
     .filter(fc => fc.key === 'feat-l1' || fc.key.startsWith('feat-'))
     .map(fc => typeof fc.value === 'string' ? fc.value : fc.value[0])
   const featBonuses = sumFeatBonuses(featSlugs, content.feats)
-  const itemBonuses = sumItemBonuses(char.equipment, content.items)
+  // Armor proficiency from feats (Heavily Armored, …): counted without being stored
+  const featArmor = featArmorKinds(featSlugs, content)
+  const artificerLevel = artificerLevelOf(char)
+  // An attuned Enhanced Arcane Focus in hand adds its +1/+2 to spell attacks, like a magic focus
+  const itemBonuses = (() => {
+    const b = sumItemBonuses(char.equipment, content.items)
+    const focus = Math.max(0, ...char.equipment.filter(e => e.equipped).map(e => infusionBonus(e, artificerLevel, 'spellAttack')))
+    // Resistant Armor ("resistant-armor@fire"), worn and attuned
+    const resisted = char.equipment
+      .filter(e => e.equipped && e.attuned && e.infusion?.startsWith('resistant-armor@'))
+      .map(e => e.infusion!.split('@')[1])
+    if (!focus && resisted.length === 0) return b
+    return { ...b, spellAttackBonus: b.spellAttackBonus + focus, resistances: [...new Set([...b.resistances, ...resisted])] }
+  })()
 
   // Active potions still running (not out of rounds or uses), and everything they change
   const running = runningPotions(char, content.items)
@@ -1386,7 +1448,164 @@ export default function Sheet() {
     if (!(await askConfirm({ title: 'Reset Skills', message: 'Put every hand-changed skill back to what creation and level-ups gave you?', confirmLabel: 'Reset' }))) return
     patch({ skillProficiencies: [...skillBaseProf], skillExpertise: [...skillBaseExpert] })
   }
+  // Ability scores and saving throws changed by hand, compared with abilityBaseline / saveBaseline
+  const abilityBase = char.abilityBaseline ?? char.abilityScores
+  const abilitiesChanged = ABILITIES.filter(a => char.abilityScores[a] !== abilityBase[a])
+  const resetAllAbilities = async () => {
+    const list = abilitiesChanged.map(a => `${ABILITY_LABELS[a]} ${char.abilityScores[a]} → ${abilityBase[a]}`).join(', ')
+    if (!(await askConfirm({ title: 'Reset Ability Scores', message: `Put hand-changed scores back to what creation and level-ups gave you? (${list})`, confirmLabel: 'Reset' }))) return
+    patch({ abilityScores: { ...abilityBase } })
+  }
+  const saveBase = new Set(char.saveBaseline ?? char.saveProficiencies)
+  const savesChanged = ABILITIES.filter(a => saveBase.has(a) !== char.saveProficiencies.includes(a))
+  const resetSave = (a: string) => {
+    const s = new Set(char.saveProficiencies)
+    saveBase.has(a) ? s.add(a) : s.delete(a)
+    patch({ saveProficiencies: [...s] })
+  }
+  const resetAllSaves = async () => {
+    if (!(await askConfirm({ title: 'Reset Saving Throws', message: 'Put hand-changed saving throw proficiencies back to what your class and feats gave you?', confirmLabel: 'Reset' }))) return
+    patch({ saveProficiencies: [...saveBase] })
+  }
   const classResources = deriveClassResources(char)
+
+  /** A resource's uses: gems for small counts, a gauge for big pools (Ki, Lay on Hands). The same
+   *  tracker shows on the Resources card and on the class feature it belongs to. */
+  const resourceTracker = (r: ClassResource) => {
+    const isPool = (r.max ?? 0) > 6  // large pools get a number input
+    const current = r.current
+    const max = r.max
+    return (
+      <>
+      {isPool ? (
+        // Filled gauge + controls for large pools (Ki, Sorcery Points, Lay on Hands)
+        (() => {
+          const cap = max ?? 9999
+          const pct = cap > 0 ? Math.min(100, Math.round((current / cap) * 100)) : 0
+          const setVal = (v: number) =>
+            patch({ classResources: { ...char.classResources, [r.key]: Math.max(0, Math.min(cap, v)) } })
+          return (
+            <div>
+              <div
+                className="res-pool-track relative h-4 rounded-full overflow-hidden cursor-pointer"
+                title="Click to set remaining"
+                onClick={e => {
+                  const rect = e.currentTarget.getBoundingClientRect()
+                  setVal(Math.round(((e.clientX - rect.left) / rect.width) * cap))
+                }}
+              >
+                <div
+                  className="res-pool-fill absolute inset-y-0 left-0 rounded-full transition-all duration-200"
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
+              <div className="flex items-center gap-1 mt-1">
+                <button className="btn-ghost px-1 text-sm" onClick={() => setVal(current - 1)}>−</button>
+                <input
+                  type="number" min={0} max={max ?? 9999}
+                  className="w-12 text-center text-sm font-bold bg-transparent border border-parchment-300 rounded py-0.5"
+                  value={current}
+                  onChange={e => setVal(parseInt(e.target.value, 10) || 0)}
+                />
+                <span className="text-xs text-parchment-400">/ {max ?? '∞'}</span>
+                <button className="btn-ghost px-1 text-sm" onClick={() => setVal(current + 1)}>+</button>
+              </div>
+            </div>
+          )
+        })()
+      ) : max === null ? (
+        // Unlimited (Barbarian L20 rage)
+        <div className="text-sm font-bold text-green-600">Unlimited</div>
+      ) : (
+        // Pip display for small counts (1–6)
+        <div className="flex gap-1 flex-wrap items-center">
+          {Array.from({ length: max }).map((_, i) => {
+            const fx = pipFx?.key === r.key && i >= pipFx.from && i < pipFx.to ? pipFx : null
+            const full = i < current
+            return (
+              <button
+                key={i}
+                type="button"
+                className="res-pip"
+                onClick={() => {
+                  // Click pip to toggle — clicking a used pip restores it, clicking available uses it
+                  const newVal = Math.min(max, full ? i : i + 1)
+                  setPipFx(newVal < current
+                    ? { key: r.key, from: newVal, to: current, kind: 'spend' }
+                    : { key: r.key, from: current, to: newVal, kind: 'restore' })
+                  patch({ classResources: { ...char.classResources, [r.key]: newVal } })
+                }}
+                onAnimationEnd={e => {
+                  // The gem that finishes the ripple clears it (the pulse never ends)
+                  if (!fx) return
+                  const lastPip = fx.kind === 'spend' ? fx.from : fx.to - 1
+                  if (i === lastPip && e.animationName === (fx.kind === 'spend' ? 'res-gem-spend' : 'res-gem-restore')) setPipFx(null)
+                }}
+                title={full ? 'Click to use' : 'Click to restore'}
+                aria-label={`${r.name} ${i + 1} of ${max}: ${full ? 'available' : 'used'}`}
+              >
+                <span
+                  // Class names spelled out in full so Tailwind keeps them
+                  className={`res-gem ${full ? 'res-gem-full' : 'res-gem-spent'}${fx ? (fx.kind === 'spend' ? ' res-gem-spend' : ' res-gem-restore') : ''}`}
+                  // Several gems at once ripple outward from the first one; at rest the
+                  // pulse is staggered like the spell slots
+                  style={fx
+                    ? { animationDelay: `${(fx.kind === 'spend' ? fx.to - 1 - i : i - fx.from) * 60}ms` }
+                    : full ? { animationDelay: `${i * 0.18}s` } : undefined}
+                />
+              </button>
+            )
+          })}
+          <span className="text-xs text-parchment-400 ml-1">{current}/{max}</span>
+        </div>
+      )}
+      </>
+    )
+  }
+
+  // Each class resource belongs to a class or subclass feature (Rage → Rage, Superiority Dice →
+  // Combat Superiority): the earliest matching feature card shows its tracker, and the resource's
+  // name on the Resources card jumps there.
+  const featureAnchor = (classSlug: string, f: { level: number; name: string }) =>
+    `feature-${classSlug}-${f.level}-${featureKey(f.name).replace(/ /g, '-')}`
+  const resourceAnchor = new Map<string, string>()
+  for (const cc of char.classes) {
+    const opts = CLASS_OPTIONS[cc.classSlug]
+    const sub = opts?.subclasses.find(s => s.slug === cc.subclassSlug)
+    const feats = [...(opts?.features ?? content.classes.find(c => c.slug === cc.classSlug)?.features ?? []), ...(sub?.features ?? [])]
+      .filter(f => f.level <= cc.level)
+      .sort((x, y) => x.level - y.level)
+    for (const r of classResources) {
+      if (r.classSlug !== cc.classSlug || resourceAnchor.has(r.key)) continue
+      const f = feats.find(f => resourceMatchesFeature(r, f.name))
+      if (f) resourceAnchor.set(r.key, featureAnchor(cc.classSlug, f))
+    }
+  }
+  const resourcesAt = (anchor: string) => classResources.filter(r => resourceAnchor.get(r.key) === anchor)
+  const jumpToFeature = (anchor: string) => {
+    setTab('features')
+    window.setTimeout(() => {
+      const el = document.getElementById(anchor)
+      if (!el) return
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      el.classList.remove('feature-flash')
+      void el.offsetWidth  // restart the flash if it's already playing
+      el.classList.add('feature-flash')
+    }, 60)
+  }
+  /** The tracker a feature card shows for the resources it spends. Eldritch Cannon's card has its
+   *  own "free creation" control for the same counter, so it doesn't get a second one. */
+  const featureTrackers = (anchor: string, featureName: string) => resourcesAt(anchor).filter(r => r.key !== 'eldritch-cannon').map(r => (
+    <div key={r.key} className="mt-2 flex items-center gap-2 flex-wrap">
+      {!resourceMatchesFeature({ key: '', name: r.name }, featureName) && (
+        <span className="text-xs font-semibold text-parchment-600">{r.name}</span>
+      )}
+      <span className={`text-xs rounded px-1 ${r.recharge === 'short' ? 'bg-blue-100 text-blue-600' : 'bg-amber-100 text-amber-600'}`}>
+        {r.recharge === 'short' ? 'Short rest' : 'Long rest'}
+      </span>
+      <div className="min-w-[8rem]">{resourceTracker(r)}</div>
+    </div>
+  ))
   const isMulticlassCaster = isMulticlassSpellcaster(char.classes)
   const multiclassMaxes = isMulticlassCaster ? multiclassSpellSlotsMax(char.classes) : null
   const jackOfAllTrades = hasBardJackOfAllTrades(char)
@@ -1442,42 +1661,55 @@ export default function Sheet() {
 
   return (
     <div>
-      {/* Header */}
-      <div className="flex flex-wrap items-start justify-between gap-3 mb-6">
-        <div>
+      {/* Header: back link, name and summary on the left; rests, Level Up and the file actions on the right */}
+      <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3 mb-6">
+        <div className="min-w-0 flex items-end gap-4">
+          <PortraitPicker name={char.name} portrait={char.portrait} onChange={p => patch({ portrait: p })} />
+          <div className="min-w-0">
+          <Link to="/" className="text-xs text-parchment-500 hover:text-parchment-800 px-1">← Vault</Link>
           <input
-            className="text-3xl font-bold bg-transparent border-none outline-none focus:bg-parchment-50 rounded px-1"
+            className="block text-3xl font-bold bg-transparent border-none outline-none focus:bg-parchment-50 rounded px-1"
             value={char.name}
             onChange={e => patch({ name: e.target.value })}
+            aria-label="Character name"
           />
           <p className="text-sm text-parchment-500 mt-1 px-1">
             Level {level} &bull;{' '}
             {char.classes.map(c => `${content.classes.find(cl => cl.slug === c.classSlug)?.name ?? c.classSlug} ${c.level}`).join(' / ')} &bull;{' '}
             {content.races.find(r => r.slug === char.raceSlug)?.name ?? char.raceSlug}
           </p>
+          </div>
         </div>
-        <div className="flex gap-2 flex-wrap items-center">
-          <button
-            className="btn btn-secondary text-sm"
-            onClick={() => { setShortRestDice({}); setShortRestOpen(true) }}
-          >Short Rest</button>
-          <button
-            className="btn btn-secondary text-sm"
-            onClick={() => setLongRestOpen(true)}
-          >Long Rest</button>
-          <button
-            onClick={saveToFile}
-            className={`btn text-sm font-semibold transition-all ${
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Rests, as one segmented control */}
+          <div className="inline-flex rounded border border-parchment-300 overflow-hidden" role="group" aria-label="Rest">
+            <button type="button"
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-semibold bg-parchment-200 text-dungeon-900 hover:bg-parchment-300 transition-colors"
+              onClick={() => { setShortRestDice({}); setShortRestOpen(true) }}
+            ><HourglassIcon className="w-4 h-4" />Short Rest</button>
+            <button type="button"
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-semibold bg-parchment-200 text-dungeon-900 hover:bg-parchment-300 transition-colors border-l border-parchment-300"
+              onClick={() => setLongRestOpen(true)}
+            ><MoonIcon className="w-4 h-4" />Long Rest</button>
+          </div>
+          <Link to={`/c/${char.id}/level-up`} className="btn-primary text-sm gap-1.5 px-3">
+            <LevelUpIcon className="w-4 h-4" />Level Up
+          </Link>
+          <span className="hidden sm:block w-px h-7 bg-parchment-300 mx-1" aria-hidden />
+          {/* File actions. The sheet also saves on its own; this saves this instant (⌘S / Ctrl+S). */}
+          <button type="button" onClick={saveToFile}
+            title={saveFlash === 'saved' ? 'Saved' : 'Save now (⌘S / Ctrl+S). Changes also save automatically.'}
+            aria-label={saveFlash === 'saved' ? 'Saved' : 'Save now'}
+            className={`inline-flex items-center justify-center w-9 h-9 rounded border transition-colors ${
               saveFlash === 'saved'
-                ? 'bg-green-600 text-white hover:bg-green-700 focus:ring-green-500'
-                : 'btn-primary'
+                ? 'border-green-400 bg-green-50 text-green-600'
+                : 'border-parchment-300 text-parchment-600 hover:text-parchment-900 hover:border-parchment-500 hover:bg-parchment-100'
             }`}
-          >
-            {saveFlash === 'saved' ? '✓ Saved!' : 'Save Character'}
-          </button>
-          <Link to={`/c/${char.id}/level-up`} className="btn-secondary text-sm">Level Up</Link>
-          <button onClick={() => exportCharacter(char)} className="btn-ghost text-sm" title="Download character as JSON">↓ Export</button>
-          <Link to="/" className="btn-ghost text-sm">← Vault</Link>
+          >{saveFlash === 'saved' ? <CheckIcon className="w-5 h-5" /> : <SaveIcon className="w-5 h-5" />}</button>
+          <button type="button" onClick={() => exportCharacter(char)}
+            title="Export: download this character as a .json file" aria-label="Export character as JSON"
+            className="inline-flex items-center justify-center w-9 h-9 rounded border border-parchment-300 text-parchment-600 hover:text-parchment-900 hover:border-parchment-500 hover:bg-parchment-100 transition-colors"
+          ><ExportIcon className="w-5 h-5" /></button>
         </div>
       </div>
 
@@ -1506,14 +1738,15 @@ export default function Sheet() {
           <div className="flex flex-col items-center shrink-0">
             <div className="text-xs text-parchment-400 mb-1">Temp</div>
             <div className="relative w-9 h-10">
-              <svg viewBox="0 0 56 64" className="absolute inset-0 w-full h-full text-blue-200" fill="currentColor">
+              <svg viewBox="0 0 56 64" className="absolute inset-0 w-full h-full temp-shield" fill="currentColor" aria-hidden>
                 <path d="M28 2 L54 14 L54 36 C54 50 28 62 28 62 C28 62 2 50 2 36 L2 14 Z" />
               </svg>
               <input
                 type="text"
                 inputMode="numeric"
                 pattern="[0-9]*"
-                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-sm font-bold text-blue-700 w-8 text-center bg-transparent border-none focus:outline-none"
+                aria-label="Temporary hit points"
+                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-sm font-bold temp-shield-value w-8 text-center bg-transparent border-none focus:outline-none"
                 value={char.hp.temp}
                 onChange={e => {
                   const v = parseInt(e.target.value, 10)
@@ -1557,7 +1790,7 @@ export default function Sheet() {
               className="flex-1 py-1.5 px-2 rounded text-sm font-medium transition-colors bg-red-100 text-red-700 border border-red-200 hover:bg-red-200 disabled:opacity-40 disabled:cursor-not-allowed"
               onClick={() => { applyDamage(quickN); setDamageInput('') }}
             >
-              <div>⚔ Damage</div>
+              <div>Damage</div>
               {quickAfterDamage !== null && <div className="text-xs opacity-70">→ {quickAfterDamage}</div>}
             </button>
             <button
@@ -1566,7 +1799,7 @@ export default function Sheet() {
               className="flex-1 py-1.5 px-2 rounded text-sm font-medium transition-colors bg-green-100 text-green-700 border border-green-200 hover:bg-green-200 disabled:opacity-40 disabled:cursor-not-allowed"
               onClick={() => { patch({ hp: { ...char.hp, current: Math.min(maxHp, char.hp.current + quickN) } }); setDamageInput('') }}
             >
-              <div>♥ Heal</div>
+              <div>Heal</div>
               {quickAfterHeal !== null && <div className="text-xs opacity-70">→ {quickAfterHeal}</div>}
             </button>
             <button
@@ -1576,7 +1809,7 @@ export default function Sheet() {
               title="Temporary hit points don't add together — you keep the larger amount"
               onClick={() => { patch({ hp: { ...char.hp, temp: Math.max(char.hp.temp, quickN) } }); setDamageInput('') }}
             >
-              <div>🛡 Temp</div>
+              <div>Temp</div>
               {quickValid && <div className="text-xs opacity-70">→ {Math.max(char.hp.temp, quickN)}</div>}
             </button>
           </div>
@@ -1663,13 +1896,17 @@ export default function Sheet() {
           )}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
             {trackedResources.map(r => {
-              const isPool = (r.max ?? 0) > 6  // large pools get a number input
-              const current = r.current
-              const max = r.max
               return (
                 <div key={r.key} className="group p-2 rounded border border-parchment-100 bg-parchment-50">
                   <div className="flex items-center justify-between gap-1 mb-1">
-                    <span className="text-xs font-semibold text-parchment-700 truncate">{r.name}</span>
+                    {resourceAnchor.has(r.key) ? (
+                      <button type="button" onClick={() => jumpToFeature(resourceAnchor.get(r.key)!)}
+                        title="Show this feature on the Features tab"
+                        className="text-xs font-semibold text-parchment-700 truncate text-left hover:underline decoration-dotted underline-offset-2"
+                      >{r.name}</button>
+                    ) : (
+                      <span className="text-xs font-semibold text-parchment-700 truncate">{r.name}</span>
+                    )}
                     <span className="flex items-center gap-1 shrink-0">
                       {r.isCustom && (
                         <button type="button" onClick={() => removeCustomResource(r.key, r.name)} title="Stop tracking"
@@ -1683,67 +1920,7 @@ export default function Sheet() {
                   </div>
                   {r.display && <div className="text-xs text-parchment-400 mb-1">{r.display}</div>}
 
-                  {isPool ? (
-                    // Filled gauge + controls for large pools (Ki, Sorcery Points, Lay on Hands)
-                    (() => {
-                      const cap = max ?? 9999
-                      const pct = cap > 0 ? Math.min(100, Math.round((current / cap) * 100)) : 0
-                      const setVal = (v: number) =>
-                        patch({ classResources: { ...char.classResources, [r.key]: Math.max(0, Math.min(cap, v)) } })
-                      return (
-                        <div>
-                          <div
-                            className="relative h-4 rounded-full bg-parchment-200 border border-parchment-300 overflow-hidden cursor-pointer"
-                            title="Click to set remaining"
-                            onClick={e => {
-                              const rect = e.currentTarget.getBoundingClientRect()
-                              setVal(Math.round(((e.clientX - rect.left) / rect.width) * cap))
-                            }}
-                          >
-                            <div
-                              className="absolute inset-y-0 left-0 bg-gradient-to-r from-parchment-500 to-parchment-700 transition-all duration-200"
-                              style={{ width: `${pct}%` }}
-                            />
-                          </div>
-                          <div className="flex items-center gap-1 mt-1">
-                            <button className="btn-ghost px-1 text-sm" onClick={() => setVal(current - 1)}>−</button>
-                            <input
-                              type="number" min={0} max={max ?? 9999}
-                              className="w-12 text-center text-sm font-bold bg-transparent border border-parchment-300 rounded py-0.5"
-                              value={current}
-                              onChange={e => setVal(parseInt(e.target.value, 10) || 0)}
-                            />
-                            <span className="text-xs text-parchment-400">/ {max ?? '∞'}</span>
-                            <button className="btn-ghost px-1 text-sm" onClick={() => setVal(current + 1)}>+</button>
-                          </div>
-                        </div>
-                      )
-                    })()
-                  ) : max === null ? (
-                    // Unlimited (Barbarian L20 rage)
-                    <div className="text-sm font-bold text-green-600">Unlimited</div>
-                  ) : (
-                    // Pip display for small counts (1–6)
-                    <div className="flex gap-1 flex-wrap">
-                      {Array.from({ length: max }).map((_, i) => (
-                        <button
-                          key={i}
-                          onClick={() => {
-                            // Click pip to toggle — clicking a used pip restores it, clicking available uses it
-                            const newVal = i < current ? i : i + 1
-                            patch({ classResources: { ...char.classResources, [r.key]: Math.min(max, newVal) } })
-                          }}
-                          className={`w-5 h-5 rounded-full border-2 transition-colors ${
-                            i < current
-                              ? 'bg-[rgb(var(--accent))] border-[rgb(var(--accent))]'
-                              : 'border-parchment-300 hover:border-parchment-500'
-                          }`}
-                          title={i < current ? 'Click to use' : 'Click to restore'}
-                        />
-                      ))}
-                      <span className="text-xs text-parchment-400 ml-1 self-center">{current}/{max}</span>
-                    </div>
-                  )}
+                  {resourceTracker(r)}
                 </div>
               )
             })}
@@ -1954,10 +2131,18 @@ export default function Sheet() {
             {/* Col 1: Ability Scores + Saving Throws */}
             <div className="space-y-4">
               <div className="card p-4">
-                <h2 className="section-header">Ability Scores</h2>
+                <div className="flex items-center gap-2 mb-2">
+                  <h2 className="section-header mb-0 flex-1">Ability Scores</h2>
+                  {abilitiesChanged.length > 0 && (
+                    <button type="button" onClick={resetAllAbilities}
+                      title={`Changed by hand: ${abilitiesChanged.map(a => ABILITY_LABELS[a]).join(', ')}. Click to restore them.`}
+                      className="text-xs rounded-full px-2.5 py-0.5 border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors shrink-0"
+                    >↺ Reset {abilitiesChanged.length} changed</button>
+                  )}
+                </div>
                 <div className="grid grid-cols-3 gap-2">
                   {ABILITIES.map(a => (
-                    <div key={a} className="stat-box">
+                    <div key={a} className="stat-box relative">
                       <div className="text-xs text-parchment-500 uppercase">{ABILITY_LABELS[a]}</div>
                       <input
                         type="number"
@@ -1978,13 +2163,28 @@ export default function Sheet() {
                           >★{effectiveChar.abilityScores[a]}</span>
                         )}
                       </div>
+                      {/* In the corner, so a changed box keeps the same layout as the others */}
+                      {abilitiesChanged.includes(a) && (
+                        <button type="button" onClick={() => patch({ abilityScores: { ...char.abilityScores, [a]: abilityBase[a] } })}
+                          title={`Changed by hand (was ${abilityBase[a]}). Click to reset.`}
+                          className="absolute top-1 right-1.5 text-[11px] font-semibold text-amber-700 hover:text-amber-900"
+                        >↺ {abilityBase[a]}</button>
+                      )}
                     </div>
                   ))}
                 </div>
               </div>
 
               <div className="card p-4">
-                <h2 className="section-header">Saving Throws</h2>
+                <div className="flex items-center gap-2 mb-2">
+                  <h2 className="section-header mb-0 flex-1">Saving Throws</h2>
+                  {savesChanged.length > 0 && (
+                    <button type="button" onClick={resetAllSaves}
+                      title={`Changed by hand: ${savesChanged.map(a => ABILITY_FULL[a]).join(', ')}. Click to restore them.`}
+                      className="text-xs rounded-full px-2.5 py-0.5 border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors shrink-0"
+                    >↺ Reset {savesChanged.length} changed</button>
+                  )}
+                </div>
                 <div className="space-y-1.5">
                   {ABILITIES.map(a => (
                     <div key={a} className="flex items-center gap-2 text-sm">
@@ -1999,6 +2199,12 @@ export default function Sheet() {
                       />
                       <span className="w-10 font-mono text-right text-parchment-700">{formatMod(saveMod(effectiveChar, a) + itemBonuses.savingThrowBonus + paladinAura)}</span>
                       <span className="flex-1">{ABILITY_FULL[a]}</span>
+                      {savesChanged.includes(a) && (
+                        <button type="button" onClick={() => resetSave(a)}
+                          title={`Changed by hand. Originally ${saveBase.has(a) ? 'proficient' : 'not proficient'}. Click to reset.`}
+                          className="text-[11px] font-semibold text-amber-700 hover:text-amber-900 shrink-0"
+                        >↺ reset</button>
+                      )}
                       {paladinAura > 0 && <span className="text-xs bg-yellow-100 text-yellow-700 rounded px-1.5 py-0.5">+{paladinAura} Aura</span>}
                       {a === 'con' && featBonuses.concentrationAdvantage && (
                         <span className="text-xs bg-amber-100 text-amber-700 rounded px-1.5 py-0.5">War Caster</span>
@@ -2241,37 +2447,8 @@ export default function Sheet() {
             <div className="space-y-4">
               <div className="card p-4">
                 <h2 className="section-header">Status</h2>
-                {/* Inspiration token — a glowing gold coin while held */}
-                <button type="button" onClick={() => patch({ inspiration: !char.inspiration })}
-                  aria-pressed={char.inspiration}
-                  title={char.inspiration ? 'Spend Inspiration' : 'Gain Inspiration'}
-                  className={`w-full flex items-center gap-3 rounded-lg border-2 px-3 py-2.5 mb-4 text-left transition-colors ${
-                    char.inspiration ? 'border-amber-300 bg-amber-50' : 'border-dashed border-parchment-300 hover:border-amber-300 hover:bg-parchment-50'
-                  }`}>
-                  <span className="relative w-11 h-11 shrink-0 flex items-center justify-center">
-                    {char.inspiration && (
-                      <span className="inspire-rays absolute inset-0 rounded-full"
-                        style={{ background: 'repeating-conic-gradient(rgba(245,158,11,0.3) 0deg 10deg, transparent 10deg 30deg)' }} />
-                    )}
-                    <span key={String(char.inspiration)}
-                      className={`relative w-9 h-9 rounded-full flex items-center justify-center text-lg ${
-                        char.inspiration
-                          ? 'inspire-token-active bg-gradient-to-br from-amber-200 via-amber-400 to-amber-600 text-white'
-                          : 'bg-parchment-100 border border-parchment-300 text-parchment-300'
-                      }`}>✦</span>
-                  </span>
-                  <span className="flex-1 min-w-0">
-                    <span className={`block text-sm font-bold ${char.inspiration ? 'text-amber-700' : 'text-parchment-600'}`}>
-                      {char.inspiration ? 'Inspired!' : 'Inspiration'}
-                    </span>
-                    <span className="block text-[11px] text-parchment-500 leading-snug">
-                      {char.inspiration ? 'Spend it for advantage on one attack, save or check.' : 'Not held. Click when your DM awards it.'}
-                    </span>
-                  </span>
-                  {char.inspiration && (
-                    <span className="text-[10px] font-semibold uppercase tracking-wide text-amber-700 border border-amber-300 rounded-full px-2 py-0.5 shrink-0">Spend</span>
-                  )}
-                </button>
+                {/* Inspiration: click to gain it; press and hold the glowing gem to spend it */}
+                <InspirationToken held={char.inspiration} onChange={v => patch({ inspiration: v })} />
                 <div className="text-xs font-semibold text-parchment-600 uppercase tracking-wide mb-1.5">Exhaustion</div>
                 <div className="flex gap-1 mb-1">
                   {[1,2,3,4,5,6].map(lvl => (
@@ -2380,7 +2557,7 @@ export default function Sheet() {
                   {char.equipment.filter(e => e.equipped).map((item, idx) => {
                     const ws = resolveWeapon(item, content.items)
                     if (!ws) return null
-                    const bonus = magicBonus(item.name)
+                    const bonus = magicBonus(item, artificerLevel)
                     const proficient = isWeaponProficient(char, item)
                     const effectivePb = proficient ? pb : 0
                     const styles = fightingStyles(char)
@@ -2466,34 +2643,145 @@ export default function Sheet() {
             </div>
           </div>
 
-          {/* Proficiencies — full width */}
-          <div className="card">
-            <h2 className="section-header">All Proficiencies</h2>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
-              <div>
-                <div className="font-semibold text-parchment-700 mb-1">Armor</div>
-                {char.armorProficiencies.length > 0
-                  ? <div className="flex flex-wrap gap-1">{char.armorProficiencies.map(p => <span key={p} className="bg-blue-100 text-blue-700 rounded px-2 py-0.5 text-xs capitalize">{p}</span>)}</div>
-                  : <span className="text-parchment-400 text-xs">None</span>}
-              </div>
-              <div>
-                <div className="font-semibold text-parchment-700 mb-1">Weapons</div>
-                {char.weaponProficiencies.length > 0
-                  ? <div className="flex flex-wrap gap-1">{char.weaponProficiencies.map(p => <span key={p} className="bg-green-100 text-green-700 rounded px-2 py-0.5 text-xs capitalize">{p}</span>)}</div>
-                  : <span className="text-parchment-400 text-xs">None</span>}
-              </div>
-              <div>
-                <div className="font-semibold text-parchment-700 mb-1">Tools</div>
-                {char.toolProficiencies.length > 0
-                  ? <div className="flex flex-wrap gap-1">{char.toolProficiencies.map(p => <span key={p} className="bg-parchment-100 text-parchment-700 rounded px-2 py-0.5 text-xs capitalize">{p}</span>)}</div>
-                  : <span className="text-parchment-400 text-xs">None recorded</span>}
-              </div>
-              <div>
-                <div className="font-semibold text-parchment-700 mb-1">Languages</div>
-                {char.languages.length > 0
-                  ? <div className="flex flex-wrap gap-1">{char.languages.map(l => {
+          {/* Proficiencies — full width. Each shows where it comes from; Edit adds and removes them, and
+              "Your gear" shows whether you're proficient with what you carry. */}
+          {(() => {
+            const sources = proficiencySources(char, content, featSlugs)
+            // A free pick ("one language of your choice") isn't recorded against its source, so unlisted ones may be either
+            const fromText = (from: string[] | undefined) => from?.length ? `From ${from.join(', ')}` : 'Chosen or added by hand'
+            const chip = (label: string, title: string, tone: string, onRemove?: () => void) => (
+              <span key={label} title={title} className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs capitalize ${tone}`}>
+                {label}
+                {profEditing && onRemove && (
+                  <button type="button" onClick={onRemove} aria-label={`Remove ${label}`} className="opacity-50 hover:opacity-100 hover:text-red-600 leading-none">✕</button>
+                )}
+              </span>
+            )
+
+            // Armor: four kinds. Feat armor is always on (remove the feat to lose it).
+            const storedArmor = armorKindsOf(char.armorProficiencies)
+            const toggleArmor = (k: ArmorKind) => {
+              const next = new Set(storedArmor)
+              if (next.has(k)) next.delete(k); else next.add(k)
+              patch({ armorProficiencies: ARMOR_KINDS.filter(a => next.has(a.key)).map(a => a.key) })
+            }
+            // Weapons: Simple / Martial, plus named weapons stored by name ("Longsword", "Pistol")
+            const weaponKeys = new Set(char.weaponProficiencies.map(profKey))
+            const addWeapon = (name: string) => {
+              if (!weaponKeys.has(profKey(name))) patch({ weaponProficiencies: [...char.weaponProficiencies, name] })
+            }
+            const toggleCategory = (cat: 'simple' | 'martial') => weaponKeys.has(cat)
+              ? patch({ weaponProficiencies: char.weaponProficiencies.filter(w => profKey(w) !== cat) })
+              : addWeapon(cat)
+            const namedWeapons = char.weaponProficiencies.filter(w => !['simple', 'martial'].includes(profKey(w)))
+            const weaponOptions = [...new Map(content.items
+              .filter(i => i.weaponStats && i.weaponStats.damage !== '—' && (!i.rarity || i.rarity.toLowerCase() === 'common'))
+              .map(i => [profKey(i.weaponStats!.label ?? i.name ?? i.slug), { name: i.weaponStats!.label ?? i.name ?? i.slug, simple: SIMPLE_WEAPON_SLUGS.has(i.slug) }])).values()]
+              .filter(w => !weaponKeys.has(profKey(w.name)))
+              .sort((a, b) => a.name.localeCompare(b.name))
+            // Tools and languages
+            const toolKeys = new Set(char.toolProficiencies.map(profKey))
+            const addTool = (name: string) => { if (name && !toolKeys.has(profKey(name))) patch({ toolProficiencies: [...char.toolProficiencies, name] }) }
+            const langKeys = new Set(char.languages.map(profKey))
+            const addLanguage = (name: string) => { if (name && !langKeys.has(profKey(name))) patch({ languages: [...char.languages, name] }) }
+
+            // Your gear: is the character proficient with what it carries?
+            const gearWeapons = char.equipment.flatMap(e => {
+              const ws = resolveWeapon(e, content.items)
+              return ws ? [{ e, base: ws.label ?? e.name, ok: isWeaponProficient(char, e) }] : []
+            })
+            const gearArmor = char.equipment.flatMap(e => {
+              const as_ = resolveArmor(e, content.items)
+              return as_ ? [{ e, kind: (as_.type === 'shield' ? 'shields' : as_.type) as ArmorKind, ok: isArmorProficient(char, as_, featArmor) }] : []
+            })
+            const gearTools = char.equipment.filter(e => isToolItem(e.name)).map(e => ({ e, ok: toolKeys.has(profKey(e.name)) }))
+            const gear = [
+              ...gearWeapons.map(g => ({ key: `w${g.e.name}`, name: g.e.name, ok: g.ok, add: () => addWeapon(g.base), what: `${g.base} proficiency` })),
+              ...gearArmor.map(g => ({ key: `a${g.e.name}`, name: g.e.name, ok: g.ok, add: () => toggleArmor(g.kind), what: `${g.kind === 'shields' ? 'shield' : g.kind + ' armor'} proficiency` })),
+              ...gearTools.map(g => ({ key: `t${g.e.name}`, name: g.e.name, ok: g.ok, add: () => addTool(g.e.name), what: `${g.e.name} proficiency` })),
+            ]
+
+            return (
+              <div className="card">
+                <div className="flex items-center gap-2 mb-3">
+                  <h2 className="section-header mb-0 flex-1">All Proficiencies</h2>
+                  <button type="button" onClick={() => setProfEditing(v => !v)}
+                    className={`text-xs rounded-full px-2.5 py-0.5 border transition-colors ${profEditing ? 'bg-parchment-700 text-white border-parchment-700' : 'border-parchment-200 text-parchment-500 hover:border-parchment-500 hover:text-parchment-800'}`}
+                  >{profEditing ? 'Done' : '✎ Edit'}</button>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+                  <div>
+                    <div className="font-semibold text-parchment-700 mb-1">Armor</div>
+                    <div className="flex flex-wrap gap-1">
+                      {profEditing
+                        ? ARMOR_KINDS.map(a => {
+                            const viaFeat = featArmor.get(a.key)
+                            const on = storedArmor.has(a.key) || !!viaFeat
+                            return (
+                              <button key={a.key} type="button" aria-pressed={on} disabled={!!viaFeat}
+                                onClick={() => toggleArmor(a.key)} title={viaFeat ? `From ${viaFeat}` : fromText(sources.armor.get(a.key))}
+                                className={`rounded px-2 py-0.5 text-xs border transition-colors ${on ? 'bg-blue-100 text-blue-700 border-blue-200 font-semibold' : 'border-dashed border-parchment-300 text-parchment-400 hover:border-blue-300 hover:text-blue-700'} disabled:cursor-not-allowed`}
+                              >{a.label}{viaFeat ? ' 🔒' : ''}</button>
+                            )
+                          })
+                        : ARMOR_KINDS.filter(a => storedArmor.has(a.key) || featArmor.has(a.key)).map(a =>
+                            chip(a.label, featArmor.get(a.key) ? `From ${featArmor.get(a.key)}` : fromText(sources.armor.get(a.key)), 'bg-blue-100 text-blue-700'))}
+                      {!profEditing && storedArmor.size === 0 && featArmor.size === 0 && <span className="text-parchment-400 text-xs">None</span>}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="font-semibold text-parchment-700 mb-1">Weapons</div>
+                    <div className="flex flex-wrap gap-1">
+                      {profEditing
+                        ? (['simple', 'martial'] as const).map(cat => (
+                            <button key={cat} type="button" aria-pressed={weaponKeys.has(cat)} onClick={() => toggleCategory(cat)} title={fromText(sources.weapons.get(cat))}
+                              className={`rounded px-2 py-0.5 text-xs border capitalize transition-colors ${weaponKeys.has(cat) ? 'bg-green-100 text-green-700 border-green-200 font-semibold' : 'border-dashed border-parchment-300 text-parchment-400 hover:border-green-300 hover:text-green-700'}`}
+                            >{cat}</button>
+                          ))
+                        : (['simple', 'martial'] as const).filter(cat => weaponKeys.has(cat)).map(cat => chip(cat, fromText(sources.weapons.get(cat)), 'bg-green-100 text-green-700'))}
+                      {namedWeapons.map(w => chip(w, fromText(sources.weapons.get(profKey(w))), 'bg-green-100 text-green-700',
+                        () => patch({ weaponProficiencies: char.weaponProficiencies.filter(x => x !== w) })))}
+                      {!profEditing && char.weaponProficiencies.length === 0 && <span className="text-parchment-400 text-xs">None</span>}
+                    </div>
+                    {profEditing && (
+                      <select className="input text-xs py-1 mt-1.5" value="" aria-label="Add a weapon proficiency"
+                        onChange={e => { if (e.target.value) addWeapon(e.target.value) }}>
+                        <option value="">+ Add a weapon…</option>
+                        <optgroup label="Simple">{weaponOptions.filter(w => w.simple).map(w => <option key={w.name} value={w.name}>{w.name}</option>)}</optgroup>
+                        <optgroup label="Martial & other">{weaponOptions.filter(w => !w.simple).map(w => <option key={w.name} value={w.name}>{w.name}</option>)}</optgroup>
+                      </select>
+                    )}
+                  </div>
+                  <div>
+                    <div className="font-semibold text-parchment-700 mb-1">Tools</div>
+                    <div className="flex flex-wrap gap-1">
+                      {char.toolProficiencies.map(t => chip(t, fromText(sources.tools.get(profKey(t))), 'bg-parchment-100 text-parchment-700',
+                        () => patch({ toolProficiencies: char.toolProficiencies.filter(x => x !== t) })))}
+                      {!profEditing && char.toolProficiencies.length === 0 && <span className="text-parchment-400 text-xs">None recorded</span>}
+                    </div>
+                    {profEditing && (
+                      <div className="mt-1.5 space-y-1">
+                        <select className="input text-xs py-1" value="" aria-label="Add a tool proficiency" onChange={e => addTool(e.target.value)}>
+                          <option value="">+ Add a tool…</option>
+                          {([["Artisan's tools", ARTISAN_TOOLS], ['Instruments', MUSICAL_INSTRUMENTS], ['Gaming sets', GAMING_SETS], ['Other tools', OTHER_TOOLS]] as const).map(([group, list]) => (
+                            <optgroup key={group} label={group}>
+                              {list.filter(t => !toolKeys.has(profKey(t))).map(t => <option key={t} value={t}>{t}</option>)}
+                            </optgroup>
+                          ))}
+                        </select>
+                        <input className="input text-xs py-1" placeholder="Other… (press Enter)" value={newToolText}
+                          onChange={e => setNewToolText(e.target.value)}
+                          onKeyDown={e => { if (e.key === 'Enter') { addTool(newToolText.trim()); setNewToolText('') } }} />
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <div className="font-semibold text-parchment-700 mb-1">Languages</div>
+                    {char.languages.length > 0
+                      ? <div className="flex flex-wrap gap-1">{char.languages.map(l => {
                       const picks = languageChoiceCount(l)
-                      if (!picks) return <span key={l} className="bg-parchment-100 text-parchment-700 rounded px-2 py-0.5 text-xs capitalize">{l}</span>
+                      if (!picks) return chip(l, fromText(sources.languages.get(profKey(l))), 'bg-parchment-100 text-parchment-700',
+                        () => patch({ languages: char.languages.filter(x => x !== l) }))
                       // "one language of your choice" left over from creation — ask for it here
                       const known = new Set(char.languages)
                       return (
@@ -2509,9 +2797,39 @@ export default function Sheet() {
                         </select>
                       )
                     })}</div>
-                  : <span className="text-parchment-400 text-xs">None recorded</span>}
-              </div>
-            </div>
+                      : <span className="text-parchment-400 text-xs">None recorded</span>}
+                    {profEditing && (
+                      <div className="mt-1.5 space-y-1">
+                        <select className="input text-xs py-1" value="" aria-label="Add a language" onChange={e => addLanguage(e.target.value)}>
+                          <option value="">+ Add a language…</option>
+                          <optgroup label="Standard">{LANGUAGES_STANDARD.filter(x => !langKeys.has(profKey(x))).map(x => <option key={x}>{x}</option>)}</optgroup>
+                          <optgroup label="Exotic">{LANGUAGES_EXOTIC.filter(x => !langKeys.has(profKey(x))).map(x => <option key={x}>{x}</option>)}</optgroup>
+                        </select>
+                        <input className="input text-xs py-1" placeholder="Other… (press Enter)" value={newLangText}
+                          onChange={e => setNewLangText(e.target.value)}
+                          onKeyDown={e => { if (e.key === 'Enter') { addLanguage(newLangText.trim()); setNewLangText('') } }} />
+                      </div>
+                    )}
+                  </div>
+                </div>
+                {gear.length > 0 && (
+                  <div className="mt-4 pt-3 border-t border-parchment-100">
+                    <div className="font-semibold text-parchment-700 mb-2 text-sm">Your gear</div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {gear.map(g => (
+                        <span key={g.key}
+                          className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs border ${g.ok ? 'bg-green-50 text-green-700 border-green-200' : 'bg-amber-50 text-amber-800 border-amber-300'}`}
+                          title={g.ok ? 'Proficient' : 'Not proficient: no proficiency bonus with this'}>
+                          {g.ok ? '✓' : '⚠'} {g.name}
+                          {!g.ok && (
+                            <button type="button" onClick={g.add} title={`Add ${g.what}`} aria-label={`Add ${g.what}`}
+                              className="ml-0.5 font-bold hover:text-green-700">+</button>
+                          )}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
             <div className="mt-4 pt-3 border-t border-parchment-100">
               <div className="font-semibold text-parchment-700 mb-2 text-sm">Saving Throw Proficiencies</div>
               <div className="flex flex-wrap gap-1">
@@ -2527,27 +2845,9 @@ export default function Sheet() {
                 })}
               </div>
             </div>
-            <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <div>
-                <label className="label text-xs">Add tool proficiency</label>
-                <input id="tool-add" className="input text-xs py-1" placeholder="e.g. Thieves' tools" onKeyDown={e => {
-                  if (e.key === 'Enter') {
-                    const val = (e.target as HTMLInputElement).value.trim()
-                    if (val) { patch({ toolProficiencies: [...new Set([...char.toolProficiencies, val])] });(e.target as HTMLInputElement).value = '' }
-                  }
-                }} />
               </div>
-              <div>
-                <label className="label text-xs">Add language</label>
-                <input className="input text-xs py-1" placeholder="e.g. Elvish" onKeyDown={e => {
-                  if (e.key === 'Enter') {
-                    const val = (e.target as HTMLInputElement).value.trim()
-                    if (val) { patch({ languages: [...new Set([...char.languages, val])] });(e.target as HTMLInputElement).value = '' }
-                  }
-                }} />
-              </div>
-            </div>
-          </div>
+            )
+          })()}
         </div>
       )}
 
@@ -2574,12 +2874,13 @@ export default function Sheet() {
             // free once-a-day spells like Mystic Arcanum are extra)
             const preparedCount = char.spells.filter(s => {
               const def = content.spells.find(d => d.slug === s.spellSlug)
-              return s.prepared && s.classSlug === primarySlug && (def?.level ?? 0) > 0 && !s.freeUseKey
+              return s.prepared && s.classSlug === primarySlug && (def?.level ?? 0) > 0 && !s.freeUseKey && !s.grantedBy
             }).length
             const cantripMax = cantripsKnownAt(progression, classLevel)
+            // A feat's or race's cantrip (Magic Initiate, High Elf) is extra, even when tagged with this class
             const cantripCount = char.spells.filter(s => {
               const def = content.spells.find(d => d.slug === s.spellSlug)
-              return s.classSlug === primarySlug && (def?.level ?? 0) === 0
+              return s.classSlug === primarySlug && (def?.level ?? 0) === 0 && !s.grantedBy
             }).length
             const atCantripCap = cantripMax > 0 && cantripCount >= cantripMax
             // Eldritch Knights and Arcane Tricksters learn from the wizard list
@@ -2609,7 +2910,7 @@ export default function Sheet() {
             const knownMax = !isPrepared ? progression?.spellsKnownTable?.[classLevel - 1] : undefined
             const knownCount = char.spells.filter(s => {
               const def = content.spells.find(d => d.slug === s.spellSlug)
-              return s.classSlug === primarySlug && (def?.level ?? 0) > 0 && !s.freeUseKey
+              return s.classSlug === primarySlug && (def?.level ?? 0) > 0 && !s.freeUseKey && !s.grantedBy
             }).length
             const atKnownCap = !!knownMax && knownCount >= knownMax
             const ordinals = ['Cantrips','1st','2nd','3rd','4th','5th','6th','7th','8th','9th']
@@ -2789,7 +3090,7 @@ export default function Sheet() {
                                   >
                                     <div className={`w-3.5 h-3.5 rotate-45 border ${
                                       available
-                                        ? 'bg-violet-500 border-violet-300'
+                                        ? 'spell-gem'
                                         : 'bg-parchment-200 border-parchment-300 opacity-40 transition-all duration-150 group-hover:scale-125'
                                     }`}
                                       style={available ? {
@@ -3145,8 +3446,17 @@ export default function Sheet() {
                                               </>
                                             )
                                           })()}
-                                          {!isCantrip && (
-                                            isSpellbookCaster ? (
+                                          {/* A feat's, race's or Strixhaven's spell is always prepared, and only its source can
+                                              add it back, so it gets no Unprepare. Mystic Arcanum and imported spells can be removed. */}
+                                          {!isCantrip && s.grantedBy && (
+                                            <span className="text-xs italic text-parchment-400">
+                                              Always prepared · {s.grantedBy.startsWith('feat:')
+                                                ? content.feats.find(f => f.slug === s.grantedBy!.slice(5))?.name ?? 'a feat'
+                                                : s.grantedBy === 'strixhaven' ? 'Strixhaven Initiate' : 'High Elf'}
+                                            </span>
+                                          )}
+                                          {!isCantrip && !s.grantedBy && (
+                                            isSpellbookCaster && !s.freeUseKey ? (
                                               <button type="button"
                                                 className="px-3 py-1.5 rounded border text-xs text-parchment-400 hover:text-amber-600 border-parchment-200 hover:border-amber-300 transition-colors"
                                                 onClick={() => patch({ spells: char.spells.map(sp => sp.spellSlug === s.spellSlug ? { ...sp, prepared: false } : sp) })}
@@ -3155,7 +3465,7 @@ export default function Sheet() {
                                               <button type="button"
                                                 className="px-3 py-1.5 rounded border text-xs text-parchment-400 hover:text-red-500 border-parchment-200 hover:border-red-300 transition-colors"
                                                 onClick={() => patch({ spells: char.spells.filter(sp => sp.spellSlug !== s.spellSlug) })}
-                                              >{isPrepared ? 'Unprepare' : 'Remove'}</button>
+                                              >{isPrepared && !s.freeUseKey ? 'Unprepare' : 'Remove'}</button>
                                             )
                                           )}
                                         </div>
@@ -3232,7 +3542,7 @@ export default function Sheet() {
                               className="w-5 h-5 flex items-center justify-center group"
                             >
                               <div className={`w-3.5 h-3.5 rotate-45 border-2 ${
-                                available ? 'bg-violet-500 border-violet-300' : 'bg-parchment-200 border-parchment-300 opacity-40 transition-all duration-150 group-hover:scale-125'
+                                available ? 'spell-gem' : 'bg-parchment-200 border-parchment-300 opacity-40 transition-all duration-150 group-hover:scale-125'
                               }`} style={available ? {
                                 animation: 'pip-pulse 2.4s ease-in-out infinite',
                                 animationDelay: `${i * 0.18}s`,
@@ -3631,9 +3941,11 @@ export default function Sheet() {
                 {/* Balance — gold leaf, odometer digits; floating +/- labels */}
                 <div className="relative flex flex-col items-center py-2">
                   <div className="flex items-baseline gap-2">
-                    <span className="text-5xl font-bold"><RollingNumber value={purse.gp} digitClassName="gold-leaf" /></span>
-                    {/* leading-none: the gold-leaf gradient repeats every 1em, so the box must be 1em tall */}
-                    <span className="text-xl font-bold leading-none gold-leaf">gp</span>
+                    <span className="text-5xl font-bold"><RollingNumber value={purse.gp} digitClassName="gold-leaf gold-shimmer" /></span>
+                    {/* leading-none: the gold-leaf gradient repeats every 1em, so the box must be 1em tall.
+                        --i places "gp" after the digits in the shimmer's sweep. */}
+                    <span className="text-xl font-bold leading-none gold-leaf gold-shimmer"
+                      style={{ '--i': purse.gp.toLocaleString().length } as React.CSSProperties}>gp</span>
                   </div>
                   <div className="text-xs italic text-parchment-500 h-4">{change ? `and ${change}` : ''}</div>
                   {purseFloats.map(f => (
@@ -3752,6 +4064,8 @@ export default function Sheet() {
               )
             })()}
 
+            {/* Right column: Attunement, then an artificer's Infusions */}
+            <div className="space-y-3">
             {/* Attunement */}
             <div className="card p-3">
               <div className="text-xs font-bold text-parchment-500 uppercase tracking-wider mb-2">Attunement</div>
@@ -3759,7 +4073,8 @@ export default function Sheet() {
                 <span className={`text-2xl font-bold ${attuned >= 3 ? 'text-red-600' : 'text-parchment-800'}`}>{attuned}</span>
                 <span className="text-parchment-300 text-lg">/</span>
                 <span className="text-2xl font-semibold text-parchment-400">3</span>
-                <div className="flex gap-1.5 ml-2">
+                {/* Rotated, the diamonds are wider than their boxes: gap-3 keeps the tips apart */}
+                <div className="flex gap-3 ml-3">
                   {[0,1,2].map(i => {
                     const filled = i < attuned
                     const full = attuned >= 3
@@ -3768,8 +4083,8 @@ export default function Sheet() {
                         key={i}
                         className={`w-4 h-4 rotate-45 border-2 ${
                           filled
-                            ? full ? 'bg-red-500 border-red-400' : 'bg-indigo-500 border-indigo-400'
-                            : 'border-parchment-300 bg-transparent'
+                            ? full ? 'attune-gem-full' : 'attune-gem'
+                            : 'bg-parchment-200 border-parchment-300 opacity-40'
                         }`}
                         style={filled ? {
                           animation: `${full ? 'attune-full' : 'attune-pulse'} 3.5s ease-in-out infinite`,
@@ -3795,6 +4110,222 @@ export default function Sheet() {
               })()}
               {attuned >= 3 && <p className="text-xs text-red-500 mt-1">Maximum reached</p>}
             </div>
+
+            {/* Infusions (Artificer). Each known infusion goes in one of your items, makes the Homunculus
+                Servant, or makes a replicated magic item; all of them count against the infused-item limit. */}
+            {artificerLevel >= 2 && (() => {
+              const artOpts = CLASS_OPTIONS.artificer
+              const maxActive = artOpts.infusionsActiveAtLevel?.[artificerLevel - 1] ?? 0
+              const knownMax = artOpts.infusionsKnownAtLevel?.[artificerLevel - 1] ?? 0
+              const knownFC = char.featuresChosen.find(fc => fc.key === 'infusions')?.value
+              const known = (Array.isArray(knownFC) ? knownFC : knownFC ? [knownFC] : [])
+                .map(slug => findInfusion(slug))
+                .filter((i): i is NonNullable<typeof i> => !!i)
+              const homunculi = char.summons.filter(sm => sm.templateKey === 'homunculus-servant')
+              const active = char.equipment.filter(e => e.infusion).length + homunculi.length
+              const atMax = active >= maxActive
+              const limitTitle = atMax ? `All ${maxActive} infusions are in use. End one first.` : undefined
+              // Only nonmagical items take an infusion
+              const isMagic = (e: typeof char.equipment[number]) => {
+                if (/\+\d\b/.test(e.name)) return true
+                const def = content.items.find(i => i.slug === e.itemSlug)
+                if (!def?.rarity) return false
+                // A homebrew mundane weapon or armor (a Pistol) can still carry a "Common" rarity
+                return !(def.rarity.toLowerCase() === 'common' && (def.weaponStats || def.armorStats))
+              }
+              // Whether an item is the kind an infusion goes on ("A suit of armor", "A simple or martial weapon", …)
+              const fits = (e: typeof char.equipment[number], type = '') => {
+                const t = type.toLowerCase(), n = e.name.toLowerCase()
+                const ws = resolveWeapon(e, content.items), as_ = resolveArmor(e, content.items)
+                if (t.includes('ammunition')) return !!ws?.ranged
+                if (t.includes('thrown')) return !!ws && !ws.ranged
+                if (t.includes('weapon')) return !!ws
+                if (t.includes('armor or a shield')) return !!as_
+                if (t.includes('armor or robes')) return (!!as_ && as_.type !== 'shield') || /\brobes?\b/.test(n)
+                if (t.includes('suit of armor')) return !!as_ && as_.type !== 'shield'
+                if (t.includes('shield')) return as_?.type === 'shield'
+                if (t.includes('rod, staff, or wand')) return /\b(rod|staff|quarterstaff|wand)\b/.test(n)
+                if (t.includes('ring')) return /\bring\b/.test(n)
+                if (t.includes('helmet')) return /\b(helm|helmet|hat|cap|circlet)\b/.test(n)
+                if (t.includes('boots')) return /\bboots\b/.test(n)
+                return true
+              }
+              const holderIndex = (slug: string) => char.equipment.findIndex(e => findInfusion(e.infusion)?.slug === slug)
+              const infuse = (idx: number, inf: typeof known[number], choice?: string) => patch({
+                equipment: char.equipment.map((e, i) => i !== idx ? e : {
+                  ...e,
+                  infusion: choice ? `${inf.slug}@${choice}` : inf.slug,
+                  ...(inf.charges ? { charges: inf.charges, chargesMax: inf.charges, rechargesOnLongRest: true } : {}),
+                }),
+              })
+              const endInfusion = (idx: number, inf: typeof known[number]) => {
+                // A replica was made by the infusion, so it goes with it
+                if (inf.kind === 'replicate') { patch({ equipment: char.equipment.filter((_, i) => i !== idx) }); return }
+                patch({
+                  equipment: char.equipment.map((e, i) => {
+                    if (i !== idx) return e
+                    // Ending an infusion ends the attunement and charges it brought (a magic item keeps its own)
+                    const ownAttunement = !!content.items.find(d => d.slug === e.itemSlug)?.attunement
+                    return {
+                      ...e, infusion: undefined, attuned: ownAttunement ? e.attuned : false,
+                      ...(inf.charges ? { charges: undefined, chargesMax: undefined, rechargesOnLongRest: undefined } : {}),
+                    }
+                  }),
+                })
+              }
+              const makeReplica = (inf: typeof known[number]) => {
+                const def = content.items.find(i => i.slug === inf.replicates)
+                patch({ equipment: [...char.equipment, {
+                  itemSlug: inf.replicates!, name: def?.name ?? inf.name.replace('Replicate: ', ''), quantity: 1,
+                  equipped: false, attuned: false, isHomebrew: false, notes: '', infusion: inf.slug,
+                }] })
+              }
+              // Homunculus Servant (TCoE p.21): Tiny construct, HP 1 + INT mod + artificer level
+              const makeHomunculus = () => {
+                const hp = 1 + abilityModFor(effectiveChar, 'int') + artificerLevel
+                const homunculus: Summon = {
+                  id: Math.random().toString(36).slice(2, 10), name: 'Homunculus Servant', templateKey: 'homunculus-servant',
+                  hp: { current: hp, max: hp }, ac: 13, speed: 20,
+                  saveProficiencies: ['dex'], immunities: ['poison'], resistances: [],
+                  attacks: [{ name: 'Force Strike', toHit: spellAttackBonus(effectiveChar, 'artificer', content) + itemBonuses.spellAttackBonus,
+                    damage: `1d4+${pb}`, damageType: 'force', range: '30 ft', notes: 'Ranged weapon attack, one target it can see' }],
+                  abilities: [
+                    { name: 'Flight', description: 'Fly speed 30 ft.' },
+                    { name: 'Evasion', description: 'On a DEX save for half damage it takes none on a success and half on a failure.' },
+                    { name: 'Channel Magic', description: 'Reaction: deliver a spell you cast with a range of touch, while it is within 120 ft of you.' },
+                  ],
+                  notes: 'Immune to poison damage and to the exhausted and poisoned conditions. Darkvision 60 ft. Acts on your initiative; it takes the Dodge action unless you use a bonus action to command it.',
+                }
+                patch({ summons: [...char.summons, homunculus] })
+              }
+              const attuneToggle = (idx: number) => {
+                const item = char.equipment[idx]
+                return (
+                  <button type="button" disabled={!item.attuned && attuned >= 3}
+                    onClick={() => { const eq = [...char.equipment]; eq[idx] = { ...item, attuned: !item.attuned }; patch({ equipment: eq }) }}
+                    title={!item.attuned && attuned >= 3 ? 'All three attunement slots are in use' : undefined}
+                    className={`px-2 py-0.5 rounded border text-[11px] font-semibold transition-colors disabled:opacity-40 ${item.attuned ? 'bg-indigo-600 text-white border-indigo-600' : 'border-parchment-300 text-parchment-600 hover:border-indigo-400'}`}
+                  >{item.attuned ? '✦ Attuned' : '✦ Attune'}</button>
+                )
+              }
+              const endButton = (onClick: () => void, title?: string) => (
+                <button type="button" onClick={onClick} title={title}
+                  className="px-2 py-0.5 rounded border border-parchment-200 text-[11px] text-parchment-500 hover:text-red-600 hover:border-red-300 transition-colors"
+                >End</button>
+              )
+              const makeButton = (label: string, onClick: () => void) => (
+                <button type="button" onClick={onClick} disabled={atMax} title={limitTitle}
+                  className="mt-1 px-2.5 py-1 rounded border border-teal-300 bg-teal-50 text-xs font-semibold text-teal-700 hover:bg-teal-100 transition-colors disabled:opacity-40"
+                >{label}</button>
+              )
+              return (
+                <div className="card p-3">
+                  <div className="text-xs font-bold text-parchment-500 uppercase tracking-wider mb-2">Infusions</div>
+                  <div className="flex items-center gap-3">
+                    <span className={`text-2xl font-bold ${atMax ? 'text-teal-700' : 'text-parchment-800'}`}>{active}</span>
+                    <span className="text-parchment-300 text-lg">/</span>
+                    <span className="text-2xl font-semibold text-parchment-400">{maxActive}</span>
+                    <div className="flex gap-3 ml-3">
+                      {Array.from({ length: maxActive }, (_, i) => (
+                        <div key={i}
+                          className={`w-4 h-4 rotate-45 border-2 ${i < active ? 'infuse-gem' : 'bg-parchment-200 border-parchment-300 opacity-40'}`}
+                          style={i < active ? { animation: 'infuse-pulse 3.5s ease-in-out infinite', animationDelay: `${i * 0.3}s` } : { transition: 'all 0.2s ease' }}
+                        />
+                      ))}
+                    </div>
+                    <span className="ml-auto text-[11px] text-parchment-400" title="Infusions known / allowed at your level">Known {known.length}/{knownMax}</span>
+                  </div>
+                  {known.length === 0 ? (
+                    <p className="text-xs text-parchment-400 mt-2">No infusions chosen yet. Pick them when you level up.</p>
+                  ) : (
+                    <ul className="mt-2 divide-y divide-parchment-100">
+                      {known.map(inf => {
+                        const plus = inf.bonusAt10 && artificerLevel >= 10 ? 2 : 1
+                        const bonusText = inf.bonus === 'item' ? ` · +${plus}` : inf.bonus === 'spellAttack' ? ` · +${plus} spell attacks` : ''
+                        const holderIdx = inf.kind === 'creature' ? -1 : holderIndex(inf.slug)
+                        const holder = holderIdx >= 0 ? char.equipment[holderIdx] : undefined
+                        const isActive = inf.kind === 'creature' ? homunculi.length > 0 : !!holder
+                        const needsAttunement = inf.attunement || (inf.kind === 'replicate' && !!content.items.find(i => i.slug === inf.replicates)?.attunement)
+                        let body: React.ReactNode
+                        if (inf.kind === 'creature') {
+                          const h = homunculi[0]
+                          body = h ? (
+                            <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                              <span className="text-xs font-medium text-teal-700">Active · {h.hp.current}/{h.hp.max} HP</span>
+                              <button type="button" onClick={() => setTab('summons')}
+                                className="px-2 py-0.5 rounded border border-parchment-200 text-[11px] text-parchment-600 hover:border-parchment-400 transition-colors"
+                              >Summons →</button>
+                              {endButton(() => patch({ summons: char.summons.filter(sm => sm.templateKey !== 'homunculus-servant') }), 'The homunculus is gone')}
+                            </div>
+                          ) : makeButton('Create Homunculus', makeHomunculus)
+                        } else if (inf.kind === 'replicate') {
+                          body = holder ? (
+                            <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                              <span className="text-xs font-medium text-teal-700">In your inventory</span>
+                              {needsAttunement && attuneToggle(holderIdx)}
+                              {endButton(() => endInfusion(holderIdx, inf), 'Ends the infusion: the replica is removed from your inventory')}
+                            </div>
+                          ) : makeButton(`Make ${inf.name.replace('Replicate: ', '')}`, () => makeReplica(inf))
+                        } else if (holder) {
+                          const choice = holder.infusion?.split('@')[1]
+                          body = (
+                            <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                              <span className="text-xs font-medium text-teal-700">in {holder.name}{choice ? ` · ${choice} resistance` : ''}</span>
+                              {needsAttunement && attuneToggle(holderIdx)}
+                              {endButton(() => endInfusion(holderIdx, inf))}
+                            </div>
+                          )
+                        } else {
+                          const candidates = char.equipment.map((e, i) => ({ e, i })).filter(({ e }) => !e.infusion && !isMagic(e))
+                          const suitable = candidates.filter(({ e }) => fits(e, inf.itemType))
+                          const other = candidates.filter(({ e }) => !fits(e, inf.itemType))
+                          body = (
+                            <div className="mt-1 flex gap-1.5">
+                              {inf.damageTypes && (
+                                <select className="input text-xs py-1 w-28 shrink-0" value={infuseResistType} disabled={atMax}
+                                  aria-label="Resistance" onChange={e => setInfuseResistType(e.target.value)}>
+                                  {inf.damageTypes.map(t => <option key={t} value={t}>{t}</option>)}
+                                </select>
+                              )}
+                              <select className="input text-xs py-1" value="" disabled={atMax} title={limitTitle}
+                                onChange={e => { if (e.target.value !== '') infuse(Number(e.target.value), inf, inf.damageTypes ? infuseResistType : undefined) }}>
+                                <option value="">{atMax ? '— at the infusion limit —' : '— infuse an item —'}</option>
+                                {suitable.length > 0 && (
+                                  <optgroup label="Suitable">
+                                    {suitable.map(({ e, i }) => <option key={i} value={i}>{e.name}</option>)}
+                                  </optgroup>
+                                )}
+                                {other.length > 0 && (
+                                  <optgroup label="Other items">
+                                    {other.map(({ e, i }) => <option key={i} value={i}>{e.name}</option>)}
+                                  </optgroup>
+                                )}
+                              </select>
+                            </div>
+                          )
+                        }
+                        return (
+                          <li key={inf.slug} className="flex items-start gap-2.5 py-2">
+                            <div className={`mt-1.5 w-2.5 h-2.5 rotate-45 border shrink-0 ${isActive ? 'infuse-gem' : 'bg-parchment-200 border-parchment-300 opacity-50'}`} />
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm font-semibold text-parchment-800 leading-tight">
+                                {inf.name}
+                                {needsAttunement && <span className="text-indigo-400 ml-1" title="Requires attunement">✦</span>}
+                              </div>
+                              <div className="text-[11px] text-parchment-500" title={inf.description}>
+                                {inf.itemType}{bonusText}{inf.charges ? ` · ${inf.charges === 1 ? 'once per dawn' : `${inf.charges} charges`}` : ''}
+                              </div>
+                              {body}
+                            </div>
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  )}
+                </div>
+              )
+            })()}
+            </div>{/* end right column */}
 
 
           </div>{/* end top row grid */}
@@ -3912,7 +4443,8 @@ export default function Sheet() {
               const isExpanded = expandedInventoryItem === idx
               const def = content.items.find(i => i.slug === item.itemSlug)
               const rarity = def?.rarity?.toLowerCase() ?? ''
-              const needsAttunement = showAttune || item.attuned
+              const infusionDef = findInfusion(item.infusion)
+              const needsAttunement = showAttune || item.attuned || !!infusionDef?.attunement
               const ws = resolveWeapon(item, content.items)
               const as_ = resolveArmor(item, content.items)
               const isArmorPiece = !!as_ && as_.type !== 'shield'
@@ -4057,6 +4589,9 @@ export default function Sheet() {
                     <div className="flex-1 min-w-0 space-y-0.5">
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <span className="font-semibold text-sm text-parchment-900 leading-snug">{item.name}</span>
+                        {infusionDef && (
+                          <span className="text-[10px] font-semibold rounded px-1.5 py-0.5 bg-teal-50 text-teal-700 border border-teal-200" title="Artificer infusion">⟡ {infusionDef.name}</span>
+                        )}
                         {item.attuned && <span className="text-[11px] text-indigo-500 shrink-0">✦</span>}
                         {item.quantity > 1 && (
                           <span className="text-[11px] bg-parchment-100 text-parchment-500 px-1.5 py-0.5 rounded-full font-medium shrink-0">×{item.quantity}</span>
@@ -4084,9 +4619,9 @@ export default function Sheet() {
                           return (
                             <WeaponStatBlock
                               ws={ws}
-                              attackBonus={weaponAttackBonus(effectiveChar, ws, pb, magicBonus(item.name)) + pw.bonus}
-                              damageMod={weaponDamageMod(effectiveChar, ws, magicBonus(item.name)) + pw.bonus}
-                              magicBonus={magicBonus(item.name)}
+                              attackBonus={weaponAttackBonus(effectiveChar, ws, pb, magicBonus(item, artificerLevel)) + pw.bonus}
+                              damageMod={weaponDamageMod(effectiveChar, ws, magicBonus(item, artificerLevel)) + pw.bonus}
+                              magicBonus={magicBonus(item, artificerLevel)}
                               attackDice={pw.attackDice}
                               damageDice={pw.damageDice}
                               potionBonus={pw.bonus}
@@ -4097,9 +4632,9 @@ export default function Sheet() {
                       {as_ && !ws && (
                         <ArmorStatBlock
                           as_={as_}
-                          computedAC={as_.type === 'light' ? as_.acBase + abilityModFor(effectiveChar, 'dex') + magicBonus(item.name)
-                            : as_.type === 'medium' ? as_.acBase + Math.min(abilityModFor(effectiveChar, 'dex'), mediumDexCap) + magicBonus(item.name)
-                            : as_.type === 'heavy' ? as_.acBase + magicBonus(item.name) || undefined
+                          computedAC={as_.type === 'light' ? as_.acBase + abilityModFor(effectiveChar, 'dex') + magicBonus(item, artificerLevel)
+                            : as_.type === 'medium' ? as_.acBase + Math.min(abilityModFor(effectiveChar, 'dex'), mediumDexCap) + magicBonus(item, artificerLevel)
+                            : as_.type === 'heavy' ? as_.acBase + magicBonus(item, artificerLevel) || undefined
                             : undefined}
                         />
                       )}
@@ -4416,7 +4951,7 @@ export default function Sheet() {
                         (() => {
                           const w = dualWieldWeapon
                           const pw = potionWeaponMods(w.item.name)
-                          const atkBonus = weaponAttackBonus(effectiveChar, w.ws!, pb, magicBonus(w.item.name)) + pw.bonus
+                          const atkBonus = weaponAttackBonus(effectiveChar, w.ws!, pb, magicBonus(w.item, artificerLevel)) + pw.bonus
                           return (
                             <div className="col-span-1 sm:col-span-2 flex flex-col gap-1 rounded-lg border border-green-200 bg-green-50 px-3 py-2.5">
                               <div className="flex items-center justify-between">
@@ -4425,7 +4960,7 @@ export default function Sheet() {
                               </div>
                               <span className="text-sm font-semibold text-green-900 truncate">{w.item.name} × 2</span>
                               <div className="flex items-center gap-3 mt-0.5">
-                                <span className="text-xs font-bold text-green-700">{w.ws!.damage}{(() => { const m = weaponDamageMod(effectiveChar, w.ws!, magicBonus(w.item.name)) + pw.bonus; return m ? ` ${formatMod(m)}` : '' })()}{pw.damageDice} {w.ws!.damageType}</span>
+                                <span className="text-xs font-bold text-green-700">{w.ws!.damage}{(() => { const m = weaponDamageMod(effectiveChar, w.ws!, magicBonus(w.item, artificerLevel)) + pw.bonus; return m ? ` ${formatMod(m)}` : '' })()}{pw.damageDice} {w.ws!.damageType}</span>
                                 <span className="text-xs text-green-600">{formatMod(atkBonus)}{pw.attackDice} to hit</span>
                               </div>
                             </div>
@@ -4451,7 +4986,7 @@ export default function Sheet() {
                         (() => {
                           const w = mainHandWeapon
                           const pw = potionWeaponMods(w.item.name)
-                          const atkBonus = weaponAttackBonus(effectiveChar, w.ws!, pb, magicBonus(w.item.name)) + pw.bonus
+                          const atkBonus = weaponAttackBonus(effectiveChar, w.ws!, pb, magicBonus(w.item, artificerLevel)) + pw.bonus
                           return (
                             <div className="col-span-1 sm:col-span-2 flex flex-col gap-1 rounded-lg border border-green-200 bg-green-50 px-3 py-2.5">
                               <div className="flex items-center justify-between">
@@ -4460,7 +4995,7 @@ export default function Sheet() {
                               </div>
                               <span className="text-sm font-semibold text-green-900 truncate">{w.item.name}</span>
                               <div className="flex items-center gap-3 mt-0.5">
-                                <span className="text-xs font-bold text-green-700">{w.ws!.damage}{(() => { const m = weaponDamageMod(effectiveChar, w.ws!, magicBonus(w.item.name)) + pw.bonus; return m ? ` ${formatMod(m)}` : '' })()}{pw.damageDice} {w.ws!.damageType}</span>
+                                <span className="text-xs font-bold text-green-700">{w.ws!.damage}{(() => { const m = weaponDamageMod(effectiveChar, w.ws!, magicBonus(w.item, artificerLevel)) + pw.bonus; return m ? ` ${formatMod(m)}` : '' })()}{pw.damageDice} {w.ws!.damageType}</span>
                                 <span className="text-xs text-green-600">{formatMod(atkBonus)}{pw.attackDice} to hit</span>
                               </div>
                             </div>
@@ -4473,7 +5008,7 @@ export default function Sheet() {
                             (() => {
                               const w = mainHandWeapon
                               const pw = potionWeaponMods(w.item.name)
-                              const atkBonus = weaponAttackBonus(effectiveChar, w.ws!, pb, magicBonus(w.item.name)) + pw.bonus
+                              const atkBonus = weaponAttackBonus(effectiveChar, w.ws!, pb, magicBonus(w.item, artificerLevel)) + pw.bonus
                               return (
                                 <div className="flex flex-col gap-1 rounded-lg border border-green-200 bg-green-50 px-3 py-2.5">
                                   <div className="flex items-center justify-between">
@@ -4483,7 +5018,7 @@ export default function Sheet() {
                                   </div>
                                   <span className="text-sm font-semibold text-green-900 truncate">{w.item.name}</span>
                                   <div className="flex items-center gap-3 mt-0.5">
-                                    <span className="text-xs font-bold text-green-700">{w.ws!.damage}{(() => { const m = weaponDamageMod(effectiveChar, w.ws!, magicBonus(w.item.name)) + pw.bonus; return m ? ` ${formatMod(m)}` : '' })()}{pw.damageDice} {w.ws!.damageType}</span>
+                                    <span className="text-xs font-bold text-green-700">{w.ws!.damage}{(() => { const m = weaponDamageMod(effectiveChar, w.ws!, magicBonus(w.item, artificerLevel)) + pw.bonus; return m ? ` ${formatMod(m)}` : '' })()}{pw.damageDice} {w.ws!.damageType}</span>
                                     <span className="text-xs text-green-600">{formatMod(atkBonus)}{pw.attackDice} to hit</span>
                                   </div>
                                 </div>
@@ -4512,7 +5047,7 @@ export default function Sheet() {
                             (() => {
                               const w = offHandWeapon
                               const pw = potionWeaponMods(w.item.name)
-                              const atkBonus = weaponAttackBonus(effectiveChar, w.ws!, pb, magicBonus(w.item.name)) + pw.bonus
+                              const atkBonus = weaponAttackBonus(effectiveChar, w.ws!, pb, magicBonus(w.item, artificerLevel)) + pw.bonus
                               return (
                                 <div className="flex flex-col gap-1 rounded-lg border border-green-200 bg-green-50 px-3 py-2.5">
                                   <div className="flex items-center justify-between">
@@ -4522,7 +5057,7 @@ export default function Sheet() {
                                   </div>
                                   <span className="text-sm font-semibold text-green-900 truncate">{w.item.name}</span>
                                   <div className="flex items-center gap-3 mt-0.5">
-                                    <span className="text-xs font-bold text-green-700">{w.ws!.damage}{(() => { const m = weaponDamageMod(effectiveChar, w.ws!, magicBonus(w.item.name)) + pw.bonus; return m ? ` ${formatMod(m)}` : '' })()}{pw.damageDice} {w.ws!.damageType}</span>
+                                    <span className="text-xs font-bold text-green-700">{w.ws!.damage}{(() => { const m = weaponDamageMod(effectiveChar, w.ws!, magicBonus(w.item, artificerLevel)) + pw.bonus; return m ? ` ${formatMod(m)}` : '' })()}{pw.damageDice} {w.ws!.damageType}</span>
                                     <span className="text-xs text-green-600">{formatMod(atkBonus)}{pw.attackDice} to hit</span>
                                   </div>
                                 </div>
@@ -4532,7 +5067,7 @@ export default function Sheet() {
                             <div className="flex flex-col gap-1 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2.5">
                               <span className="text-[9px] font-bold text-blue-400 uppercase tracking-widest">Off Hand — Shield</span>
                               <span className="text-sm font-semibold text-blue-900 truncate">{equippedShield.item.name}</span>
-                              <span className="text-xs font-bold text-blue-700 mt-0.5">+{(equippedShield.as_?.acBase ?? 2) + magicBonus(equippedShield.item.name)} AC</span>
+                              <span className="text-xs font-bold text-blue-700 mt-0.5">+{(equippedShield.as_?.acBase ?? 2) + magicBonus(equippedShield.item, artificerLevel)} AC</span>
                             </div>
                           ) : offHandImpl ? (
                             (() => {
@@ -4786,10 +5321,10 @@ export default function Sheet() {
                                 {grouped.armor.map(({ item, idx }) => {
                                   const as_ = resolveArmor(item, content.items)!
                                   const dex = abilityModFor(effectiveChar, 'dex')
-                                  const mb = magicBonus(item.name)
+                                  const mb = magicBonus(item, artificerLevel)
                                   const calcAC = as_.type === 'shield' ? `+${as_.acBase + mb} AC` : as_.type === 'light' ? `AC ${as_.acBase + dex + mb}` : as_.type === 'medium' ? `AC ${as_.acBase + Math.min(dex, mediumDexCap) + mb}` : `AC ${as_.acBase + mb}`
                                   const warnings: string[] = []
-                                  if (as_.type !== 'shield' && !isArmorProficient(char, as_)) warnings.push('Not proficient')
+                                  if (as_.type !== 'shield' && !isArmorProficient(char, as_, featArmor)) warnings.push('Not proficient')
                                   if (as_.minStrength && effectiveChar.abilityScores.str < as_.minStrength) warnings.push(`STR ${as_.minStrength} req.`)
                                   const def = content.items.find(i => i.slug === item.itemSlug && i.name)
                                   const descParts = [warnings.length ? `⚠ ${warnings.join(' · ')}` : null, def?.description || null, item.notes || null].filter(Boolean)
@@ -4905,7 +5440,7 @@ export default function Sheet() {
                               <div className="space-y-2">
                                 {grouped.weapon.map(({ item, idx }) => {
                                   const ws = resolveWeapon(item, content.items)!
-                                  const bonus = magicBonus(item.name)
+                                  const bonus = magicBonus(item, artificerLevel)
                                   const pw = potionWeaponMods(item.name)
                                   const dmgMod = weaponDamageMod(effectiveChar, ws, bonus) + pw.bonus
                                   const dmgStr = ws.damage === '—' ? ws.damage : `${ws.damage}${dmgMod !== 0 ? formatMod(dmgMod) : ''}${pw.damageDice} ${ws.damageType}`
@@ -5574,11 +6109,12 @@ export default function Sheet() {
                   )
                 })()}
                 {subclassEntry?.features && subclassEntry.features.filter(f => f.level <= cc.level).map(f => (
-                  <div key={`sub-${f.level}-${f.name}`} className="mb-3 p-3 rounded border border-indigo-100 bg-indigo-50/40">
+                  <div key={`sub-${f.level}-${f.name}`} id={featureAnchor(cc.classSlug, f)} className="mb-3 p-3 rounded border border-indigo-100 bg-indigo-50/40">
                     <div className="flex items-center gap-2 mb-1">
                       <span className="text-xs bg-indigo-100 text-indigo-600 rounded px-1.5 py-0.5 shrink-0">Lvl {f.level}</span>
                       <span className="font-medium text-indigo-900">{f.name}</span>
                     </div>
+                    {featureTrackers(featureAnchor(cc.classSlug, f), f.name)}
                     {f.name === 'Eldritch Cannon' ? (
                       (() => {
                         const artLevel = cc.level
@@ -5591,7 +6127,8 @@ export default function Sheet() {
                         const intMod = abilityModFor(effectiveChar, 'int')
                         const dc = spellSaveDC(effectiveChar, 'artificer', content) + itemBonuses.spellDCBonus
                         const atkBonus = spellAttackBonus(effectiveChar, 'artificer', content) + itemBonuses.spellAttackBonus
-                        const freeUsed = (char.classResources['cannon-free-used'] ?? 0) >= 1
+                        // Same counter as the Resources card's Eldritch Cannon (1 free creation per long rest)
+                        const freeUsed = (char.classResources['eldritch-cannon'] ?? 1) < 1
 
                         const CANNON_TYPES = [
                           {
@@ -5638,7 +6175,7 @@ export default function Sheet() {
                           }
                           patch({
                             summons: [...char.summons, cannon],
-                            classResources: { ...char.classResources, 'cannon-free-used': 1 },
+                            classResources: { ...char.classResources, 'eldritch-cannon': 0 },
                           })
                           setTab('summons')
                         }
@@ -5653,7 +6190,7 @@ export default function Sheet() {
                               </span>
                               <button type="button"
                                 className="ml-auto text-[10px] underline opacity-60 hover:opacity-100 transition-opacity"
-                                onClick={() => patch({ classResources: { ...char.classResources, 'cannon-free-used': freeUsed ? 0 : 1 } })}>
+                                onClick={() => patch({ classResources: { ...char.classResources, 'eldritch-cannon': freeUsed ? 1 : 0 } })}>
                                 {freeUsed ? 'Restore' : 'Mark used'}
                               </button>
                             </div>
@@ -5793,11 +6330,12 @@ export default function Sheet() {
                 {features.map(f => {
                   const isFightingStyle = f.name === 'Fighting Style'
                   return (
-                    <div key={`${f.level}-${f.name}`} className="mb-3 p-3 rounded border border-parchment-100">
+                    <div key={`${f.level}-${f.name}`} id={featureAnchor(cc.classSlug, f)} className="mb-3 p-3 rounded border border-parchment-100">
                       <div className="flex items-center gap-2">
                         <span className="text-xs bg-parchment-200 text-parchment-700 rounded px-1.5 py-0.5 shrink-0">Lvl {f.level}</span>
                         <span className="font-medium">{f.name}</span>
                       </div>
+                      {featureTrackers(featureAnchor(cc.classSlug, f), f.name)}
                       {f.description && <p className="text-sm text-parchment-600 mt-1">{f.description}</p>}
                       {isFightingStyle && chosenStyle && (
                         <div className="mt-2 pl-3 border-l-2 border-amber-300">
@@ -6344,7 +6882,7 @@ export default function Sheet() {
                         {slugs.length > 0 ? (
                           <div className="space-y-1">
                             {slugs.map(slug => {
-                              const inf = ARTIFICER_INFUSIONS.find(i => i.slug === slug)
+                              const inf = findInfusion(slug)
                               return (
                                 <div key={slug} className="flex items-start gap-1.5">
                                   <span className="text-sm font-medium shrink-0">{inf?.name ?? slug}</span>
@@ -6373,9 +6911,9 @@ export default function Sheet() {
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-amber-50">
-                              {ARTIFICER_INFUSIONS.map(inf => {
+                              {ARTIFICER_INFUSIONS.filter(inf => inf.kind !== 'replicate').map(inf => {
                                 const available = cc.level >= (inf.levelRequirement ?? 2)
-                                const known = slugs.includes(inf.slug)
+                                const known = slugs.some(s => findInfusion(s)?.slug === inf.slug)
                                 return (
                                   <tr key={inf.slug} className={known ? 'bg-amber-50' : !available ? 'bg-parchment-50' : ''}>
                                     <td className={`py-1.5 pr-2 font-medium align-top whitespace-nowrap ${!available ? 'text-parchment-300' : ''}`}>
@@ -6393,6 +6931,19 @@ export default function Sheet() {
                                   </tr>
                                 )
                               })}
+                              {/* Replicate Magic Item: one infusion per replicated item */}
+                              <tr>
+                                <td className="py-1.5 pr-2 font-medium align-top whitespace-nowrap">Replicate Magic Item</td>
+                                <td className="py-1.5 pr-2 align-top"><span className="text-green-600 font-medium">✓ 2</span></td>
+                                <td className="py-1.5 pr-2 align-top text-parchment-500">Varies</td>
+                                <td className="py-1.5 pr-2 align-top text-amber-700">—</td>
+                                <td className="py-1.5 align-top text-parchment-600">
+                                  Learn it once per item to make that magic item. At your level:{' '}
+                                  {ARTIFICER_INFUSIONS.filter(inf => inf.kind === 'replicate' && cc.level >= (inf.levelRequirement ?? 2))
+                                    .map(inf => inf.name.replace('Replicate: ', '') + (slugs.some(s => findInfusion(s)?.slug === inf.slug) ? ' ✓' : ''))
+                                    .join(', ')}.
+                                </td>
+                              </tr>
                             </tbody>
                           </table>
                         </div>
@@ -6661,7 +7212,7 @@ export default function Sheet() {
                       const newSlug = resolveSlug(value)
                       if (newSlug && !spells.some(s => s.spellSlug === newSlug && s.classSlug === 'strixhaven')) {
                         spells = [...spells, {
-                          spellSlug: newSlug, name: value, classSlug: 'strixhaven', prepared: true, isHomebrew: false,
+                          spellSlug: newSlug, name: value, classSlug: 'strixhaven', prepared: true, isHomebrew: false, grantedBy: 'strixhaven',
                           ...(level === 1 ? { usesPerLongRest: 1, freeUseKey: 'strixhaven-spell' } : {}),
                         }]
                       }
@@ -7292,7 +7843,7 @@ export default function Sheet() {
                   }
                   patch({
                     hp: { ...char.hp, current: maxHp, temp: 0 },  // temporary HP don't last through a long rest
-                    classResources: { ...char.classResources, ...resets, 'cannon-free-used': 0, 'breath-weapon-used': 0 },
+                    classResources: { ...char.classResources, ...resets, 'breath-weapon-used': 0 },
                     spellSlots: freshSlots,
                     hitDiceUsed: newHitDiceUsed,
                     freeSpellUses: {},
@@ -7482,7 +8033,11 @@ export default function Sheet() {
                 patch({
                   featuresChosen: [...char.featuresChosen, { key, value: pending.slug }],
                   ...grantPatch,
-                  ...(pending.abilityScoreIncrease && addFeatApplyAsi ? applyFeatAbilityIncrease(char, pending, addFeatAbility) : {}),
+                  ...(pending.abilityScoreIncrease ? (() => {
+                    const inc = applyFeatAbilityIncrease(char, pending, addFeatAbility)
+                    // Unticked: the player already raised the score by hand, so only the baseline catches up
+                    return addFeatApplyAsi ? { ...inc, ...shiftBaselines(char, inc) } : shiftBaselines(char, inc)
+                  })() : {}),
                 })
                 setAddFeatPending(null); setAddFeatAbility(''); setAddFeatOpen(false)
               }

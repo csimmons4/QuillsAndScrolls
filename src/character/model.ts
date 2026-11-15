@@ -91,6 +91,9 @@ const EquipmentItemSchema = z.object({
   isHomebrew: z.boolean(),
   notes: z.string(),
   charges: z.number().int().min(0).optional(),
+  // The artificer infusion this item holds (Enhanced Defense, Repeating Shot, …): each infusion is
+  // in at most one item, and only nonmagical items can be infused
+  infusion: z.string().optional(),
   chargesMax: z.number().int().min(1).optional(),
   rechargesOnLongRest: z.boolean().optional(),
 })
@@ -114,6 +117,9 @@ const SpellEntrySchema = z.object({
   // Feat-grant tracking: set by applyGrantPicks for spells granted with a free cast per LR.
   usesPerLongRest: z.number().optional(),
   freeUseKey: z.string().optional(),
+  // What granted a spell the class didn't teach ('feat:<slug>', 'race:high-elf', 'strixhaven').
+  // Granted spells don't count toward the class's cantrips or spells and can't be swapped out.
+  grantedBy: z.string().optional(),
 })
 export type SpellEntry = z.infer<typeof SpellEntrySchema>
 
@@ -129,6 +135,8 @@ export const CharacterSchema = z.object({
   id: z.string().uuid(),
   schemaVersion: z.number().int(),
   name: z.string(),
+  // Portrait: a small JPEG data URL (≤ 512 px, see storage/portrait.ts) shown on the sheet and in the Vault
+  portrait: z.string().optional(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 
@@ -252,7 +260,10 @@ export const CharacterSchema = z.object({
     proficiencies: z.array(z.string()),
     expertise: z.array(z.string()),
   }).optional(),
+  // The same for ability scores (ASIs, feat +1s, Primal Champion) and saving throw proficiencies
+  abilityBaseline: AbilityScoresSchema.optional(),
+  saveBaseline: z.array(z.string()).optional(),
 })
 
 export type Character = z.infer<typeof CharacterSchema>
-export const SCHEMA_VERSION = 5
+export const SCHEMA_VERSION = 6

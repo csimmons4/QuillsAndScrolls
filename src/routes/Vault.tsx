@@ -131,12 +131,21 @@ export default function Vault() {
           {characters.map(char => (
             <div key={char.id} className="card hover:shadow-md transition-shadow">
               <div className="flex justify-between items-start">
-                <div>
-                  <h2 className="text-xl font-bold text-parchment-900">{char.name}</h2>
-                  <p className="text-sm text-parchment-600">
-                    Level {totalLevel(char)} {raceName(char.raceSlug)}
-                  </p>
-                  <p className="text-sm text-parchment-600">{classLabel(char)}</p>
+                <div className="flex items-center gap-3 min-w-0">
+                  {char.portrait ? (
+                    <img src={char.portrait} alt="" className="w-14 h-14 rounded-lg object-cover object-top border-2 border-parchment-300 shrink-0" />
+                  ) : (
+                    <span className="w-14 h-14 rounded-lg border-2 border-parchment-300 bg-parchment-100 shrink-0 flex items-center justify-center text-lg font-bold text-parchment-400" aria-hidden>
+                      {char.name.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]!.toUpperCase()).join('') || '?'}
+                    </span>
+                  )}
+                  <div className="min-w-0">
+                    <h2 className="text-xl font-bold text-parchment-900 truncate">{char.name}</h2>
+                    <p className="text-sm text-parchment-600">
+                      Level {totalLevel(char)} {raceName(char.raceSlug)}
+                    </p>
+                    <p className="text-sm text-parchment-600">{classLabel(char)}</p>
+                  </div>
                 </div>
                 <span className="text-xs text-parchment-400">
                   {new Date(char.updatedAt).toLocaleDateString()}

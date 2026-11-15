@@ -150,6 +150,25 @@ export interface ClassResource {
   classSlug: string
 }
 
+// Class features whose name doesn't match the resource they track
+const RESOURCE_FEATURE: Record<string, string> = {
+  'superiority-dice': 'Combat Superiority',
+  'sorcery-points': 'Font of Magic',
+  'soul-trinkets': 'Tokens of the Departed',
+  'paladin-channel-divinity': 'Sacred Oath',
+}
+
+/** A feature or resource name reduced for matching: "Channel Divinity (2/rest)" → "channel divinity",
+ *  "The Third Eye" → "third eye" */
+export const featureKey = (name: string) =>
+  name.toLowerCase().replace(/\(.*?\)/g, '').replace(/[^a-z]+/g, ' ').trim().replace(/^the /, '')
+
+/** Whether a class feature is the one a resource belongs to ("Ki" ↔ "Ki Points", "Rage" ↔ "Rage") */
+export function resourceMatchesFeature(r: Pick<ClassResource, 'key' | 'name'>, featureName: string): boolean {
+  const rk = featureKey(RESOURCE_FEATURE[r.key] ?? r.name), fk = featureKey(featureName)
+  return rk === fk || rk.startsWith(fk + ' ') || fk.startsWith(rk + ' ')
+}
+
 export function deriveClassResources(char: Character): ClassResource[] {
   const resources: ClassResource[] = []
   const pb = profBonus(char)
@@ -281,6 +300,13 @@ export function deriveClassResources(char: Character): ClassResource[] {
             display: 'Reaction: creature that failed an Inspiration roll can retry',
           })
         }
+        if (cc.subclassSlug === 'glamour' && lvl >= 3) {
+          resources.push({
+            key: 'enthralling-performance', name: "Enthralling Performance", classSlug: slug,
+            current: get('enthralling-performance', 1), max: 1, recharge: 'short',
+            display: "Perform 1 min: charm up to CHA mod humanoids for 1 hr (WIS save)",
+          })
+        }
         break
       }
       case 'cleric': {
@@ -356,6 +382,21 @@ export function deriveClassResources(char: Character): ClassResource[] {
             key: 'steps-of-night', name: 'Steps of Night', classSlug: slug,
             current: get('steps-of-night', pb), max: pb, recharge: 'long',
             display: 'Bonus action: fly speed = walk speed for 1 min (dim light or darkness)',
+          })
+        }
+        if (cc.subclassSlug === 'grave' && lvl >= 2) {
+          const wisUses = Math.max(1, abilityModFor(char, 'wis'))
+          resources.push({
+            key: 'sentinel-at-deaths-door', name: "Sentinel at Death's Door", classSlug: slug,
+            current: get('sentinel-at-deaths-door', wisUses), max: wisUses, recharge: 'long',
+            display: "Reaction: turn a critical hit within 30 ft into a normal hit",
+          })
+        }
+        if (cc.subclassSlug === 'knowledge' && lvl >= 17) {
+          resources.push({
+            key: 'visions-of-the-past', name: "Visions of the Past", classSlug: slug,
+            current: get('visions-of-the-past', 1), max: 1, recharge: 'short',
+            display: "Meditate 1 min: see an object's or place's recent past",
           })
         }
         break
@@ -442,6 +483,21 @@ export function deriveClassResources(char: Character): ClassResource[] {
             display: 'When reduced to 0 HP: automatically summon 4 protective spirits (1 min)',
           })
         }
+        if (cc.subclassSlug === 'dreams' && lvl >= 10) {
+          const wisUses = Math.max(1, abilityModFor(char, 'wis'))
+          resources.push({
+            key: 'hidden-paths', name: "Hidden Paths", classSlug: slug,
+            current: get('hidden-paths', wisUses), max: wisUses, recharge: 'long',
+            display: "Bonus action: teleport 60 ft (or a willing creature 30 ft as an action)",
+          })
+        }
+        if (cc.subclassSlug === 'stars' && lvl >= 2) {
+          resources.push({
+            key: 'star-map', name: "Star Map", classSlug: slug,
+            current: get('star-map', pb), max: pb, recharge: 'long',
+            display: "Cast Guiding Bolt without a slot",
+          })
+        }
         break
       }
       case 'fighter': {
@@ -510,11 +566,50 @@ export function deriveClassResources(char: Character): ClassResource[] {
             display: `adv on attacks · +${tempHp} temp HP`,
           })
         }
-        if (cc.subclassSlug === 'samurai' && lvl >= 15) {
+        if (cc.subclassSlug === 'samurai' && lvl >= 18) {
           resources.push({
             key: 'strength-before-death', name: 'Strength Before Death', classSlug: slug,
             current: get('strength-before-death', 1), max: 1, recharge: 'long',
             display: 'Reaction: delay drop to 0 HP and take an immediate extra turn',
+          })
+        }
+        if (cc.subclassSlug === 'cavalier' && lvl >= 3) {
+          const strUses = Math.max(1, abilityModFor(char, 'str'))
+          resources.push({
+            key: 'unwavering-mark', name: "Unwavering Mark", classSlug: slug,
+            current: get('unwavering-mark', strUses), max: strUses, recharge: 'long',
+            display: "Bonus action: special attack on a marked creature that attacked someone else",
+          })
+        }
+        if (cc.subclassSlug === 'cavalier' && lvl >= 7) {
+          const conUses = Math.max(1, abilityModFor(char, 'con'))
+          resources.push({
+            key: 'warding-maneuver', name: "Warding Maneuver", classSlug: slug,
+            current: get('warding-maneuver', conUses), max: conUses, recharge: 'long',
+            display: "Reaction: +1d8 AC against one attack (you or an ally within 5 ft)",
+          })
+        }
+        if (cc.subclassSlug === 'echo-knight' && lvl >= 3) {
+          const conUses = Math.max(1, abilityModFor(char, 'con'))
+          resources.push({
+            key: 'unleash-incarnation', name: "Unleash Incarnation", classSlug: slug,
+            current: get('unleash-incarnation', conUses), max: conUses, recharge: 'long',
+            display: "Extra melee attack from your echo when you take the Attack action",
+          })
+        }
+        if (cc.subclassSlug === 'echo-knight' && lvl >= 10) {
+          resources.push({
+            key: 'shadow-martyr', name: "Shadow Martyr", classSlug: slug,
+            current: get('shadow-martyr', 1), max: 1, recharge: 'short',
+            display: "Reaction: your echo takes an attack aimed at an ally within 5 ft of it",
+          })
+        }
+        if (cc.subclassSlug === 'echo-knight' && lvl >= 15) {
+          const conUses = Math.max(1, abilityModFor(char, 'con'))
+          resources.push({
+            key: 'reclaim-potential', name: "Reclaim Potential", classSlug: slug,
+            current: get('reclaim-potential', conUses), max: conUses, recharge: 'long',
+            display: "When your echo is destroyed: gain 2d6 + CON temp HP",
           })
         }
         break
@@ -684,6 +779,20 @@ export function deriveClassResources(char: Character): ClassResource[] {
             display: 'Cast Summon Fey (no slot, concentration)',
           })
         }
+        if (cc.subclassSlug === 'horizon-walker' && lvl >= 3) {
+          resources.push({
+            key: 'detect-portal', name: "Detect Portal", classSlug: slug,
+            current: get('detect-portal', 1), max: 1, recharge: 'short',
+            display: "Action: sense distance and direction of planar portals within 1 mile",
+          })
+        }
+        if (cc.subclassSlug === 'swarmkeeper' && lvl >= 7) {
+          resources.push({
+            key: 'writhing-tide', name: "Writhing Tide", classSlug: slug,
+            current: get('writhing-tide', pb), max: pb, recharge: 'long',
+            display: "Bonus action: fly 10 ft and hover for 1 min",
+          })
+        }
         break
       }
       case 'rogue': {
@@ -745,6 +854,13 @@ export function deriveClassResources(char: Character): ClassResource[] {
             key: 'spell-thief', name: 'Spell Thief', classSlug: slug,
             current: get('spell-thief', 1), max: 1, recharge: 'long',
             display: 'Reaction: negate spell targeting only you and steal it for 8 hrs',
+          })
+        }
+        if (cc.subclassSlug === 'soulknife' && lvl >= 9) {
+          resources.push({
+            key: 'psychic-veil', name: "Psychic Veil", classSlug: slug,
+            current: get('psychic-veil', 1), max: 1, recharge: 'long',
+            display: "Action: invisible for 1 hr (or spend a Psionic Energy die)",
           })
         }
         break
@@ -920,6 +1036,13 @@ export function deriveClassResources(char: Character): ClassResource[] {
             display: 'Reaction: impose disadvantage on attack vs you; advantage on next attack if it misses',
           })
         }
+        if (cc.subclassSlug === 'genie' && lvl >= 6) {
+          resources.push({
+            key: 'elemental-gift', name: "Elemental Gift", classSlug: slug,
+            current: get('elemental-gift', pb), max: pb, recharge: 'long',
+            display: "Bonus action: fly speed 30 ft for 10 min",
+          })
+        }
         break
       }
       case 'artificer': {
@@ -978,6 +1101,14 @@ export function deriveClassResources(char: Character): ClassResource[] {
             key: 'perfected-armor', name: 'Perfected Armor (Guardian)', classSlug: slug,
             current: get('perfected-armor', pb), max: pb, recharge: 'long',
             display: 'Reaction: force attacker within 30ft to redirect attack to you',
+          })
+        }
+        if (lvl >= 11) {
+          const intUses = Math.max(2, 2 * abilityModFor(char, 'int'))
+          resources.push({
+            key: 'spell-storing-item', name: "Spell-Storing Item", classSlug: slug,
+            current: get('spell-storing-item', intUses), max: intUses, recharge: 'long',
+            display: "A creature holding the item casts the stored 1st/2nd-level spell",
           })
         }
         break

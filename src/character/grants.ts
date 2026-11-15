@@ -134,6 +134,7 @@ export function applyGrantPicks(
         classSlug: prompt.classSlug,
         prepared: true,
         isHomebrew: false,
+        grantedBy: `feat:${feat.slug}`,
         ...(freeUseKey ? { usesPerLongRest: prompt.usesPerLongRest, freeUseKey } : {}),
       }
       spells.push(entry)

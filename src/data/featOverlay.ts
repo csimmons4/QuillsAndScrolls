@@ -245,16 +245,19 @@ export const FEAT_OVERLAY: Record<string, Partial<FeatDef>> = {
 
   'heavily-armored': {
     abilityScoreIncrease: { choose: 1, from: ['str'], max: 20 },
+    grantsProficiencies: { armor: ['heavy'] },
     notes: ["Grants heavy armor proficiency."],
   },
 
   'lightly-armored': {
     abilityScoreIncrease: { choose: 1, from: ['str', 'dex'], max: 20 },
+    grantsProficiencies: { armor: ['light'] },
     notes: ["Grants light armor proficiency."],
   },
 
   'moderately-armored': {
     abilityScoreIncrease: { choose: 1, from: ['str', 'dex'], max: 20 },
+    grantsProficiencies: { armor: ['medium', 'shield'] },
     notes: ["Grants medium armor and shield proficiency."],
   },
 

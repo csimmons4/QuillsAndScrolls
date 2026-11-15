@@ -258,24 +258,32 @@ export const CLASS_OPTIONS: Record<string, ClassOptionsDef> = {
     infusionsKnownAtLevel:  [0,4,4,4,4,6,6,6,6,8,8,8,8,10,10,10,10,12,12,12],
     infusionsActiveAtLevel: [0,2,2,2,2,3,3,3,3,4,4,4,4,5,5,5,5,6,6,6],
     subclasses: [
-      { slug: 'alchemist', name: 'Alchemist', level: 3, description: 'Brew experimental elixirs that grant random benefits, and fling vials of corrosive or restorative fluid.', features: [
+      { slug: 'alchemist', name: 'Alchemist', level: 3, grantedSpells: [
+        gs(3,1,'Healing Word'), gs(3,1,'Ray of Sickness'), gs(5,2,'Flaming Sphere'), gs(5,2,"Melf's Acid Arrow"), gs(9,3,'Gaseous Form'), gs(9,3,'Mass Healing Word'), gs(13,4,'Blight'), gs(13,4,'Death Ward'), gs(17,5,'Cloudkill'), gs(17,5,'Raise Dead'),
+      ], description: 'Brew experimental elixirs that grant random benefits, and fling vials of corrosive or restorative fluid.', features: [
         { level: 3, name: 'Alchemist Spells', description: 'You always have Healing Word, Ray of Sickness, Flaming Sphere, Melf\'s Acid Arrow, Gaseous Form, Mass Healing Word, Blight, Death Ward, Cloudkill, and Raise Dead prepared (gaining each pair at levels 3, 5, 9, 13, 17).' },
         { level: 3, name: 'Experimental Elixir', description: 'When you finish a long rest, you magically produce a number of experimental elixirs equal to your INT modifier (min 1). Roll on the Experimental Elixir table for each: Healing (2d4+2), Swiftness (+10ft speed), Resilience (+1 AC), Boldness (Bless for 1 min), Flight (10ft fly 10 min), or Transformation (Alter Self 10 min). Extras require an action and a spell slot.' },
         { level: 9, name: 'Restorative Reagents', description: 'Your elixirs cure one disease or poison when consumed. Additionally, casting Lesser Restoration costs no spell slot for you.' },
         { level: 15, name: 'Chemical Mastery', description: 'You gain resistance to acid and poison damage and immunity to the poisoned condition. You can cast Greater Restoration and Heal each once per long rest without a spell slot.' },
       ] },
-      { slug: 'armorer', name: 'Armorer', level: 3, description: 'Infuse your armor for Guardian mode (thunder gauntlets, defensive field) or Infiltrator mode (lightning launcher, dampening field).', features: [
+      { slug: 'armorer', name: 'Armorer', level: 3, grantedSpells: [
+        gs(3,1,'Magic Missile'), gs(3,1,'Thunderwave'), gs(5,2,'Mirror Image'), gs(5,2,'Shatter'), gs(9,3,'Hypnotic Pattern'), gs(9,3,'Lightning Bolt'), gs(13,4,'Fire Shield'), gs(13,4,'Greater Invisibility'), gs(17,5,'Passwall'), gs(17,5,'Wall of Force'),
+      ], description: 'Infuse your armor for Guardian mode (thunder gauntlets, defensive field) or Infiltrator mode (lightning launcher, dampening field).', features: [
         { level: 3, name: 'Arcane Armor', description: 'You can use a suit of armor as a spellcasting focus and ignore the STR requirement. It can\'t be removed against your will, replaces missing limbs, and can be donned/doffed as an action. Choose Guardian (thunder gauntlets: d8 bludgeoning + target can only attack you; defensive field: temp HP = INT mod bonus action) or Infiltrator (lightning launcher: d6 lightning 90ft ranged; dampening field: advantage on Stealth) mode.' },
         { level: 9, name: 'Armor Modifications', description: 'You can infuse your armor with up to 4 infusions, splitting them between the armor, boots, gauntlets, and helmet components as separate items.' },
         { level: 15, name: 'Perfected Armor', description: 'Guardian: when a creature you can see hits a target within 30ft, you can use a reaction to magically teleport to an unoccupied space within 5ft of the target and cause the attack to hit you instead. Infiltrator: when you hit with the lightning launcher, you can deal an extra 1d6 lightning damage; the target is also illuminated in dim light until your next turn, making attacks against it have advantage.' },
       ] },
-      { slug: 'artillerist', name: 'Artillerist', level: 3, description: 'Create an Eldritch Cannon that blasts enemies (force), heals allies, or protects with a firewall.', features: [
+      { slug: 'artillerist', name: 'Artillerist', level: 3, grantedSpells: [
+        gs(3,1,'Shield'), gs(3,1,'Thunderwave'), gs(5,2,'Scorching Ray'), gs(5,2,'Shatter'), gs(9,3,'Fireball'), gs(9,3,'Wind Wall'), gs(13,4,'Ice Storm'), gs(13,4,'Wall of Fire'), gs(17,5,'Cone of Cold'), gs(17,5,'Wall of Force'),
+      ], description: 'Create an Eldritch Cannon that blasts enemies (force), heals allies, or protects with a firewall.', features: [
         { level: 3, name: 'Eldritch Cannon', description: 'As an action, use your tinker\'s tools to create a Small or Tiny Eldritch Cannon in an unoccupied space within 5ft. It lasts 1 hour, until reduced to 0 HP, or you dismiss it (no action). You can have one cannon at a time (two at level 15). Choose one type: Flamethrower (15ft cone, 2d8 fire, DEX save DC = spell save DC for half), Force Ballista (ranged spell attack, 2d8 force, pushes 5ft), or Protector (aura grants THP = 1d8 + INT mod to you and allies within 10ft). Uses per long rest = INT mod (min 1); extra uses cost a spell slot.' },
         { level: 5, name: 'Arcane Firearm', description: 'After a long rest, you can use your tinker\'s tools to imbue a wand, staff, or rod and make it your arcane firearm. When you use it as your spellcasting focus for an Artificer spell, you can add 1d8 to one of the spell\'s damage rolls.' },
         { level: 9, name: 'Explosive Cannon', description: 'Your Eldritch Cannon deals an extra 1d8 damage on a hit (Force Ballista) or in its area (Flamethrower). As an action you can detonate the cannon: each creature within 20ft must make a DEX save or take 3d8 force damage (half on success). After detonating, the cannon is destroyed.' },
         { level: 15, name: 'Fortified Position', description: 'You can now have two Eldritch Cannons active at once, and you can create them with a bonus action instead of an action. While within 10ft of a cannon, you and your allies have half cover (+2 AC and DEX saves).' },
       ] },
-      { slug: 'battle-smith', name: 'Battle Smith', level: 3, description: 'Forge a Steel Defender construct companion and use INT for weapon attacks with your magic items.', features: [
+      { slug: 'battle-smith', name: 'Battle Smith', level: 3, grantedSpells: [
+        gs(3,1,'Heroism'), gs(3,1,'Shield'), gs(5,2,'Branding Smite'), gs(5,2,'Warding Bond'), gs(9,3,'Aura of Vitality'), gs(9,3,'Conjure Barrage'), gs(13,4,'Aura of Purity'), gs(13,4,'Fire Shield'), gs(17,5,'Banishing Smite'), gs(17,5,'Mass Cure Wounds'),
+      ], description: 'Forge a Steel Defender construct companion and use INT for weapon attacks with your magic items.', features: [
         { level: 3, name: 'Battle Ready', description: 'You gain proficiency with martial weapons. When you attack with a magic weapon, you can use INT instead of STR or DEX for the attack and damage rolls.' },
         { level: 3, name: 'Steel Defender', description: 'You create a Steel Defender construct (Medium, AC 15, HP = 2 + INT mod + 5× artificer level). It acts on your initiative, obeys your commands, and can use its reaction to impose disadvantage on an attack against a nearby creature. It lacks the ability to make opportunity attacks. Regains HP on short/long rest; rebuilt after long rest if destroyed.' },
         { level: 5, name: 'Arcane Jolt', description: 'When your Steel Defender or a magic weapon you\'re holding hits a creature, you can channel a jolt of magic: deal an extra 2d6 force damage OR restore 2d6 HP to one creature within 30ft of the target. You can use this feature a number of times equal to your INT modifier (min 1) per long rest.' },
@@ -530,7 +538,7 @@ export const CLASS_OPTIONS: Record<string, ClassOptionsDef> = {
         { level: 2, name: 'Read Thoughts', description: 'Channel Divinity: as an action, read a creature\'s surface thoughts within 60ft (WIS save or you read thoughts for 1 min; bonus action to cast Suggestion on them with no save).' },
         { level: 6, name: 'Channel Divinity: Read Thoughts', description: 'While reading a creature\'s thoughts, you can also cast Suggestion on it as a bonus action (no save needed).' },
         { level: 8, name: 'Potent Spellcasting', description: 'Add your WIS modifier to the damage you deal with any Cleric cantrip.' },
-        { level: 17, name: 'Visions of the Past', description: 'Spend 1 minute meditating on an object or location to see 10-minute visions of its recent past (up to the last few days). Cast this as a ritual; uses = WIS modifier per short rest.' },
+        { level: 17, name: 'Visions of the Past', description: 'Spend 1 minute meditating on an object or location to see 10-minute visions of its recent past (up to the last few days). 1 use per short rest.' },
       ] },
       { slug: 'nature', name: 'Nature Domain', level: 1, grantedSpells: [
         gs(1,1,'Animal Friendship'), gs(1,1,'Speak with Animals'), gs(3,2,'Barkskin'), gs(3,2,'Spike Growth'),
@@ -823,7 +831,7 @@ export const CLASS_OPTIONS: Record<string, ClassOptionsDef> = {
         { level: 3, name: 'Unleash Incarnation', description: 'When you take the Attack action, you can make one additional melee attack from the echo\'s position. CON modifier uses per long rest.' },
         { level: 7, name: 'Echo Avatar', description: 'Spend 10 minutes to extend your senses through the echo. For up to 10 minutes (concentration), you see and hear through it instead of your own senses. The echo can move normally. You can end this early as a free action.' },
         { level: 10, name: 'Shadow Martyr', description: 'Reaction: when an ally within 5ft of your echo is hit, make the echo the new target of the attack. The attack hits the echo. 1 use per short rest.' },
-        { level: 15, name: 'Reclaim Potential', description: 'When your echo is destroyed by taking damage, gain 2d6 + CON modifier temp HP. 2 uses per long rest.' },
+        { level: 15, name: 'Reclaim Potential', description: 'When your echo is destroyed by taking damage, gain 2d6 + CON modifier temp HP. Uses = CON modifier per long rest (min 1).' },
         { level: 18, name: 'Legion of One', description: 'Create two echoes at once. Each functions independently. If you summon a third, the oldest is destroyed. If both echoes are present, you have advantage on DEX saves and cannot be surprised.' },
       ] },
       { slug: 'psi-warrior', name: 'Psi Warrior', level: 3, description: 'Psionic Energy dice (2d6, refill 1 on SR). Protective Field: expend die to reduce damage. Psionic Strike: extra force damage. Telekinetic Movement: move object or willing creature.', features: [
@@ -846,6 +854,7 @@ export const CLASS_OPTIONS: Record<string, ClassOptionsDef> = {
         { level: 3, name: 'Fighting Spirit', description: 'Bonus action: until end of your turn, advantage on all weapon attack rolls and gain 5 temp HP (increases to 10 at L10, 15 at L15). 3 uses per long rest.' },
         { level: 7, name: 'Elegant Courtier', description: 'Add WIS modifier to Persuasion checks (in addition to CHA). You also gain proficiency in WIS saves; if already proficient, add double proficiency bonus instead.' },
         { level: 15, name: 'Rapid Strike', description: 'When you use Fighting Spirit and have advantage on an attack roll on your turn, you can forgo advantage on one attack roll to make one additional attack with that weapon as part of the same action.' },
+        { level: 18, name: 'Strength Before Death', description: 'Reaction: when you take damage that reduces you to 0 HP, delay falling unconscious and immediately take an extra turn, interrupting the current one. While you have 0 HP during that turn, taking damage causes death saving throw failures as normal. 1 use per long rest.' },
       ] },
     ],
     features: [
@@ -1154,7 +1163,7 @@ export const CLASS_OPTIONS: Record<string, ClassOptionsDef> = {
       ], description: 'Gathered Swarm: once per turn, hit deals extra 1d6 damage OR move target 15ft OR move self 5ft. Writhing Tide: fly with swarm 10ft each turn. Mighty Swarm: restrain targets.', features: [
         { level: 3, name: 'Gathered Swarm', description: 'A swarm of nature spirits inhabits your space. Once per turn when you hit with an attack: choose one — deal extra 1d6 damage; move the target up to 15ft horizontally (STR save to resist); or move yourself 5ft without provoking OAs.' },
         { level: 3, name: 'Swarmkeeper Magic', description: 'Mage Hand is always prepared. Additional spells: Web (L5), Gaseous Form (L9), Arcane Eye (L13), Insect Plague (L17). When you cast Mage Hand, the hand takes the form of your swarm.' },
-        { level: 7, name: 'Writhing Tide', description: 'Bonus action: your swarm carries you — gain a flying speed equal to your walking speed for 1 minute. 1 use per short rest.' },
+        { level: 7, name: 'Writhing Tide', description: 'Bonus action: your swarm lifts you — gain a flying speed of 10 ft and can hover for 1 minute. Uses = PB per long rest.' },
         { level: 11, name: 'Mighty Swarm', description: 'Your Gathered Swarm is more powerful. You gain a fourth option for the Gathered Swarm feature: the target is knocked prone; and the Gathered Swarm knocking a target back 15ft now also restrains it until the start of your next turn (STR save to resist).' },
         { level: 15, name: 'Swarming Dispersal', description: 'Reaction: when you take damage, magically scatter — become invisible, teleport up to 30ft to an unoccupied space you can see, take resistance to the triggering damage. Visibility ends at the start of your next turn. WIS mod uses per long rest.' },
       ] },
@@ -1743,30 +1752,103 @@ export interface InfusionDef {
   levelRequirement?: number
   itemType?: string
   cost?: string
+  attunement?: boolean      // the infused item requires attunement
+  // The infused item becomes +1 to attack and damage (weapons) or AC (armor, shields), or to spell
+  // attacks made through it ('spellAttack'); +2 from artificer level 10 when bonusAt10
+  bonus?: 'item' | 'spellAttack'
+  bonusAt10?: boolean
+  // What infusing does: put the infusion in one of your items (default), create the Homunculus
+  // Servant ('creature'), or make the replicated magic item ('replicate')
+  kind?: 'item' | 'creature' | 'replicate'
+  replicates?: string       // 'replicate': the magic item's slug in the item list
+  charges?: number          // the infused item gets this many charges, regained at dawn
+  damageTypes?: string[]    // Resistant Armor: one resistance, chosen when the item is infused
 }
 
-export const ARTIFICER_INFUSIONS: InfusionDef[] = [
-  // Available at level 2
-  { slug: 'enhanced-weapon',        name: 'Enhanced Weapon',           itemType: 'Simple or martial weapon',        description: 'Becomes a +1 magic weapon (+2 at artificer level 10).' },
-  { slug: 'enhanced-defense',       name: 'Enhanced Defense',          itemType: 'Armor or shield',                 description: 'Becomes a +1 magic item (+2 at artificer level 10).' },
-  { slug: 'enhanced-arcane-focus',  name: 'Enhanced Arcane Focus',     itemType: 'Rod, staff, or wand',             description: '+1 spellcasting focus (+2 at level 10). Spell attacks through it ignore half cover.' },
-  { slug: 'returning-weapon',       name: 'Returning Weapon',          itemType: 'Simple or martial thrown weapon', description: 'Gains the thrown property (20/60ft). Returns to your hand immediately after being thrown.' },
-  { slug: 'repeating-shot',         name: 'Repeating Shot',            itemType: 'Simple or martial ranged weapon', description: 'Magically produces its own ammunition; ignores the loading property. Ammunition vanishes after impact.' },
-  { slug: 'bag-of-holding',         name: 'Bag of Holding',            itemType: 'A bag',                           description: 'Becomes a Bag of Holding (holds 500 lb / 64 cu ft; weighs 15 lb).' },
-  // Available at level 6
-  { slug: 'armor-magical-strength', name: 'Armor of Magical Strength', itemType: 'A suit of armor',                 description: '6 charges. Reaction: expend a charge to succeed on a failed STR check or save. Regains 1d6 charges at dawn.', levelRequirement: 6 },
-  { slug: 'boots-winding-path',     name: 'Boots of the Winding Path', itemType: 'A pair of boots',                 description: 'Once per turn, wearer can teleport (bonus action) up to 15ft to an unoccupied space they can see.', levelRequirement: 6 },
-  { slug: 'homunculus-servant',     name: 'Homunculus Servant',        itemType: 'Gem or crystal',                  description: 'Creates a Homunculus Servant construct. Can deliver your touch spells. Rebuilt after a long rest if destroyed.', levelRequirement: 6, cost: '100 gp gem or crystal' },
-  { slug: 'mind-sharpener',         name: 'Mind Sharpener',            itemType: 'Armor or robes',                  description: '4 charges. Reaction: expend a charge to succeed on a failed CON save to maintain concentration. Regains 1d4 at dawn.', levelRequirement: 6 },
-  { slug: 'radiant-weapon',         name: 'Radiant Weapon',            itemType: 'Simple or martial weapon',        description: '+1 magic weapon. Sheds light (5/10ft) on command. 4 charges: reaction to blind an attacker until their next turn (CON save). Regains 1d4 at dawn.', levelRequirement: 6 },
-  { slug: 'repulsion-shield',       name: 'Repulsion Shield',          itemType: 'A shield',                        description: '+1 magic shield. 4 charges: reaction to push a creature 15ft when it hits you (STR save). Regains 1d4 at dawn.', levelRequirement: 6 },
-  { slug: 'resistant-armor',        name: 'Resistant Armor',           itemType: 'A suit of armor',                 description: 'Grants resistance to one damage type chosen at infusion (acid, cold, fire, force, lightning, necrotic, poison, psychic, radiant, or thunder).', levelRequirement: 6 },
-  { slug: 'spell-refueling-ring',   name: 'Spell-Refueling Ring',      itemType: 'A ring',                          description: 'Once per dawn, wearer can recover one expended spell slot of 3rd level or lower.', levelRequirement: 6 },
-  // Available at level 10
-  { slug: 'helm-of-awareness',      name: 'Helm of Awareness',         itemType: 'A helmet',                        description: 'Wearer can\'t be surprised and has advantage on initiative rolls.', levelRequirement: 10 },
-  // Available at level 14
-  { slug: 'arcane-propulsion-armor',name: 'Arcane Propulsion Armor',   itemType: 'A suit of armor (not heavy)',     description: 'Wearer\'s speed increases by 5ft. They can use the armor as a spellcasting focus. Gauntlets count as simple melee weapons (1d8 force, thrown 20/60ft, return after throwing).', levelRequirement: 14 },
+// Tasha's Cauldron of Everything, Replicate Magic Item tables: [artificer level, item slug, name]
+const REPLICABLE_ITEMS: [number, string, string][] = [
+  [2, 'alchemy-jug', 'Alchemy Jug'], [2, 'bag-of-holding', 'Bag of Holding'], [2, 'cap-of-water-breathing', 'Cap of Water Breathing'],
+  [2, 'goggles-of-night', 'Goggles of Night'], [2, 'rope-of-climbing', 'Rope of Climbing'], [2, 'sending-stones', 'Sending Stones'],
+  [2, 'wand-of-magic-detection', 'Wand of Magic Detection'], [2, 'wand-of-secrets', 'Wand of Secrets'],
+  [6, 'boots-of-elvenkind', 'Boots of Elvenkind'], [6, 'cloak-of-elvenkind', 'Cloak of Elvenkind'], [6, 'cloak-of-the-manta-ray', 'Cloak of the Manta Ray'],
+  [6, 'eyes-of-charming', 'Eyes of Charming'], [6, 'gloves-of-thievery', 'Gloves of Thievery'], [6, 'lantern-of-revealing', 'Lantern of Revealing'],
+  [6, 'pipes-of-haunting', 'Pipes of Haunting'], [6, 'ring-of-water-walking', 'Ring of Water Walking'],
+  [10, 'boots-of-striding-and-springing', 'Boots of Striding and Springing'], [10, 'boots-of-the-winterlands', 'Boots of the Winterlands'],
+  [10, 'bracers-of-archery', 'Bracers of Archery'], [10, 'brooch-of-shielding', 'Brooch of Shielding'], [10, 'cloak-of-protection', 'Cloak of Protection'],
+  [10, 'eyes-of-the-eagle', 'Eyes of the Eagle'], [10, 'gauntlets-of-ogre-power', 'Gauntlets of Ogre Power'],
+  [10, 'gloves-of-missile-snaring', 'Gloves of Missile Snaring'], [10, 'gloves-of-swimming-and-climbing', 'Gloves of Swimming and Climbing'],
+  [10, 'hat-of-disguise', 'Hat of Disguise'], [10, 'headband-of-intellect', 'Headband of Intellect'], [10, 'helm-of-telepathy', 'Helm of Telepathy'],
+  [10, 'medallion-of-thoughts', 'Medallion of Thoughts'], [10, 'necklace-of-adaptation', 'Necklace of Adaptation'],
+  [10, 'periapt-of-wound-closure', 'Periapt of Wound Closure'], [10, 'pipes-of-the-sewers', 'Pipes of the Sewers'], [10, 'quiver-of-ehlonna', 'Quiver of Ehlonna'],
+  [10, 'ring-of-jumping', 'Ring of Jumping'], [10, 'ring-of-mind-shielding', 'Ring of Mind Shielding'],
+  [10, 'slippers-of-spider-climbing', 'Slippers of Spider Climbing'], [10, 'ventilating-lungs', 'Ventilating Lungs'], [10, 'winged-boots', 'Winged Boots'],
+  [14, 'amulet-of-health', 'Amulet of Health'], [14, 'arcane-propulsion-arm', 'Arcane Propulsion Arm'], [14, 'belt-of-giant-strength', 'Belt of Hill Giant Strength'],
+  [14, 'boots-of-levitation', 'Boots of Levitation'], [14, 'boots-of-speed', 'Boots of Speed'], [14, 'bracers-of-defense', 'Bracers of Defense'],
+  [14, 'cloak-of-the-bat', 'Cloak of the Bat'], [14, 'dimensional-shackles', 'Dimensional Shackles'], [14, 'gem-of-seeing', 'Gem of Seeing'],
+  [14, 'horn-of-blasting', 'Horn of Blasting'], [14, 'ring-of-free-action', 'Ring of Free Action'], [14, 'ring-of-protection', 'Ring of Protection'],
+  [14, 'ring-of-the-ram', 'Ring of the Ram'],
 ]
+
+// Tasha's Cauldron of Everything, Artificer Infusions
+export const ARTIFICER_INFUSIONS: InfusionDef[] = [
+  // No prerequisite
+  { slug: 'enhanced-weapon', name: 'Enhanced Weapon', itemType: 'A simple or martial weapon', bonus: 'item', bonusAt10: true,
+    description: '+1 to attack and damage rolls made with this magic weapon (+2 from artificer level 10).' },
+  { slug: 'enhanced-defense', name: 'Enhanced Defense', itemType: 'A suit of armor or a shield', bonus: 'item', bonusAt10: true,
+    description: '+1 to Armor Class while wearing the armor or wielding the shield (+2 from artificer level 10).' },
+  { slug: 'enhanced-arcane-focus', name: 'Enhanced Arcane Focus', itemType: 'A rod, staff, or wand', bonus: 'spellAttack', bonusAt10: true, attunement: true,
+    description: 'While holding it, +1 to spell attack rolls, which ignore half cover (+2 from artificer level 10).' },
+  { slug: 'returning-weapon', name: 'Returning Weapon', itemType: 'A simple or martial weapon with the thrown property', bonus: 'item',
+    description: '+1 to attack and damage rolls, and it returns to the wielder\'s hand right after it\'s used for a ranged attack.' },
+  { slug: 'repeating-shot', name: 'Repeating Shot', itemType: 'A simple or martial weapon with the ammunition property', bonus: 'item', attunement: true,
+    description: '+1 to attack and damage rolls with ranged attacks. Ignores the loading property, and makes its own magic ammunition when fired without any (it vanishes after the attack).' },
+  { slug: 'armor-magical-strength', name: 'Armor of Magical Strength', itemType: 'A suit of armor', attunement: true, charges: 6,
+    description: '6 charges (regains 1d6 at dawn). Spend 1 to add your Intelligence modifier to a Strength check or saving throw, or as a reaction to avoid being knocked prone.' },
+  { slug: 'homunculus-servant', name: 'Homunculus Servant', itemType: 'A gem or crystal worth at least 100 gp', cost: '100 gp gem or crystal', kind: 'creature',
+    description: 'Creates a Tiny homunculus (AC 13, HP 1 + INT mod + artificer level, fly 30 ft) that acts on your initiative. Force Strike: ranged spell attack, 1d4 + PB force. Channel Magic: it can deliver your touch spells.' },
+  { slug: 'mind-sharpener', name: 'Mind Sharpener', itemType: 'A suit of armor or robes', attunement: true, charges: 4,
+    description: '4 charges (regains 1d4 at dawn). When the wearer fails a Constitution save to keep concentration, it can use its reaction and 1 charge to succeed instead.' },
+  // 6th-level artificer
+  { slug: 'boots-winding-path', name: 'Boots of the Winding Path', itemType: 'A pair of boots', levelRequirement: 6, attunement: true,
+    description: 'Bonus action: the wearer teleports up to 15 ft to an unoccupied space it can see that it occupied earlier this turn.' },
+  { slug: 'radiant-weapon', name: 'Radiant Weapon', itemType: 'A simple or martial weapon', levelRequirement: 6, bonus: 'item', attunement: true, charges: 4,
+    description: '+1 to attack and damage rolls; sheds bright light 30 ft and dim light 30 ft more on command. 4 charges (regains 1d4 at dawn): when hit, use a reaction and 1 charge to blind the attacker until the end of its next turn unless it makes a CON save against your spell save DC.' },
+  { slug: 'repulsion-shield', name: 'Repulsion Shield', itemType: 'A shield', levelRequirement: 6, bonus: 'item', attunement: true, charges: 4,
+    description: '+1 to Armor Class. 4 charges (regains 1d4 at dawn): when hit by a melee attack, use a reaction and 1 charge to push the attacker up to 15 ft away.' },
+  { slug: 'resistant-armor', name: 'Resistant Armor', itemType: 'A suit of armor', levelRequirement: 6, attunement: true,
+    damageTypes: ['acid', 'cold', 'fire', 'force', 'lightning', 'necrotic', 'poison', 'psychic', 'radiant', 'thunder'],
+    description: 'Resistance to one damage type, chosen when you infuse it: acid, cold, fire, force, lightning, necrotic, poison, psychic, radiant or thunder.' },
+  { slug: 'spell-refueling-ring', name: 'Spell-Refueling Ring', itemType: 'A ring', levelRequirement: 6, attunement: true, charges: 1,
+    description: 'As an action, the wearer recovers one expended spell slot of 3rd level or lower. Once per dawn.' },
+  // 10th-level artificer
+  { slug: 'helm-of-awareness', name: 'Helm of Awareness', itemType: 'A helmet', levelRequirement: 10, attunement: true,
+    description: 'Advantage on initiative rolls, and the wearer can\'t be surprised while it isn\'t incapacitated.' },
+  // 14th-level artificer
+  { slug: 'arcane-propulsion-armor', name: 'Arcane Propulsion Armor', itemType: 'A suit of armor', levelRequirement: 14, attunement: true,
+    description: 'Speed +5 ft. Its gauntlets are magic melee weapons (1d8 force, thrown 20/60 ft, fly back after a ranged attack) usable only with an empty hand. It can\'t be removed against the wearer\'s will and replaces missing limbs.' },
+  // Replicate Magic Item: learned once per item, making that item
+  ...REPLICABLE_ITEMS.map(([level, item, name]): InfusionDef => ({
+    slug: `replicate:${item}`, name: `Replicate: ${name}`, kind: 'replicate', replicates: item, itemType: `Makes a ${name}`,
+    description: `Replicate Magic Item: create a ${name}. Learn this infusion again to replicate another item.`,
+    ...(level > 2 ? { levelRequirement: level } : {}),
+  })),
+]
+
+/** An infusion by the slug it's known or stored under. A stored infusion may carry its choice after
+ *  "@" (Resistant Armor: "resistant-armor@fire"); "bag-of-holding" is the old slug for replicating one. */
+export function findInfusion(slug: string | undefined): InfusionDef | undefined {
+  if (!slug) return undefined
+  const s = slug.split('@')[0]
+  return ARTIFICER_INFUSIONS.find(i => i.slug === (s === 'bag-of-holding' ? 'replicate:bag-of-holding' : s))
+}
+
+/** The +N an artificer infusion gives the item it's in: 0 for no infusion, an infusion without a
+ *  numeric bonus, a different kind of bonus, or one that needs attunement the item doesn't have. */
+export function infusionBonus(item: { infusion?: string; attuned: boolean }, artificerLevel: number, kind: 'item' | 'spellAttack' = 'item'): number {
+  const inf = findInfusion(item.infusion)
+  if (!inf || inf.bonus !== kind || (inf.attunement && !item.attuned)) return 0
+  return inf.bonusAt10 && artificerLevel >= 10 ? 2 : 1
+}
 
 // ── Eldritch Invocations ───────────────────────────────────────────────────
 

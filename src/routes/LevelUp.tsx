@@ -2,13 +2,13 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { listCharactersFromDisk, saveCharacterToDisk } from '../storage/charApi'
 import { useContent } from '../content/ContentProvider'
-import { applyLevelUp, LevelUpChoices, asiLevelsForClass } from '../character/levelUp'
+import { applyLevelUp, LevelUpChoices, asiLevelsForClass, shiftBaselines } from '../character/levelUp'
 import { totalLevel, profBonus, hpMax } from '../character/derive'
 import { sumFeatBonuses } from '../character/featBonuses'
 import { ABILITIES, Character, SKILLS, SKILL_LABELS } from '../character/model'
 import {
   CLASS_OPTIONS, slotsForLevel, PACT_SLOT_TABLE,
-  ELDRITCH_INVOCATIONS, METAMAGIC_OPTIONS, ARTIFICER_INFUSIONS,
+  ELDRITCH_INVOCATIONS, METAMAGIC_OPTIONS, ARTIFICER_INFUSIONS, findInfusion,
   BATTLE_MASTER_MANEUVERS, MULTICLASS_PROF_GRANTS,
   LAND_CIRCLE_SPELLS, RUNE_KNIGHT_RUNES, HUNTER_CHOICES,
   TOTEM_ANIMALS, TOTEM_TIER_LEVELS, STORM_AURA_OPTIONS, FOUR_ELEMENTS_DISCIPLINES,
@@ -86,7 +86,7 @@ function InfusionSwap({ currentInfusions, infusionToSwapOut, infusionToSwapIn, n
           >
             <option value="">— keep all —</option>
             {currentInfusions.map(slug => {
-              const inf = ARTIFICER_INFUSIONS.find(i => i.slug === slug)
+              const inf = findInfusion(slug)
               return <option key={slug} value={slug}>{inf?.name ?? slug}</option>
             })}
           </select>
@@ -100,20 +100,29 @@ function InfusionSwap({ currentInfusions, infusionToSwapOut, infusionToSwapIn, n
             disabled={!infusionToSwapOut}
           >
             <option value="">— choose —</option>
-            {ARTIFICER_INFUSIONS
-              .filter(inf => !currentInfusions.includes(inf.slug) || inf.slug === infusionToSwapOut)
-              .filter(inf => inf.slug !== infusionToSwapOut)
-              .filter(inf => !alreadyGaining.includes(inf.slug))
-              .filter(inf => !inf.levelRequirement || nextLevel >= inf.levelRequirement)
-              .map(inf => (
-                <option key={inf.slug} value={inf.slug}>{inf.name}</option>
-              ))}
+            {(() => {
+              const known = currentInfusions.map(s => findInfusion(s)?.slug ?? s)
+              const offer = ARTIFICER_INFUSIONS
+                .filter(inf => !known.includes(inf.slug))
+                .filter(inf => !alreadyGaining.includes(inf.slug))
+                .filter(inf => !inf.levelRequirement || nextLevel >= inf.levelRequirement)
+              return (
+                <>
+                  <optgroup label="Infusions">
+                    {offer.filter(inf => inf.kind !== 'replicate').map(inf => <option key={inf.slug} value={inf.slug}>{inf.name}</option>)}
+                  </optgroup>
+                  <optgroup label="Replicate Magic Item">
+                    {offer.filter(inf => inf.kind === 'replicate').map(inf => <option key={inf.slug} value={inf.slug}>{inf.name.replace('Replicate: ', '')}</option>)}
+                  </optgroup>
+                </>
+              )
+            })()}
           </select>
         </div>
       </div>
       {infusionToSwapOut && infusionToSwapIn && (
         <p className="text-xs text-green-700 mt-2">
-          Will replace <strong>{ARTIFICER_INFUSIONS.find(i => i.slug === infusionToSwapOut)?.name}</strong> with <strong>{ARTIFICER_INFUSIONS.find(i => i.slug === infusionToSwapIn)?.name}</strong>
+          Will replace <strong>{findInfusion(infusionToSwapOut)?.name}</strong> with <strong>{findInfusion(infusionToSwapIn)?.name}</strong>
         </p>
       )}
     </div>
@@ -229,7 +238,8 @@ export default function LevelUp() {
   const progression = spellProgression(selectedClass, effectiveSubclassSlug)
   const castsAtNextLevel = !!progression && nextLevel >= progression.startLevel
   const spellLevelOf = (slug: string) => content.spells.find(d => d.slug === slug)?.level ?? 0
-  const classSpells = char.spells.filter(s => s.classSlug === selectedClass)
+  // Spells this class taught: a feat's or race's spell tagged with the class doesn't count or swap
+  const classSpells = char.spells.filter(s => s.classSlug === selectedClass && !s.grantedBy)
   const maxSpellLevel = castsAtNextLevel ? maxSpellLevelAt(selectedClass, nextLevel, cls?.spellSlotTable, effectiveSubclassSlug) : 0
 
   // Cantrips: everything this class should know at the new level, minus what it already has
@@ -537,6 +547,8 @@ export default function LevelUp() {
         proficiencies: [...new Set([...base.proficiencies, ...gainedProfs])],
         expertise: [...new Set([...base.expertise, ...gainedExpertise])],
       },
+      // …and so do ability increases and saves (ASI, feat +1, Primal Champion, Resilient)
+      ...shiftBaselines(char, updated),
     }
 
     // Current HP goes up by as much as the maximum did (hit die, CON, Tough, Hill Dwarf, …)
@@ -832,13 +844,13 @@ export default function LevelUp() {
           {/* Cantrip swap */}
           {['sorcerer', 'bard', 'warlock'].includes(selectedClass) && char.spells.some(s => {
             const def = content.spells.find(d => d.slug === s.spellSlug)
-            return def?.level === 0 && s.classSlug === selectedClass
+            return def?.level === 0 && s.classSlug === selectedClass && !s.grantedBy
           }) && (
             <div className="mt-3">
               <p className="text-xs text-parchment-500 mb-2">Optionally replace one known cantrip (click to select, click again to keep):</p>
               <div className="grid grid-cols-2 gap-1">
                 {char.spells
-                  .filter(s => content.spells.find(d => d.slug === s.spellSlug)?.level === 0 && s.classSlug === selectedClass)
+                  .filter(s => content.spells.find(d => d.slug === s.spellSlug)?.level === 0 && s.classSlug === selectedClass && !s.grantedBy)
                   .map(s => (
                     <button
                       key={s.spellSlug}
@@ -981,50 +993,66 @@ export default function LevelUp() {
             {currentInfusions.length > 0 && <> (you have {currentInfusions.length}; gaining {infusionsToGain})</>}
           </p>
           <p className="text-sm text-amber-600 mb-3">({infusionChoices.length}/{infusionsToGain} selected)</p>
-          <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
-            {ARTIFICER_INFUSIONS
-              .filter(inf => !currentInfusions.includes(inf.slug))
+          {(() => {
+            const known = currentInfusions.map(s => findInfusion(s)?.slug ?? s)
+            const offer = ARTIFICER_INFUSIONS
+              .filter(inf => !known.includes(inf.slug))
               .filter(inf => !inf.levelRequirement || nextLevel >= inf.levelRequirement)
-              .map(inf => {
-                const selected = infusionChoices.includes(inf.slug)
-                const atMax = infusionChoices.length >= infusionsToGain
-                return (
-                  <label
-                    key={inf.slug}
-                    className={`flex items-start gap-3 p-2 rounded border cursor-pointer
-                      ${selected ? 'border-parchment-500 bg-parchment-50' : 'border-parchment-100'}
-                      ${!selected && atMax ? 'opacity-40 cursor-not-allowed' : 'hover:border-parchment-400'}`}
-                  >
-                    <input
-                      type="checkbox"
-                      className="mt-0.5 shrink-0"
-                      checked={selected}
-                      disabled={!selected && atMax}
-                      onChange={() => {
-                        setInfusionChoices(prev =>
-                          selected ? prev.filter(x => x !== inf.slug)
-                            : prev.length < infusionsToGain ? [...prev, inf.slug] : prev
-                        )
-                      }}
-                    />
-                    <div>
-                      <div className="text-sm font-medium">
-                        {inf.name}
-                        {inf.levelRequirement && <span className="ml-2 text-xs text-parchment-400">Lvl {inf.levelRequirement}+</span>}
-                      </div>
-                      {inf.itemType && <div className="text-xs text-indigo-600 mt-0.5">Item: {inf.itemType}</div>}
-                      <div className="text-xs text-parchment-500 mt-0.5">{inf.description}</div>
+            const atMax = infusionChoices.length >= infusionsToGain
+            const option = (inf: typeof offer[number]) => {
+              const selected = infusionChoices.includes(inf.slug)
+              return (
+                <label
+                  key={inf.slug}
+                  className={`flex items-start gap-3 p-2 rounded border cursor-pointer
+                    ${selected ? 'border-parchment-500 bg-parchment-50' : 'border-parchment-100'}
+                    ${!selected && atMax ? 'opacity-40 cursor-not-allowed' : 'hover:border-parchment-400'}`}
+                >
+                  <input
+                    type="checkbox"
+                    className="mt-0.5 shrink-0"
+                    checked={selected}
+                    disabled={!selected && atMax}
+                    onChange={() => {
+                      setInfusionChoices(prev =>
+                        selected ? prev.filter(x => x !== inf.slug)
+                          : prev.length < infusionsToGain ? [...prev, inf.slug] : prev
+                      )
+                    }}
+                  />
+                  <div>
+                    <div className="text-sm font-medium">
+                      {inf.kind === 'replicate' ? inf.name.replace('Replicate: ', '') : inf.name}
+                      {inf.levelRequirement && <span className="ml-2 text-xs text-parchment-400">Lvl {inf.levelRequirement}+</span>}
+                      {inf.attunement && <span className="ml-1 text-indigo-400" title="Requires attunement">✦</span>}
                     </div>
-                  </label>
-                )
-              })}
-          </div>
+                    {inf.kind !== 'replicate' && inf.itemType && <div className="text-xs text-indigo-600 mt-0.5">Item: {inf.itemType}</div>}
+                    {inf.kind !== 'replicate' && <div className="text-xs text-parchment-500 mt-0.5">{inf.description}</div>}
+                  </div>
+                </label>
+              )
+            }
+            const replicas = offer.filter(inf => inf.kind === 'replicate')
+            const pickedReplicas = replicas.filter(inf => infusionChoices.includes(inf.slug)).length
+            return (
+              <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
+                {offer.filter(inf => inf.kind !== 'replicate').map(option)}
+                {/* Replicate Magic Item: learned once per item, so each item is its own pick */}
+                <details className="rounded border border-parchment-100" open={pickedReplicas > 0}>
+                  <summary className="p-2 cursor-pointer text-sm font-medium">
+                    Replicate Magic Item <span className="text-xs text-parchment-400 font-normal">— make a magic item; choose which ({replicas.length} available{pickedReplicas ? `, ${pickedReplicas} chosen` : ''})</span>
+                  </summary>
+                  <div className="p-2 pt-0 grid grid-cols-1 sm:grid-cols-2 gap-1.5">{replicas.map(option)}</div>
+                </details>
+              </div>
+            )
+          })()}
           {currentInfusions.length > 0 && (
             <details className="mt-3">
               <summary className="text-xs text-parchment-400 cursor-pointer">Already known ({currentInfusions.length})</summary>
               <div className="mt-1 flex flex-wrap gap-1">
                 {currentInfusions.map(slug => {
-                  const inf = ARTIFICER_INFUSIONS.find(i => i.slug === slug)
+                  const inf = findInfusion(slug)
                   return <span key={slug} className="text-xs bg-parchment-100 text-parchment-600 rounded px-2 py-0.5">{inf?.name ?? slug}</span>
                 })}
               </div>
@@ -1089,7 +1117,8 @@ export default function LevelUp() {
                     <p className="text-xs text-parchment-500 mb-1">You may also replace one spell you know. Click it to forget it (click again to keep it):</p>
                     <div className="space-y-1 mb-2">
                       {char.spells
-                        .filter(s => s.classSlug === selectedClass && (content.spells.find(d => d.slug === s.spellSlug)?.level ?? 0) > 0)
+                        // Feat spells and Mystic Arcanum (free once-a-day casts) aren't class spells known
+                        .filter(s => s.classSlug === selectedClass && !s.freeUseKey && !s.grantedBy && (content.spells.find(d => d.slug === s.spellSlug)?.level ?? 0) > 0)
                         .map(s => (
                           <button
                             key={s.spellSlug}

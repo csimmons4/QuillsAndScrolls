@@ -1,4 +1,4 @@
-import { Character, CharacterClass, FeatureChoice } from './model'
+import { ABILITIES, Character, CharacterClass, FeatureChoice } from './model'
 import { touchUpdated } from './create'
 import { MULTICLASS_PROF_GRANTS, subclassProficiencies } from '../data/classData'
 
@@ -48,6 +48,19 @@ export function applySubclassProficiencies(char: Character, classSlug: string, s
     weaponProficiencies: merge(char.weaponProficiencies, gp.weapons),
     languages: merge(char.languages, gp.languages),
   }
+}
+
+/** Ability scores and saves changed by a level-up or a feat (not by hand) move the baselines the
+ *  sheet's resets restore to by the same amount, so any hand edits stay flagged. */
+export function shiftBaselines(
+  before: Character,
+  after: Pick<Character, 'abilityScores' | 'saveProficiencies'>,
+): Pick<Character, 'abilityBaseline' | 'saveBaseline'> {
+  const base = before.abilityBaseline ?? before.abilityScores
+  const abilityBaseline = { ...base }
+  for (const a of ABILITIES) abilityBaseline[a] = base[a] + after.abilityScores[a] - before.abilityScores[a]
+  const gained = after.saveProficiencies.filter(s => !before.saveProficiencies.includes(s))
+  return { abilityBaseline, saveBaseline: [...new Set([...(before.saveBaseline ?? before.saveProficiencies), ...gained])] }
 }
 
 export function applyLevelUp(char: Character, choices: LevelUpChoices): Character {

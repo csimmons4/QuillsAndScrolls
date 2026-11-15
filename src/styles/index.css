@@ -227,23 +227,166 @@
     animation: conc-glow 2s ease-in-out infinite;
   }
 
-  /* Inspiration token — pops in when gained, then glows while held */
-  @keyframes inspire-pop {
-    0%   { transform: scale(0.7) rotate(-20deg); }
-    60%  { transform: scale(1.18) rotate(8deg); }
-    100% { transform: scale(1) rotate(0); }
+  /* A feature jumped to from the Resources card flashes so the eye lands on it */
+  @keyframes feature-flash {
+    0%, 100% { box-shadow: 0 0 0 0 rgb(var(--accent) / 0); }
+    20%, 60% { box-shadow: 0 0 0 3px rgb(var(--accent) / 0.65); }
+  }
+  .feature-flash { animation: feature-flash 1.5s ease-in-out; }
+
+  /* ── Inspiration: a gold gem you click to gain and press-and-hold to spend ── */
+  .inspire-gem {
+    position: relative;
+    width: 1.75rem;
+    height: 1.75rem;
+    transform: rotate(45deg);
+    border: 1.5px solid;
+    overflow: hidden;
+    transition: transform 0.2s ease, opacity 0.2s ease, border-color 0.2s ease;
+  }
+  .inspire-socket {
+    background: rgb(var(--p-200));
+    border-color: rgb(var(--p-300));
+    opacity: 0.55;
+    box-shadow: inset 0 2px 4px rgb(60 35 5 / 0.3);
+  }
+  button:hover .inspire-socket { opacity: 0.9; border-color: rgb(var(--accent)); }
+  .inspire-gem-held {
+    background: linear-gradient(135deg, #fffbeb 0%, #fde68a 22%, #fbbf24 48%, #d97706 74%, #78350f 100%);
+    border-color: #fde68a;
+    animation: inspire-glow 2.4s ease-in-out infinite;
+  }
+  /* A glint sweeps across the held gem every few seconds */
+  .inspire-gem-held::after {
+    content: '';
+    position: absolute;
+    inset: -50%;
+    background: linear-gradient(90deg, transparent 40%, rgb(255 255 255 / 0.9) 50%, transparent 60%);
+    animation: inspire-shine 3.2s ease-in-out infinite;
   }
   @keyframes inspire-glow {
-    0%, 100% { box-shadow: 0 0 6px 1px rgba(245,158,11,0.35), inset 0 0 6px rgba(255,255,255,0.5); }
-    50%      { box-shadow: 0 0 18px 5px rgba(245,158,11,0.55), inset 0 0 8px rgba(255,255,255,0.7); }
+    0%, 100% { box-shadow: 0 0 8px 2px rgb(245 158 11 / 0.5); }
+    50%      { box-shadow: 0 0 20px 7px rgb(245 158 11 / 0.75); }
   }
-  @keyframes inspire-spin { to { transform: rotate(360deg); } }
-  .inspire-token-active {
-    animation: inspire-pop 0.5s cubic-bezier(0.16, 1, 0.3, 1), inspire-glow 2.4s ease-in-out 0.5s infinite;
+  @keyframes inspire-shine {
+    0%, 55%   { transform: translateX(-100%); }
+    85%, 100% { transform: translateX(100%); }
   }
-  .inspire-rays {
-    animation: inspire-spin 14s linear infinite;
+  /* Gained: the gem pops into its socket */
+  @keyframes inspire-gain {
+    0%   { transform: rotate(45deg) scale(0.2); }
+    60%  { transform: rotate(45deg) scale(1.3); }
+    100% { transform: rotate(45deg) scale(1); }
   }
+  .inspire-gem-gain { animation: inspire-gain 0.55s cubic-bezier(0.16, 1, 0.3, 1), inspire-glow 2.4s ease-in-out 0.55s infinite; }
+  /* Held down: the gem swells and burns brighter while the ring fills */
+  @keyframes inspire-charge {
+    from { transform: rotate(45deg) scale(1); }
+    to   { transform: rotate(45deg) scale(1.3); }
+  }
+  .inspire-holding .inspire-gem-held { animation: inspire-charge var(--hold) ease-in forwards, inspire-glow 0.5s ease-in-out infinite; }
+  .inspire-ring-track { fill: none; stroke: rgb(245 158 11 / 0.18); stroke-width: 3; }
+  .inspire-ring { fill: none; stroke: #f59e0b; stroke-width: 3; stroke-linecap: round; filter: drop-shadow(0 0 3px rgb(251 191 36 / 0.8)); }
+  /* A quick click on a held gem: a little shake to say "hold it" */
+  @keyframes inspire-hint {
+    0%, 100% { transform: translateX(0); }
+    20%, 60% { transform: translateX(-3px); }
+    40%, 80% { transform: translateX(3px); }
+  }
+  .inspire-hint { animation: inspire-hint 0.4s ease-in-out; }
+
+  /* Held down: the screen pulses gold from the gem, the pulses closing in as the ring fills */
+  .inspire-charge-screen {
+    position: fixed;
+    inset: 0;
+    z-index: 55;
+    pointer-events: none;
+    background: radial-gradient(circle at var(--x) var(--y), rgb(255 230 150 / 0.5) 0%, rgb(251 191 36 / 0.22) 35%, rgb(251 191 36 / 0.1) 70%);
+    box-shadow: inset 0 0 220px 60px rgb(251 191 36 / 0.7);
+    opacity: 0;
+    animation: inspire-charge-screen var(--hold) linear forwards;
+  }
+  @keyframes inspire-charge-screen {
+    0%   { opacity: 0; }
+    14%  { opacity: 0.5; }
+    26%  { opacity: 0.12; }
+    42%  { opacity: 0.65; }
+    52%  { opacity: 0.25; }
+    64%  { opacity: 0.8; }
+    72%  { opacity: 0.4; }
+    81%  { opacity: 0.9; }
+    87%  { opacity: 0.55; }
+    93%  { opacity: 1; }
+    96%  { opacity: 0.8; }
+    100% { opacity: 1; }
+  }
+
+  /* Spent: the whole window floods with golden light from the gem */
+  .inspire-burst { position: fixed; inset: 0; z-index: 60; pointer-events: none; overflow: hidden; }
+  .inspire-burst-glow {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at var(--x) var(--y), rgb(255 236 170 / 0.85) 0%, rgb(251 191 36 / 0.45) 22%, rgb(245 158 11 / 0.18) 50%, transparent 78%);
+    box-shadow: inset 0 0 160px 40px rgb(251 191 36 / 0.55);
+    animation: inspire-flood 1.8s ease-out forwards;
+  }
+  @keyframes inspire-flood {
+    0%   { opacity: 0.85; }
+    10%  { opacity: 1; }
+    55%  { opacity: 0.85; }
+    100% { opacity: 0; }
+  }
+  .inspire-burst-rays {
+    position: absolute;
+    left: var(--x);
+    top: var(--y);
+    width: 160vmax;
+    height: 160vmax;
+    margin: -80vmax 0 0 -80vmax;
+    background: repeating-conic-gradient(rgb(255 240 190 / 0.6) 0deg 5deg, transparent 5deg 18deg);
+    -webkit-mask-image: radial-gradient(circle, black 0%, transparent 60%);
+    mask-image: radial-gradient(circle, black 0%, transparent 60%);
+    animation: inspire-rays 1.8s ease-out forwards;
+  }
+  @keyframes inspire-rays {
+    0%   { opacity: 0; transform: scale(0.2) rotate(0deg); }
+    15%  { opacity: 1; }
+    100% { opacity: 0; transform: scale(1) rotate(25deg); }
+  }
+  .inspire-spark {
+    position: absolute;
+    left: var(--x);
+    top: var(--y);
+    width: var(--s);
+    height: var(--s);
+    margin: calc(var(--s) / -2) 0 0 calc(var(--s) / -2);
+    /* White-hot centre so the sparks stand out against the golden wash */
+    background: radial-gradient(circle, #fff 0 22%, #fef3c7 38%, #fbbf24 62%, #d97706 100%);
+    box-shadow: 0 0 4px 1px #fff, 0 0 14px 5px rgb(251 191 36 / 0.9);
+    opacity: 0;
+    animation: inspire-spark 1.2s cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+  }
+  @keyframes inspire-spark {
+    0%   { transform: translate(0, 0) rotate(45deg) scale(1); opacity: 1; }
+    100% { transform: translate(var(--dx), var(--dy)) rotate(225deg) scale(0.2); opacity: 0; }
+  }
+  .inspire-burst-word {
+    position: absolute;
+    left: 50%;
+    top: 42%;
+    font-size: clamp(3rem, 9vw, 6rem);
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+    animation: inspire-word 1.8s ease-out forwards;
+  }
+  @keyframes inspire-word {
+    0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.6); }
+    20%  { opacity: 1; transform: translate(-50%, -50%) scale(1.06); }
+    70%  { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    100% { opacity: 0; transform: translate(-50%, -62%) scale(1); }
+  }
+
   /* ── Coin purse (merchant's ledger) ─────────────────────────────────────── */
   /* Gold-leaf lettering; the gradient repeats every 1em so each odometer digit matches */
   .gold-leaf {
@@ -257,6 +400,21 @@
   }
   .odometer-strip {
     transition: transform 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  /* Every few seconds a glint sweeps across the gold, one character after the next (--i). The band
+     is vertical: each digit is a tall 0–9 strip, so a slanted band would land differently per digit. */
+  .gold-leaf.gold-shimmer {
+    background-image:
+      linear-gradient(90deg, transparent 40%, rgb(255 252 235 / 0.95) 50%, transparent 60%),
+      linear-gradient(180deg, #fbe7a1 0%, #e3b64e 42%, #a8771f 68%, #f0cd6e 100%);
+    background-size: 300% 100%, 100% 1em;
+    background-repeat: no-repeat, repeat-y;
+    animation: gold-shimmer 5s ease-in-out infinite;
+    animation-delay: calc(var(--i, 0) * 70ms);
+  }
+  @keyframes gold-shimmer {
+    0%, 70% { background-position: 90% 0, 0 0; }
+    100%    { background-position: 10% 0, 0 0; }
   }
   /* Ruled ledger paper with a red margin line */
   .ledger-lines {
@@ -292,8 +450,100 @@
   }
   .coin-flip { animation: coin-flip 0.5s ease-out; }
 
+  /* ── Class resource pips: amber gems, the same diamonds as spell slots and attunement ── */
+  .res-pip {
+    width: 1.5rem;
+    height: 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .res-gem {
+    width: 0.875rem;
+    height: 0.875rem;
+    transform: rotate(45deg);
+    border: 1px solid;
+    transition: transform 0.15s ease, opacity 0.15s ease, filter 0.15s ease;
+  }
+  .res-gem-full {
+    background: linear-gradient(135deg, #fef3c7 0%, #fbbf24 35%, #d97706 70%, #92400e 100%);
+    border-color: #fcd34d;
+    animation: res-gem-pulse 2.6s ease-in-out infinite;
+  }
+  .res-pip:hover .res-gem-full { filter: brightness(1.15); }
+  /* A spent gem leaves an empty socket */
+  .res-gem-spent {
+    background: rgb(var(--p-200));
+    border-color: rgb(var(--p-300));
+    opacity: 0.45;
+  }
+  .res-pip:hover .res-gem-spent { transform: rotate(45deg) scale(1.25); opacity: 0.75; }
+  @keyframes res-gem-pulse {
+    0%, 100% { box-shadow: 0 0 4px 1px rgb(245 158 11 / 0.45); transform: rotate(45deg) scale(1); }
+    50%      { box-shadow: 0 0 10px 4px rgb(245 158 11 / 0.75); transform: rotate(45deg) scale(1.12); }
+  }
+  /* Spending flares the gem and lets it fade into its socket; restoring pops it back in */
+  @keyframes res-gem-spend {
+    0%   { transform: rotate(45deg) scale(1.35); opacity: 1; background: #fbbf24; box-shadow: 0 0 14px 6px rgb(245 158 11 / 0.8); }
+    100% { transform: rotate(45deg) scale(1); opacity: 0.45; }
+  }
+  @keyframes res-gem-restore {
+    0%   { transform: rotate(45deg) scale(0.3); box-shadow: 0 0 0 0 rgb(245 158 11 / 0); }
+    60%  { transform: rotate(45deg) scale(1.35); box-shadow: 0 0 16px 6px rgb(253 230 138 / 0.9); }
+    100% { transform: rotate(45deg) scale(1); box-shadow: 0 0 4px 1px rgb(245 158 11 / 0.45); }
+  }
+  /* After .res-gem-full so a restore's animation replaces the pulse while it plays */
+  .res-gem-spend { animation: res-gem-spend 0.4s ease-out both; }
+  .res-gem-restore { animation: res-gem-restore 0.5s cubic-bezier(0.16, 1, 0.3, 1) both; }
+  /* Spell and pact slots: the same cut gem in violet (their pulse is pip-pulse) */
+  .spell-gem {
+    background: linear-gradient(135deg, #f5f3ff 0%, #c4b5fd 30%, #8b5cf6 62%, #5b21b6 100%);
+    border-color: #ddd6fe;
+  }
+  .group:hover .spell-gem { filter: brightness(1.15); }
+  /* Attunement: indigo gems, turning ruby once all three slots are taken (attune-pulse / attune-full) */
+  .attune-gem {
+    background: linear-gradient(135deg, #eef2ff 0%, #a5b4fc 30%, #6366f1 62%, #3730a3 100%);
+    border-color: #c7d2fe;
+  }
+  /* Temp HP shield: pale blue with dark digits, or deep blue with light digits in dark mode */
+  .temp-shield { color: #bfdbfe; }
+  .temp-shield path { stroke: #93c5fd; stroke-width: 2; }
+  .temp-shield-value { color: #1d4ed8; }
+  [data-theme='dark'] .temp-shield { color: #1e3a8a; }
+  [data-theme='dark'] .temp-shield path { stroke: #60a5fa; }
+  [data-theme='dark'] .temp-shield-value { color: #eff6ff; }
+
+  /* Infusions: teal gems for the artificer's infused items */
+  .infuse-gem {
+    background: linear-gradient(135deg, #f0fdfa 0%, #5eead4 30%, #14b8a6 62%, #115e59 100%);
+    border-color: #99f6e4;
+  }
+  @keyframes infuse-pulse {
+    0%, 100% { box-shadow: 0 0 3px 1px rgb(20 184 166 / 0.35); }
+    50%      { box-shadow: 0 0 8px 3px rgb(20 184 166 / 0.6); }
+  }
+  .attune-gem-full {
+    background: linear-gradient(135deg, #fef2f2 0%, #fca5a5 30%, #ef4444 62%, #991b1b 100%);
+    border-color: #fecaca;
+  }
+  /* Pools too big for pips (Lay on Hands): a gold bar in the same sunken track */
+  .res-pool-track {
+    background: rgb(var(--p-100));
+    box-shadow: inset 0 1.5px 3px rgb(0 0 0 / 0.25), inset 0 0 0 1px rgb(var(--p-300));
+  }
+  .res-pool-fill {
+    background: linear-gradient(180deg, #f8e3a0 0%, #e0b14f 40%, #b07d24 75%, #8a5d17 100%);
+    box-shadow: inset 0 1px 0 rgb(255 245 210 / 0.6), inset 0 -1px 0 rgb(80 48 8 / 0.35);
+  }
+
   @media (prefers-reduced-motion: reduce) {
-    .inspire-token-active, .inspire-rays, .purse-float, .coin-flip { animation: none; }
+    .purse-float, .coin-flip, .gold-leaf.gold-shimmer, .res-gem-full, .res-gem-spend, .res-gem-restore,
+    .inspire-gem-held, .inspire-gem-gain, .inspire-holding .inspire-gem-held, .inspire-hint { animation: none; }
+    .inspire-gem-held { box-shadow: 0 0 12px 4px rgb(245 158 11 / 0.6); }
+    .inspire-gem-held::after, .inspire-burst-rays, .inspire-spark { display: none; }
+    .inspire-charge-screen { animation: none; opacity: 0.5; }
+    .res-gem-full { box-shadow: 0 0 6px 2px rgb(245 158 11 / 0.55); }
     .odometer-strip { transition: none; }
   }
 

@@ -2,13 +2,24 @@ import { Character, CharacterSchema, SCHEMA_VERSION } from '../character/model'
 
 /**
  * Per-version migration steps. Each entry upgrades a character object FROM that
- * version to the next (e.g. key `1` turns a v1 object into a v2 one). Schema
- * changes so far have been additive — new fields are optional or carry Zod
- * defaults — so there are no transforms yet. Add a step here whenever a future
- * SCHEMA_VERSION bump changes the shape in a way the schema can't absorb on its own.
+ * version to the next (e.g. key `1` turns a v1 object into a v2 one). Most schema
+ * changes have been additive — new fields are optional or carry Zod defaults. Add a
+ * step here whenever a SCHEMA_VERSION bump needs existing saves filled in or reshaped.
  */
 const MIGRATIONS: Record<number, (c: Record<string, unknown>) => Record<string, unknown>> = {
-  // 1: c => ({ ...c, someNewField: deriveFrom(c) }),
+  // v5 → v6: spell entries record what granted them. Feat picks (freeUseKey "feat:<slug>:…") and
+  // Strixhaven picks can be told apart; a feat's cantrips and the High Elf cantrip can't, so
+  // only new picks are tagged for those.
+  5: c => ({
+    ...c,
+    spells: ((c.spells as Record<string, unknown>[] | undefined) ?? []).map(s => {
+      if (s.grantedBy) return s
+      const key = typeof s.freeUseKey === 'string' ? s.freeUseKey : ''
+      if (key.startsWith('feat:')) return { ...s, grantedBy: `feat:${key.split(':')[1]}` }
+      if (s.classSlug === 'strixhaven') return { ...s, grantedBy: 'strixhaven' }
+      return s
+    }),
+  }),
 }
 
 /**

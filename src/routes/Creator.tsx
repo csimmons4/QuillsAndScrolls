@@ -4,7 +4,7 @@ import { useContent } from '../content/ContentProvider'
 import { newCharacter, touchUpdated } from '../character/create'
 import { applySubclassProficiencies } from '../character/levelUp'
 import { saveCharacterToDisk } from '../storage/charApi'
-import { Character, EquipmentItem, SKILLS, SKILL_LABELS, AbilityScores, ABILITIES } from '../character/model'
+import { Character, EquipmentItem, SpellEntry, SKILLS, SKILL_LABELS, AbilityScores, ABILITIES } from '../character/model'
 import { abilityMod, hpMax } from '../character/derive'
 import { sumFeatBonuses } from '../character/featBonuses'
 import { v4 as uuidv4 } from 'uuid'
@@ -12,6 +12,7 @@ import { DRACONIC_ANCESTRIES, RaceCategory, LANGUAGES_STANDARD, LANGUAGES_EXOTIC
 import { CLASS_OPTIONS, INITIAL_SPELL_SLOTS, PACT_SLOT_TABLE, FAVORED_ENEMY_TYPES, FAVORED_TERRAINS } from '../data/classData'
 import { STRIXHAVEN_COLLEGES } from '../data/strixhavenSpells'
 import { CLASS_STARTING_GEAR, gearPickOptions, type GearItem, type GearPick } from '../data/startingGear'
+import { ARTISAN_TOOLS, MUSICAL_INSTRUMENTS, GAMING_SETS } from '../character/proficiencies'
 import { FeatPicker } from '../components/FeatPicker'
 import { FeatGrantsBlock } from '../components/FeatGrantsBlock'
 import { InlinePicker } from '../components/InlinePicker'
@@ -61,14 +62,6 @@ function parseBgItems(raw: string[]): string[] {
     })
 }
 
-const MUSICAL_INSTRUMENTS = ['Bagpipes', 'Drum', 'Dulcimer', 'Flute', 'Lute', 'Lyre', 'Horn', 'Pan flute', 'Shawm', 'Viol']
-const ARTISAN_TOOLS = [
-  "Alchemist's supplies", "Brewer's supplies", "Calligrapher's supplies", "Carpenter's tools",
-  "Cartographer's tools", "Cobbler's tools", "Cook's utensils", "Glassblower's tools",
-  "Jeweler's tools", "Leatherworker's tools", "Mason's tools", "Painter's supplies",
-  "Potter's tools", "Smith's tools", "Tinker's tools", "Weaver's tools", "Woodcarver's tools",
-]
-const GAMING_SETS = ['Dice set', 'Dragonchess set', 'Playing card set', 'Three-Dragon Ante set']
 
 function bgToolOptions(choiceLabel: string): string[] {
   const lower = choiceLabel.toLowerCase()
@@ -479,14 +472,14 @@ export default function Creator() {
 
     // Add cantrips as spells
     const classSlug = finalChar.classes[0]?.classSlug ?? ''
-    const cantripEntries = selectedCantrips.map(slug => {
+    const cantripEntries: SpellEntry[] = selectedCantrips.map(slug => {
       const def = spells.find(s => s.slug === slug)
       return { spellSlug: slug, name: def?.name ?? slug, classSlug, prepared: true, isHomebrew: false }
     })
     // Add high elf cantrip
     if (highElfCantrip) {
       const def = spells.find(s => s.slug === highElfCantrip)
-      cantripEntries.push({ spellSlug: highElfCantrip, name: def?.name ?? highElfCantrip, classSlug: 'wizard', prepared: true, isHomebrew: false })
+      cantripEntries.push({ spellSlug: highElfCantrip, name: def?.name ?? highElfCantrip, classSlug: 'wizard', prepared: true, isHomebrew: false, grantedBy: 'race:high-elf' })
     }
     // Add known L1 spells
     const l1Entries = selectedL1Spells.map(slug => {
@@ -632,6 +625,8 @@ export default function Creator() {
     })
 
     finalChar.skillBaseline = { proficiencies: [...finalChar.skillProficiencies], expertise: [...finalChar.skillExpertise] }
+    finalChar.abilityBaseline = { ...finalChar.abilityScores }
+    finalChar.saveBaseline = [...finalChar.saveProficiencies]
 
     const final = touchUpdated(finalChar)
     await saveCharacterToDisk(final)
