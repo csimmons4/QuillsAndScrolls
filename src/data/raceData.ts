@@ -1,5 +1,4 @@
-import { AbilityScores } from '../character/model'
-import type { FeatSpell, RaceDef } from '../content/loaders'
+import type { FeatSpell } from '../content/loaders'
 
 export interface SubraceDef {
   slug: string
@@ -8,6 +7,12 @@ export interface SubraceDef {
   traits: string[]
   grantedCantrip?: string // e.g. high elf
   grantedSpells?: FeatSpell[]
+  hpBonusPerLevel?: number
+  speed?: number  // replaces the race's walking speed
+  grantedWeapons?: string[]
+  grantedArmor?: string[]
+  grantedTools?: string[]
+  extraLanguages?: number  // languages of the player's choice (High Elf's Extra Language)
 }
 
 export type RaceCategory = 'Common' | 'Uncommon' | 'Exotic'
@@ -25,6 +30,8 @@ export interface RaceOptionsDef {
   grantedSkills?: string[]
   skillChoices?: { count: number; from: string[] }
   grantedTools?: string[]
+  grantedWeapons?: string[]  // weapon training (proficiency strings like 'longswords')
+  grantedArmor?: string[]
   grantedLanguages?: string[]
   naturalArmor?: { base: number; addDex: boolean }
   resistances?: string[]
@@ -32,6 +39,7 @@ export interface RaceOptionsDef {
   conditionImmunities?: string[]
   advantages?: string[]
   grantedSpells?: FeatSpell[]
+  hpBonusPerLevel?: number
 }
 
 export const RACE_OPTIONS: Record<string, RaceOptionsDef> = {
@@ -70,6 +78,8 @@ export const RACE_OPTIONS: Record<string, RaceOptionsDef> = {
     subraces: [
       {
         slug: 'high-elf',
+        extraLanguages: 1,
+        grantedWeapons: ['longswords', 'shortswords', 'shortbows', 'longbows'],
         name: 'High Elf',
         abilityBonuses: { int: 1 },
         traits: ['Elf Weapon Training (longsword, shortsword, shortbow, longbow)', 'Extra Language', 'Cantrip (one Wizard cantrip, INT-based)'],
@@ -77,19 +87,22 @@ export const RACE_OPTIONS: Record<string, RaceOptionsDef> = {
       },
       {
         slug: 'wood-elf',
+        grantedWeapons: ['longswords', 'shortswords', 'shortbows', 'longbows'],
         name: 'Wood Elf',
         abilityBonuses: { wis: 1 },
+        speed: 35,
         traits: ['Elf Weapon Training (longsword, shortsword, shortbow, longbow)', 'Fleet of Foot (speed 35ft)', 'Mask of the Wild (hide in natural phenomena)'],
       },
       {
         slug: 'dark-elf',
+        grantedWeapons: ['rapiers', 'shortswords', 'hand crossbows'],
         name: 'Dark Elf (Drow)',
         abilityBonuses: { cha: 1 },
         traits: ['Superior Darkvision 120ft', 'Sunlight Sensitivity (disadv in sunlight)', 'Drow Magic (Dancing Lights → Faerie Fire → Darkness, CHA-based)', 'Drow Weapon Training (rapier, shortsword, hand crossbow)'],
         grantedSpells: [
           { slug: 'dancing-lights', name: 'Dancing Lights', level: 0 },
-          { slug: 'faerie-fire',    name: 'Faerie Fire',    level: 1, usesPerLongRest: 1 },
-          { slug: 'darkness',       name: 'Darkness',       level: 2, usesPerLongRest: 1 },
+          { slug: 'faerie-fire',    name: 'Faerie Fire',    level: 1, usesPerLongRest: 1, minLevel: 3 },
+          { slug: 'darkness',       name: 'Darkness',       level: 2, usesPerLongRest: 1, minLevel: 5 },
         ],
       },
       {
@@ -101,6 +114,7 @@ export const RACE_OPTIONS: Record<string, RaceOptionsDef> = {
     ],
   },
   dwarf: {
+    grantedWeapons: ['battleaxes', 'handaxes', 'light hammers', 'warhammers'],
     category: 'Common',
     abilityBonuses: { con: 2 },
     grantedLanguages: ['Common', 'Dwarvish'],
@@ -113,9 +127,11 @@ export const RACE_OPTIONS: Record<string, RaceOptionsDef> = {
         name: 'Hill Dwarf',
         abilityBonuses: { wis: 1 },
         traits: ['Dwarven Toughness (+1 HP per level)'],
+        hpBonusPerLevel: 1,
       },
       {
         slug: 'mountain-dwarf',
+        grantedArmor: ['light', 'medium'],
         name: 'Mountain Dwarf',
         abilityBonuses: { str: 2 },
         traits: ['Dwarven Armor Training (light & medium armor proficiency)'],
@@ -142,6 +158,7 @@ export const RACE_OPTIONS: Record<string, RaceOptionsDef> = {
       },
       {
         slug: 'rock-gnome',
+        grantedTools: ["Tinker's tools"],
         name: 'Rock Gnome',
         abilityBonuses: { con: 1 },
         traits: ["Artificer's Lore (double prof bonus on magical item History checks)", 'Tinker (craft tiny clockwork devices)'],
@@ -188,8 +205,8 @@ export const RACE_OPTIONS: Record<string, RaceOptionsDef> = {
         traits: ['Infernal Legacy: Thaumaturgy cantrip → Hellish Rebuke (L3) → Darkness (L5), CHA-based'],
         grantedSpells: [
           { slug: 'thaumaturgy',   name: 'Thaumaturgy',   level: 0 },
-          { slug: 'hellish-rebuke',name: 'Hellish Rebuke', level: 1, usesPerLongRest: 1 },
-          { slug: 'darkness',      name: 'Darkness',       level: 2, usesPerLongRest: 1 },
+          { slug: 'hellish-rebuke',name: 'Hellish Rebuke', level: 1, usesPerLongRest: 1, minLevel: 3, castLevel: 2 },
+          { slug: 'darkness',      name: 'Darkness',       level: 2, usesPerLongRest: 1, minLevel: 5 },
         ],
       },
       {
@@ -199,8 +216,8 @@ export const RACE_OPTIONS: Record<string, RaceOptionsDef> = {
         traits: ['Infernal Legacy: Thaumaturgy cantrip → Hellish Rebuke (L3) → Darkness (L5), CHA-based'],
         grantedSpells: [
           { slug: 'thaumaturgy',   name: 'Thaumaturgy',   level: 0 },
-          { slug: 'hellish-rebuke',name: 'Hellish Rebuke', level: 1, usesPerLongRest: 1 },
-          { slug: 'darkness',      name: 'Darkness',       level: 2, usesPerLongRest: 1 },
+          { slug: 'hellish-rebuke',name: 'Hellish Rebuke', level: 1, usesPerLongRest: 1, minLevel: 3, castLevel: 2 },
+          { slug: 'darkness',      name: 'Darkness',       level: 2, usesPerLongRest: 1, minLevel: 5 },
         ],
       },
       {
@@ -210,8 +227,8 @@ export const RACE_OPTIONS: Record<string, RaceOptionsDef> = {
         traits: ['Infernal Legacy: Thaumaturgy cantrip → Searing Smite (L3) → Branding Smite (L5), CHA-based'],
         grantedSpells: [
           { slug: 'thaumaturgy',   name: 'Thaumaturgy',    level: 0 },
-          { slug: 'searing-smite', name: 'Searing Smite',  level: 1, usesPerLongRest: 1 },
-          { slug: 'branding-smite',name: 'Branding Smite', level: 2, usesPerLongRest: 1 },
+          { slug: 'searing-smite', name: 'Searing Smite',  level: 1, usesPerLongRest: 1, minLevel: 3, castLevel: 2 },
+          { slug: 'branding-smite',name: 'Branding Smite', level: 2, usesPerLongRest: 1, minLevel: 5 },
         ],
       },
     ],
@@ -348,6 +365,8 @@ export const RACE_OPTIONS: Record<string, RaceOptionsDef> = {
     traits: ['Acid Resistance', 'Amphibious (breathe air & water)', 'Swim 30ft', 'Call to the Wave (Shape Water cantrip → Create or Destroy Water (L3) → Water Walk (L5), CON-based)'],
   },
   githyanki: {
+    grantedArmor: ['light', 'medium'],
+    grantedWeapons: ['shortswords', 'longswords', 'greatswords'],
     category: 'Exotic',
     grantedLanguages: ['Common', 'Gith'],
     abilityBonuses: { str: 2, int: 1 },
@@ -621,25 +640,34 @@ export const DRACONIC_ANCESTRIES = [
   { slug: 'white',  name: 'White',  damageType: 'Cold',      breathShape: '15ft cone',   saveType: 'CON' },
 ]
 
-export function applyRaceAbilityBonuses(
-  base: AbilityScores,
-  race: RaceDef | undefined,
-  subraceSlug?: string
-): AbilityScores {
-  if (!race) return base
-  const scores = { ...base } as Record<string, number>
+// ── Languages ──────────────────────────────────────────────────────────────
 
-  const bonuses = { ...(race.abilityBonuses ?? {}) }
-  if (subraceSlug) {
-    const subrace = race.subraces?.find(s => s.slug === subraceSlug)
-    if (subrace?.abilityBonuses) {
-      for (const [k, v] of Object.entries(subrace.abilityBonuses)) {
-        bonuses[k] = (bonuses[k] ?? 0) + (v ?? 0)
-      }
-    }
+export const LANGUAGES_STANDARD = ['Common', 'Dwarvish', 'Elvish', 'Giant', 'Gnomish', 'Goblin', 'Halfling', 'Orc']
+export const LANGUAGES_EXOTIC = ['Abyssal', 'Celestial', 'Draconic', 'Deep Speech', 'Infernal', 'Primordial', 'Sylvan', 'Undercommon']
+
+const CHOICE_COUNT: Record<string, number> = { one: 1, two: 2, three: 3 }
+const COUNT_WORD = ['', 'one', 'two', 'three']
+
+/** How many picks a placeholder like "two languages of your choice" stands for (0 for a real language). */
+export function languageChoiceCount(lang: string): number {
+  const m = lang.match(/^(one|two|three)\b.*\bchoice\b/i)
+  return m ? CHOICE_COUNT[m[1].toLowerCase()] : 0
+}
+
+/** The placeholder for `n` languages still to pick ("one language of your choice"), or null if none. */
+export function languageChoicePlaceholder(n: number): string | null {
+  if (n <= 0) return null
+  return `${COUNT_WORD[n] ?? n} language${n > 1 ? 's' : ''} of your choice`
+}
+
+/**
+ * A race's languages split into the fixed ones and how many the player picks. Races without a
+ * curated list (most Monsters of the Multiverse races) speak Common plus one of their choice.
+ */
+export function splitRaceLanguages(granted: string[] | undefined): { fixed: string[]; choices: number } {
+  const langs = granted ?? ['Common', 'one language of your choice']
+  return {
+    fixed: langs.filter(l => !languageChoiceCount(l)),
+    choices: langs.reduce((n, l) => n + languageChoiceCount(l), 0),
   }
-  for (const [k, v] of Object.entries(bonuses)) {
-    if (v !== undefined) scores[k] = Math.min(20, (scores[k] ?? 10) + v)
-  }
-  return scores as AbilityScores
 }

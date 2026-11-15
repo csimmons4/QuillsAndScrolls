@@ -1,6 +1,7 @@
-import { BrowserRouter, Routes, Route, NavLink, Link } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, NavLink, Link, useLocation } from 'react-router-dom'
 import { ContentProvider } from './content/ContentProvider'
 import { ThemeProvider } from './theme/theme'
+import { RecentCharacterProvider, useRecentCharacter } from './storage/recentCharacter'
 import Vault from './routes/Vault'
 import Creator from './routes/Creator'
 import Sheet from './routes/Sheet'
@@ -12,6 +13,9 @@ import Settings from './routes/Settings'
 function NavBar() {
   const linkClass = ({ isActive }: { isActive: boolean }) =>
     isActive ? 'nav-link nav-link-active' : 'nav-link'
+  const { recent } = useRecentCharacter()
+  const { pathname } = useLocation()
+  const onRecentSheet = !!recent && pathname.startsWith(`/c/${recent.id}`)
 
   return (
     <header className="app-header shadow-lg">
@@ -25,6 +29,11 @@ function NavBar() {
           <NavLink to="/homebrew" className={linkClass}>Homebrew</NavLink>
           <NavLink to="/settings" className={linkClass}>Settings</NavLink>
         </nav>
+        {recent && !onRecentSheet && (
+          <Link to={`/c/${recent.id}`} className="nav-back ml-auto" title={`Back to ${recent.name}'s sheet`}>
+            ← <span className="truncate max-w-[12rem]">{recent.name}</span>
+          </Link>
+        )}
       </div>
     </header>
   )
@@ -34,6 +43,7 @@ export default function App() {
   return (
     <ThemeProvider>
     <BrowserRouter>
+      <RecentCharacterProvider>
       <ContentProvider>
         <div className="min-h-screen flex flex-col">
           <NavBar />
@@ -50,6 +60,7 @@ export default function App() {
           </main>
         </div>
       </ContentProvider>
+      </RecentCharacterProvider>
     </BrowserRouter>
     </ThemeProvider>
   )

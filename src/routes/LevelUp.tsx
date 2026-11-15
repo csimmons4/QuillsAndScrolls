@@ -3,7 +3,8 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { listCharactersFromDisk, saveCharacterToDisk } from '../storage/charApi'
 import { useContent } from '../content/ContentProvider'
 import { applyLevelUp, LevelUpChoices, asiLevelsForClass } from '../character/levelUp'
-import { totalLevel, profBonus } from '../character/derive'
+import { totalLevel, profBonus, hpMax } from '../character/derive'
+import { sumFeatBonuses } from '../character/featBonuses'
 import { ABILITIES, Character, SKILLS, SKILL_LABELS } from '../character/model'
 import {
   CLASS_OPTIONS, slotsForLevel, PACT_SLOT_TABLE,
@@ -12,11 +13,14 @@ import {
   LAND_CIRCLE_SPELLS, RUNE_KNIGHT_RUNES, HUNTER_CHOICES,
   TOTEM_ANIMALS, TOTEM_TIER_LEVELS, STORM_AURA_OPTIONS, FOUR_ELEMENTS_DISCIPLINES,
   spellcastingClasses, multiclassSpellSlotsMax,
+  spellProgression, cantripsKnownAt, maxSpellLevelAt, hasMagicalSecretsAt, FAVORED_ENEMY_TYPES, FAVORED_TERRAINS,
+  MYSTIC_ARCANUM_LEVELS, mysticArcanumKey, mysticArcanumEntry,
 } from '../data/classData'
 import { FeatPicker } from '../components/FeatPicker'
 import { FeatGrantsBlock } from '../components/FeatGrantsBlock'
 import { InlinePicker } from '../components/InlinePicker'
-import { resolveFeatGrants, applyGrantPicks, withFeatClassChoice } from '../character/grants'
+import { resolveFeatGrants, applyGrantPicks, withFeatClassChoice, applyFeatAbilityIncrease, featAbilityPick } from '../character/grants'
+import { FeatAbilityPicker } from '../components/FeatAbilityPicker'
 
 const MULTICLASS_PREREQS: Record<string, (s: { str: number; dex: number; con: number; int: number; wis: number; cha: number }) => boolean> = {
   barbarian: s => s.str >= 13,
@@ -129,7 +133,11 @@ export default function LevelUp() {
     })
   }, [id])
 
-  const [selectedClass, setSelectedClass] = useState(char?.classes[0]?.classSlug ?? '')
+  const [selectedClass, setSelectedClassState] = useState('')
+  // The character loads after the first render — default to its (first) class once it arrives
+  useEffect(() => {
+    if (char) setSelectedClassState(prev => prev || (char.classes[0]?.classSlug ?? ''))
+  }, [char])
   const [hpRoll, setHpRoll] = useState<number | null>(null)
   const [useAverage, setUseAverage] = useState(true)
   const [asiChoice, setAsiChoice] = useState<'asi' | 'feat'>('asi')
@@ -138,6 +146,7 @@ export default function LevelUp() {
   const [featSlug, setFeatSlug] = useState('')
   const [featGrants, setFeatGrants] = useState<Record<string, string[]>>({})
   const [featClass, setFeatClass] = useState('')
+  const [featAbility, setFeatAbility] = useState('')  // half-feat +1 target
   const [subclass, setSubclass] = useState('')
   const [newSpells, setNewSpells] = useState<string[]>([])
   const [newCantrips, setNewCantrips] = useState<string[]>([])
@@ -159,10 +168,25 @@ export default function LevelUp() {
   const [landTerrain, setLandTerrain] = useState('')
   const [runeChoices, setRuneChoices] = useState<string[]>([])
   const [hunterChoice, setHunterChoice] = useState('')
+  const [arcanumSpell, setArcanumSpell] = useState('')
   const [showAllSchools, setShowAllSchools] = useState(false)
   const [totemAnimal, setTotemAnimal] = useState('')
   const [stormAura, setStormAura] = useState('')
   const [fourElementsChoices, setFourElementsChoices] = useState<string[]>([])
+  const [anyClassSpells, setAnyClassSpells] = useState(false)  // Bard's Magical Secrets
+
+  // Picks made for one class don't carry over to another
+  function setSelectedClass(slug: string) {
+    if (slug === selectedClass) return
+    setSelectedClassState(slug)
+    setSubclass(''); setNewSpells([]); setNewCantrips([]); setExpertiseChoices([])
+    setInvocationChoices([]); setMetamagicChoices([]); setInfusionChoices([])
+    setInfusionToSwapOut(''); setInfusionToSwapIn(''); setSpellToForget(''); setCantripToForget('')
+    setNewSpellSearch(''); setMulticlassSkill(''); setPactBoon(''); setManeuverChoices([])
+    setFavoredEnemy(''); setFavoredTerrain(''); setFightingStyle(''); setLandTerrain('')
+    setRuneChoices([]); setHunterChoice(''); setArcanumSpell(''); setShowAllSchools(false); setTotemAnimal('')
+    setStormAura(''); setFourElementsChoices([]); setHpRoll(null); setAnyClassSpells(false)
+  }
 
   if (!char) {
     return (
@@ -191,7 +215,8 @@ export default function LevelUp() {
   const classFeatureAtLevel = classOptsDef?.features.filter(f => f.level === nextLevel) ?? cls?.features.filter(f => f.level === nextLevel) ?? []
   const availableSubclasses = classOptsDef?.subclasses ?? []
   const subclassLevel = availableSubclasses[0]?.level ?? 3
-  const needsSubclass = nextLevel === subclassLevel && !currentEntry?.subclassSlug
+  // Normally at the subclass level; also catches a class already past it without one
+  const needsSubclass = availableSubclasses.length > 0 && nextLevel >= subclassLevel && !currentEntry?.subclassSlug
   // Subclass features gained at this level — covers the existing subclass and one
   // picked during this level-up (e.g. the L3 subclass choice grants its own L3 features).
   const effectiveSubclassSlug = currentEntry?.subclassSlug ?? (subclass || undefined)
@@ -199,12 +224,37 @@ export default function LevelUp() {
     ? (availableSubclasses.find(s => s.slug === effectiveSubclassSlug)?.features?.filter(f => f.level === nextLevel) ?? [])
     : []
 
-  // Cantrip gain
-  const isNewCantripLevel = classOptsDef?.cantripsAtLevel?.includes(nextLevel) ?? false
+  // Spellcasting for this class at its new level (Eldritch Knight / Arcane Trickster cast through
+  // their subclass, from the wizard list)
+  const progression = spellProgression(selectedClass, effectiveSubclassSlug)
+  const castsAtNextLevel = !!progression && nextLevel >= progression.startLevel
+  const spellLevelOf = (slug: string) => content.spells.find(d => d.slug === slug)?.level ?? 0
+  const classSpells = char.spells.filter(s => s.classSlug === selectedClass)
+  const maxSpellLevel = castsAtNextLevel ? maxSpellLevelAt(selectedClass, nextLevel, cls?.spellSlotTable, effectiveSubclassSlug) : 0
 
-  // Spells known (known-spell casters)
-  const spellsKnownMax = classOptsDef?.spellsKnownTable?.[nextLevel - 1]
-  const currentSpellCount = char.spells.filter(s => s.classSlug === selectedClass).length
+  // Cantrips: everything this class should know at the new level, minus what it already has
+  const currentCantripCount = classSpells.filter(s => spellLevelOf(s.spellSlug) === 0).length
+  const cantripsToGain = Math.max(0, cantripsKnownAt(progression, nextLevel) - currentCantripCount)
+  const isNewCantripLevel = cantripsToGain > 0
+
+  // Spells known (known casters) or added to the spellbook (wizards). Other prepared casters
+  // (cleric, druid, paladin, artificer) prepare from their whole list on the sheet instead.
+  const spellsKnownMax = castsAtNextLevel ? progression?.spellsKnownTable?.[nextLevel - 1] : undefined
+  // Free once-a-day spells (feats, Mystic Arcanum) aren't part of the spells-known count
+  const currentSpellCount = classSpells.filter(s => spellLevelOf(s.spellSlug) > 0 && !s.freeUseKey).length
+  const isSpellbookClass = castsAtNextLevel && !!progression?.isSpellbookCaster
+  const preparesFromFullList = castsAtNextLevel && !!progression?.preparedCaster && !progression?.isSpellbookCaster
+  const magicalSecrets = hasMagicalSecretsAt(selectedClass, effectiveSubclassSlug, nextLevel)
+  const spellsToLearn = !castsAtNextLevel || preparesFromFullList ? 0
+    : isSpellbookClass ? (nextLevel === 1 ? 6 : 2)
+    : Math.max(0, (spellsKnownMax ?? 0) - currentSpellCount) + (spellToForget ? 1 : 0)
+
+  // Mystic Arcanum (Warlock 11/13/15/17): one spell of the new arcanum level
+  const arcanumLevel = selectedClass === 'warlock' ? MYSTIC_ARCANUM_LEVELS[nextLevel] : undefined
+  const needsArcanum = !!arcanumLevel && !char.spells.some(s => s.freeUseKey === mysticArcanumKey(arcanumLevel))
+  const arcanumOptions = needsArcanum
+    ? content.spells.filter(s => s.level === arcanumLevel && (s.classLists ?? []).includes('warlock')).sort((a, b) => a.name.localeCompare(b.name))
+    : []
 
   // Eldritch Invocations (Warlock)
   const invocationsTotal = classOptsDef?.invocationsAtLevel?.[nextLevel - 1] ?? 0
@@ -237,7 +287,7 @@ export default function LevelUp() {
   const infusionsToGain = Math.max(0, infusionsTotal - currentInfusions.length)
 
   // Battle Master maneuvers (Fighter: Battle Master subclass)
-  const BM_MANEUVERS_AT_LEVEL: Record<number, number> = { 3: 3, 7: 5, 10: 9 }
+  const BM_MANEUVERS_AT_LEVEL: Record<number, number> = { 3: 3, 7: 5, 10: 7, 15: 9 }  // PHB p.73
   const bmTotalManeuvers = (effectiveSubclassSlug === 'battle-master')
     ? (BM_MANEUVERS_AT_LEVEL[nextLevel] ?? 0)
     : 0
@@ -261,13 +311,15 @@ export default function LevelUp() {
   // Ranger favored enemy / terrain choices at specific levels
   const rangerFavoredEnemyLevels = [1, 6, 14]
   const rangerTerrainLevels = [1, 6, 10]
+  const alreadyFavored = (prefix: string) => char.featuresChosen.filter(f => f.key.startsWith(prefix)).map(f => String(f.value))
   const needsFavoredEnemy = selectedClass === 'ranger' && rangerFavoredEnemyLevels.includes(nextLevel)
   const needsFavoredTerrain = selectedClass === 'ranger' && rangerTerrainLevels.includes(nextLevel)
 
   // Fighting Style (Fighter L1, Paladin L2, Ranger L2)
   const FIGHTING_STYLE_LEVEL: Record<string, number> = { fighter: 1, paladin: 2, ranger: 2 }
+  // The Creator's plain 'fighting-style' key belongs to the character's first class
   const alreadyHasFightingStyle = char.featuresChosen.some(f =>
-    f.key === 'fighting-style' || f.key === `fighting-style-${selectedClass}`
+    f.key === `fighting-style-${selectedClass}` || (f.key === 'fighting-style' && char.classes[0]?.classSlug === selectedClass)
   )
   const needsFightingStyle = !!(classOptsDef?.fightingStyles?.length) &&
     nextLevel === FIGHTING_STYLE_LEVEL[selectedClass] &&
@@ -361,7 +413,6 @@ export default function LevelUp() {
       classSlug: selectedClass,
       hpRoll: effectiveHpRoll,
       subclassSlug: subclass || undefined,
-      newSaveProficiencies: isMulticlassing ? (cls?.saveProficiencies ?? []) : undefined,
       multiclassSkill: needsMulticlassSkill ? multiclassSkill : undefined,
       fightingStyle: needsFightingStyle && fightingStyle ? fightingStyle : undefined,
       landTerrain: needsLandTerrain && landTerrain ? landTerrain : undefined,
@@ -381,6 +432,23 @@ export default function LevelUp() {
       featureChoices: featureChoices.length > 0 ? featureChoices : undefined,
     }
     let updated = applyLevelUp(char, choices)
+    // applyLevelUp only knows spell slugs; give newly learned spells their display names
+    // and mark new cantrips prepared (cantrips are always ready)
+    updated = {
+      ...updated,
+      spells: updated.spells.map(s => {
+        if (s.name !== s.spellSlug && !newCantrips.includes(s.spellSlug)) return s
+        return {
+          ...s,
+          name: content.spells.find(d => d.slug === s.spellSlug)?.name ?? s.name,
+          // known casters always have their spells ready; a wizard's go into the spellbook unprepared
+          prepared: s.prepared || newCantrips.includes(s.spellSlug) || (newSpells.includes(s.spellSlug) && !progression?.preparedCaster),
+        }
+      }),
+    }
+
+    const arcanumDef = needsArcanum ? content.spells.find(s => s.slug === arcanumSpell) : undefined
+    if (arcanumDef) updated = { ...updated, spells: [...updated.spells, mysticArcanumEntry(arcanumDef)] }
 
     // Update spell slots — multiclass table or single-class progression
     const spCasters = spellcastingClasses(updated.classes)
@@ -398,7 +466,7 @@ export default function LevelUp() {
       // Single spellcasting class: use its own progression table
       const spCls = spCasters[0]
       const spClsDef = content.classes.find(c => c.slug === spCls.classSlug)
-      const newSlots = slotsForLevel(spCls.classSlug, spCls.level, spClsDef?.spellSlotTable)
+      const newSlots = slotsForLevel(spCls.classSlug, spCls.level, spClsDef?.spellSlotTable, spCls.subclassSlug)
       if (newSlots) {
         // Start from existing slots so we never drop a level that isn't in the new row
         const merged: Character['spellSlots'] = { ...updated.spellSlots }
@@ -408,7 +476,11 @@ export default function LevelUp() {
         updated = { ...updated, spellSlots: merged }
       }
     }
-    // 0 spellcasting classes (Warlock-only or non-casters): don't touch spellSlots
+    else if (Object.keys(updated.spellSlots).length > 0) {
+      // No Spellcasting class (non-casters, Warlock-only): no regular slots. Older warlocks were
+      // created with a stray 1st-level slot here; their slots are the Pact Magic ones below.
+      updated = { ...updated, spellSlots: {} }
+    }
 
     // Pact slot update for Warlock
     const warlockEntry = updated.classes.find(c => c.classSlug === 'warlock')
@@ -443,6 +515,7 @@ export default function LevelUp() {
           }
         }
         updated = { ...updated, spells: patch.spells, freeSpellUses: patch.freeSpellUses }
+        updated = { ...updated, ...applyFeatAbilityIncrease(updated, featDef, featAbility) }
       }
     }
 
@@ -454,8 +527,39 @@ export default function LevelUp() {
       }
     }
 
+    // Skills gained this level join the baseline the sheet's skill reset restores to
+    const base = char.skillBaseline ?? { proficiencies: char.skillProficiencies, expertise: char.skillExpertise }
+    const gainedProfs = updated.skillProficiencies.filter(s => !char.skillProficiencies.includes(s))
+    const gainedExpertise = updated.skillExpertise.filter(s => !char.skillExpertise.includes(s))
+    updated = {
+      ...updated,
+      skillBaseline: {
+        proficiencies: [...new Set([...base.proficiencies, ...gainedProfs])],
+        expertise: [...new Set([...base.expertise, ...gainedExpertise])],
+      },
+    }
+
+    // Current HP goes up by as much as the maximum did (hit die, CON, Tough, Hill Dwarf, …)
+    const fullMaxHp = (c: Character) => {
+      const featSlugs = c.featuresChosen.filter(f => f.key.startsWith('feat-') && typeof f.value === 'string').map(f => f.value as string)
+      return hpMax(c, content) + sumFeatBonuses(featSlugs, content.feats).hpBonusPerLevel * totalLevel(c)
+    }
+    const hpGain = Math.max(0, fullMaxHp(updated) - fullMaxHp(char))
+    if (hpGain > 0 && char.hp.current > 0) {
+      updated = { ...updated, hp: { ...updated.hp, current: updated.hp.current + hpGain } }
+    }
+
     await saveCharacterToDisk(updated)
     navigate(`/c/${char.id}`)
+  }
+
+  if (totalLvl >= 20) {
+    return (
+      <div className="text-center py-20 text-parchment-600">
+        <p className="font-semibold">{char.name} is level 20 — the highest level there is.</p>
+        <Link to={`/c/${char.id}`} className="btn-primary mt-4 inline-block">Back to Sheet</Link>
+      </div>
+    )
   }
 
   return (
@@ -533,7 +637,7 @@ export default function LevelUp() {
               max={hitDie}
               className="input w-24"
               value={hpRoll ?? ''}
-              onChange={e => setHpRoll(parseInt(e.target.value, 10) || 1)}
+              onChange={e => setHpRoll(Math.max(1, Math.min(hitDie, parseInt(e.target.value, 10) || 1)))}
             />
           </div>
         )}
@@ -675,6 +779,7 @@ export default function LevelUp() {
                   setFeatSlug(slug)
                   setFeatGrants({})
                   setFeatClass('')
+                  setFeatAbility('')
                 }}
                 maxHeightClass="max-h-96"
               />
@@ -682,14 +787,17 @@ export default function LevelUp() {
                 const featDef = content.feats.find(f => f.slug === featSlug)
                 if (!featDef) return null
                 return (
-                  <FeatGrantsBlock
-                    feat={featDef}
-                    spells={content.spells}
-                    classChoice={featClass}
-                    setClassChoice={setFeatClass}
-                    picks={featGrants}
-                    setPicks={setFeatGrants}
-                  />
+                  <>
+                    <FeatAbilityPicker feat={featDef} scores={char.abilityScores} value={featAbility} onChange={setFeatAbility} />
+                    <FeatGrantsBlock
+                      feat={featDef}
+                      spells={content.spells}
+                      classChoice={featClass}
+                      setClassChoice={setFeatClass}
+                      picks={featGrants}
+                      setPicks={setFeatGrants}
+                    />
+                  </>
                 )
               })()}
             </>
@@ -701,17 +809,20 @@ export default function LevelUp() {
       {isNewCantripLevel && (
         <div className="card mb-4">
           <h2 className="section-header">New Cantrip</h2>
-          <p className="text-sm text-parchment-500 mb-3">Choose one new cantrip to learn.</p>
+          <p className="text-sm text-parchment-500 mb-3">
+            Choose {cantripsToGain} new cantrip{cantripsToGain !== 1 ? 's' : ''} to learn. ({newCantrips.length}/{cantripsToGain} chosen)
+          </p>
           <div className="grid grid-cols-2 gap-1 max-h-60 overflow-y-auto">
             {content.spells
-              .filter(s => s.level === 0 && (s.classLists ?? []).includes(selectedClass))
+              .filter(s => s.level === 0 && (s.classLists ?? []).includes(progression?.spellList ?? selectedClass))
               .filter(s => !char.spells.find(cs => cs.spellSlug === s.slug))
               .map(s => (
                 <button
                   key={s.slug}
                   type="button"
-                  onClick={() => setNewCantrips(newCantrips[0] === s.slug ? [] : [s.slug])}
-                  className={`text-left px-2.5 py-1.5 rounded border text-sm transition-colors ${newCantrips[0] === s.slug ? 'border-parchment-500 bg-parchment-50 font-medium' : 'border-parchment-100 hover:border-parchment-400'}`}
+                  disabled={!newCantrips.includes(s.slug) && newCantrips.length >= cantripsToGain}
+                  onClick={() => setNewCantrips(newCantrips.includes(s.slug) ? newCantrips.filter(x => x !== s.slug) : [...newCantrips, s.slug])}
+                  className={`text-left px-2.5 py-1.5 rounded border text-sm transition-colors disabled:opacity-40 ${newCantrips.includes(s.slug) ? 'border-parchment-500 bg-parchment-50 font-medium' : 'border-parchment-100 hover:border-parchment-400'}`}
                 >
                   <span className="text-parchment-900">{s.name}</span>
                   <span className="text-xs text-parchment-400 ml-1">({s.school})</span>
@@ -949,20 +1060,33 @@ export default function LevelUp() {
       )}
 
       {/* New spells */}
-      {cls?.spellcastingAbility && (
+      {castsAtNextLevel && preparesFromFullList && (
         <div className="card mb-4">
-          <h2 className="section-header">New Spells</h2>
-          {spellsKnownMax !== undefined ? (
+          <h2 className="section-header">Spells</h2>
+          <p className="text-sm text-parchment-500">
+            {cls?.name ?? 'This class'} prepares spells from its whole list, so there is nothing to learn here.
+            {maxSpellLevel > 0 && <> After this level you can prepare spells of up to level {maxSpellLevel} on the sheet's Spells tab.</>}
+          </p>
+        </div>
+      )}
+      {castsAtNextLevel && !preparesFromFullList && (
+        <div className="card mb-4">
+          <h2 className="section-header">{isSpellbookClass ? 'Spellbook' : 'New Spells'}</h2>
+          {isSpellbookClass ? (
+            <p className="text-sm text-parchment-500 mb-3">
+              Add <strong>{spellsToLearn}</strong> wizard spells of level {maxSpellLevel} or lower to your spellbook. ({newSpells.length}/{spellsToLearn} chosen)
+            </p>
+          ) : spellsKnownMax !== undefined ? (
             <div className="text-sm text-parchment-500 mb-3">
               <p>
                 Spells known (this class): <strong>{currentSpellCount}</strong> / <strong>{spellsKnownMax}</strong> max at level {nextLevel}.
               </p>
-              {currentSpellCount < spellsKnownMax
-                ? <p className="mt-1">You may learn <strong>{spellsKnownMax - currentSpellCount}</strong> more spell{spellsKnownMax - currentSpellCount !== 1 ? 's' : ''}.</p>
-                : (
+              <p className="mt-1">
+                Choose <strong>{spellsToLearn}</strong> spell{spellsToLearn !== 1 ? 's' : ''} of level {maxSpellLevel} or lower. ({newSpells.length}/{spellsToLearn} chosen)
+              </p>
+              {currentSpellCount > 0 && (
                   <div className="mt-2">
-                    <p className="text-amber-600 mb-2">You are at your spell cap. You may replace one known spell.</p>
-                    <p className="text-xs text-parchment-500 mb-1">Click a spell to forget it (click again to keep it):</p>
+                    <p className="text-xs text-parchment-500 mb-1">You may also replace one spell you know. Click it to forget it (click again to keep it):</p>
                     <div className="space-y-1 mb-2">
                       {char.spells
                         .filter(s => s.classSlug === selectedClass && (content.spells.find(d => d.slug === s.spellSlug)?.level ?? 0) > 0)
@@ -978,8 +1102,7 @@ export default function LevelUp() {
                         ))}
                     </div>
                   </div>
-                )
-              }
+              )}
             </div>
           ) : (
             <p className="text-sm text-parchment-500 mb-3">Select any new spells gained at this level.</p>
@@ -992,7 +1115,8 @@ export default function LevelUp() {
                 ? ['enchantment', 'illusion']
                 : null
             const available = content.spells
-              .filter(s => s.level > 0 && (s.classLists ?? []).includes(selectedClass))
+              .filter(s => s.level > 0 && s.level <= maxSpellLevel
+                && ((magicalSecrets && anyClassSpells) || (s.classLists ?? []).includes(progression?.spellList ?? selectedClass)))
               .filter(s => !char.spells.find(cs => cs.spellSlug === s.slug))
               .filter(s => !schoolFilter || schoolFilter.includes(s.school.toLowerCase()))
             const filtered = newSpellSearch
@@ -1013,6 +1137,12 @@ export default function LevelUp() {
                     </span>
                   </div>
                 )}
+                {magicalSecrets && (
+                  <label className="mb-2 p-2 rounded border text-xs flex items-center gap-2 bg-violet-50 border-violet-200 text-violet-800 cursor-pointer">
+                    <input type="checkbox" checked={anyClassSpells} onChange={e => setAnyClassSpells(e.target.checked)} />
+                    <span><strong>Magical Secrets:</strong> two of this level's spells can come from any class. Tick to list every class's spells.</span>
+                  </label>
+                )}
                 <input
                   className="input mb-2"
                   placeholder="Search available spells…"
@@ -1026,8 +1156,9 @@ export default function LevelUp() {
                       <button
                         key={s.slug}
                         type="button"
+                        disabled={!sel && newSpells.length >= spellsToLearn}
                         onClick={() => setNewSpells(sel ? newSpells.filter(x => x !== s.slug) : [...newSpells, s.slug])}
-                        className={`w-full text-left px-2.5 py-1.5 rounded border text-sm transition-colors flex items-center gap-2 ${sel ? 'border-parchment-500 bg-parchment-50 font-medium' : 'border-parchment-100 hover:border-parchment-400'}`}
+                        className={`w-full text-left px-2.5 py-1.5 rounded border text-sm transition-colors flex items-center gap-2 disabled:opacity-40 ${sel ? 'border-parchment-500 bg-parchment-50 font-medium' : 'border-parchment-100 hover:border-parchment-400'}`}
                       >
                         {sel && <span className="text-parchment-500 text-xs shrink-0">✓</span>}
                         <span className="flex-1">{s.name}</span>
@@ -1055,16 +1186,16 @@ export default function LevelUp() {
           </p>
           <div className="grid grid-cols-2 gap-1.5">
             {(multiclassGrant.skills.from.length > 0 ? multiclassGrant.skills.from : SKILLS.map(s => SKILL_LABELS[s])).map(skill => {
-              const slug = skill.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z-]/g, '') as typeof SKILLS[number]
-              const alreadyHas = char.skillProficiencies.includes(slug) || char.skillProficiencies.includes(skill)
+              const slug = SKILLS.find(s => SKILL_LABELS[s] === skill) ?? skill
+              const alreadyHas = char.skillProficiencies.includes(slug)
               return (
                 <label key={skill} className={`flex items-center gap-2 p-2 rounded border text-sm cursor-pointer
-                  ${multiclassSkill === skill ? 'border-parchment-500 bg-parchment-50' : 'border-parchment-200'}
+                  ${multiclassSkill === slug ? 'border-parchment-500 bg-parchment-50' : 'border-parchment-200'}
                   ${alreadyHas ? 'opacity-40' : ''}`}>
                   <input type="radio" name="mc-skill" value={skill}
-                    checked={multiclassSkill === skill}
+                    checked={multiclassSkill === slug}
                     disabled={alreadyHas}
-                    onChange={() => setMulticlassSkill(skill)} />
+                    onChange={() => setMulticlassSkill(slug)} />
                   {skill}{alreadyHas ? ' (already proficient)' : ''}
                 </label>
               )
@@ -1134,7 +1265,7 @@ export default function LevelUp() {
           <p className="text-sm text-parchment-500 mb-2">Choose a creature type. You have advantage on Survival checks to track it and INT checks to recall lore.</p>
           <select className="input text-sm" value={favoredEnemy} onChange={e => setFavoredEnemy(e.target.value)}>
             <option value="">— choose —</option>
-            {['Aberrations','Beasts','Celestials','Constructs','Dragons','Elementals','Fey','Fiends','Giants','Humanoids','Monstrosities','Oozes','Plants','Undead','Two humanoid types'].map(t => (
+            {FAVORED_ENEMY_TYPES.filter(t => !alreadyFavored('favored-enemy-').includes(t)).map(t => (
               <option key={t} value={t}>{t}</option>
             ))}
           </select>
@@ -1146,7 +1277,7 @@ export default function LevelUp() {
           <p className="text-sm text-parchment-500 mb-2">Choose a favored terrain type for exploration benefits.</p>
           <select className="input text-sm" value={favoredTerrain} onChange={e => setFavoredTerrain(e.target.value)}>
             <option value="">— choose —</option>
-            {['Arctic','Coast','Desert','Forest','Grassland','Mountain','Swamp','Underdark'].map(t => (
+            {FAVORED_TERRAINS.filter(t => !alreadyFavored('favored-terrain-').includes(t)).map(t => (
               <option key={t} value={t}>{t}</option>
             ))}
           </select>
@@ -1238,6 +1369,26 @@ export default function LevelUp() {
               </div>
             </details>
           )}
+        </div>
+      )}
+
+      {/* Warlock Mystic Arcanum */}
+      {needsArcanum && (
+        <div className="card mb-4">
+          <h2 className="section-header">Mystic Arcanum — {['', '', '', '', '', '', '6th', '7th', '8th', '9th'][arcanumLevel!]} Level</h2>
+          <p className="text-sm text-parchment-500 mb-3">Choose a warlock spell of this level. You can cast it once without a spell slot, and regain the use on a long rest.</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {arcanumOptions.map(sp => (
+              <label key={sp.slug} className={`flex items-start gap-3 p-3 rounded border cursor-pointer
+                ${arcanumSpell === sp.slug ? 'border-parchment-500 bg-parchment-50' : 'border-parchment-200 hover:border-parchment-300'}`}>
+                <input type="radio" name="mystic-arcanum" value={sp.slug} checked={arcanumSpell === sp.slug} onChange={() => setArcanumSpell(sp.slug)} className="mt-0.5" />
+                <div>
+                  <div className="font-medium">{sp.name}</div>
+                  <div className="text-xs text-parchment-500 mt-0.5">{sp.school}{sp.concentration ? ' · Concentration' : ''}</div>
+                </div>
+              </label>
+            ))}
+          </div>
         </div>
       )}
 
@@ -1347,10 +1498,50 @@ export default function LevelUp() {
         </div>
       )}
 
-      <div className="flex justify-end gap-3 mt-6">
-        <Link to={`/c/${char.id}`} className="btn-secondary">Cancel</Link>
-        <button className="btn-primary" onClick={finish}>Apply Level Up</button>
-      </div>
+      {(() => {
+        const featDef = content.feats.find(f => f.slug === featSlug)
+        const needsFeatAbility = isAsiLevel && asiChoice === 'feat' && !!featDef?.abilityScoreIncrease && !featAbilityPick(featDef, featAbility)
+        // Things the level-up can't be applied without
+        const blockers = [
+          !selectedClass ? 'Choose a class.' : '',
+          needsSubclass && !subclass ? 'Choose a subclass.' : '',
+          isAsiLevel && asiChoice === 'feat' && !featDef ? 'Choose a feat.' : '',
+          needsFeatAbility ? `Choose which ability ${featDef!.name} increases.` : '',
+          needsMulticlassSkill && !multiclassSkill ? 'Choose a multiclass skill.' : '',
+          // These are only offered at this exact level, so they can't be put off
+          needsFightingStyle && !fightingStyle ? 'Choose a fighting style.' : '',
+          needsPactBoon && !pactBoon ? 'Choose a pact boon.' : '',
+          needsFavoredEnemy && !favoredEnemy ? 'Choose a favored enemy.' : '',
+          needsFavoredTerrain && !favoredTerrain ? 'Choose a favored terrain.' : '',
+          needsHunterChoice && !hunterChoice ? 'Choose a Hunter feature.' : '',
+          needsArcanum && !arcanumSpell ? 'Choose your Mystic Arcanum spell.' : '',
+          maneuversToGain > maneuverChoices.length ? `Choose ${maneuversToGain - maneuverChoices.length} more maneuver${maneuversToGain - maneuverChoices.length !== 1 ? 's' : ''}.` : '',
+          runesToGain > runeChoices.length ? `Choose ${runesToGain - runeChoices.length} more rune${runesToGain - runeChoices.length !== 1 ? 's' : ''}.` : '',
+          needsFourElements && disciplinesToGain > fourElementsChoices.length ? 'Choose your elemental disciplines.' : '',
+        ].filter(Boolean)
+        // Picks that can still be made later (the next level-up or the sheet asks again)
+        const reminders = [
+          cantripsToGain > newCantrips.length ? `${cantripsToGain - newCantrips.length} cantrip${cantripsToGain - newCantrips.length !== 1 ? 's' : ''} not chosen` : '',
+          spellsToLearn > newSpells.length ? `${spellsToLearn - newSpells.length} spell${spellsToLearn - newSpells.length !== 1 ? 's' : ''} not chosen` : '',
+          isExpertiseLevel && expertiseChoices.length < expertiseCount ? 'Expertise not chosen' : '',
+        ].filter(Boolean)
+        return (
+          <div className="mt-6">
+            <div className="flex justify-end items-center gap-3">
+              <Link to={`/c/${char.id}`} className="btn-secondary">Cancel</Link>
+              <button className="btn-primary disabled:opacity-50" disabled={blockers.length > 0} onClick={finish}>Apply Level Up</button>
+            </div>
+            {blockers.length > 0 && (
+              <div className="mt-3 p-3 bg-red-50 border border-red-300 rounded text-red-700 text-sm space-y-0.5">
+                {blockers.map(b => <div key={b}>⚠ {b}</div>)}
+              </div>
+            )}
+            {blockers.length === 0 && reminders.length > 0 && (
+              <p className="mt-2 text-xs text-amber-700 text-right">Still to pick: {reminders.join(' · ')}. You can apply anyway and choose later.</p>
+            )}
+          </div>
+        )
+      })()}
     </div>
   )
 }

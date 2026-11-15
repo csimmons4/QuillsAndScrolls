@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import { useContent } from '../content/ContentProvider'
 import { cleanFeatDesc, FeatEffectBadges } from '../components/FeatPicker'
+import { cleanHigherLevels } from '../components/SpellStatBlock'
 import type { SpellDef, ItemDef, FeatDef, RaceDef, BackgroundDef, ClassDef } from '../content/loaders'
 
 type Category = 'all' | 'spells' | 'items' | 'feats' | 'races' | 'backgrounds' | 'classes'
@@ -29,7 +30,7 @@ function Tag({ children, className = '' }: { children: React.ReactNode; classNam
   return <span className={`text-xs rounded px-1.5 py-0.5 ${className}`}>{children}</span>
 }
 
-function Expandable({ title, meta, children }: { title: string; meta?: React.ReactNode; children: React.ReactNode }) {
+function Expandable({ title, meta, badge, children }: { title: string; meta?: React.ReactNode; badge?: React.ReactNode; children: React.ReactNode }) {
   const [open, setOpen] = useState(false)
   return (
     <div className={`rounded border transition-colors ${open ? 'border-parchment-400 shadow-sm' : 'border-parchment-200 hover:border-parchment-400'}`}>
@@ -44,6 +45,7 @@ function Expandable({ title, meta, children }: { title: string; meta?: React.Rea
             {meta}
           </div>
         </div>
+        {badge}
         <span className="text-parchment-400 text-xs shrink-0 mt-0.5">{open ? '▲' : '▼'}</span>
       </button>
       {open && (
@@ -55,13 +57,14 @@ function Expandable({ title, meta, children }: { title: string; meta?: React.Rea
   )
 }
 
-function SpellCard({ spell }: { spell: SpellDef }) {
+function SpellCard({ spell, badge }: { spell: SpellDef; badge?: React.ReactNode }) {
   const levelLabel = spell.level === 0 ? 'Cantrip' : `Level ${spell.level}`
   const schoolColor = SCHOOL_COLORS[spell.school?.toLowerCase() ?? ''] ?? 'bg-parchment-100 text-parchment-600'
   const classes = spell.classLists?.length ? spell.classLists : spell.classes
   return (
     <Expandable
       title={spell.name}
+      badge={badge}
       meta={<>
         <Tag className="bg-parchment-100 text-parchment-600">{levelLabel}</Tag>
         <Tag className={schoolColor}>{spell.school}</Tag>
@@ -83,17 +86,18 @@ function SpellCard({ spell }: { spell: SpellDef }) {
       </div>
       <p className="text-sm text-parchment-700 leading-relaxed whitespace-pre-line">{spell.description}</p>
       {spell.higherLevels && (
-        <p className="text-sm text-parchment-600 mt-2 italic"><span className="font-medium not-italic text-parchment-800">At Higher Levels:</span> {spell.higherLevels}</p>
+        <p className="text-sm text-parchment-600 mt-2 italic"><span className="font-medium not-italic text-parchment-800">At Higher Levels:</span> {cleanHigherLevels(spell.higherLevels)}</p>
       )}
     </Expandable>
   )
 }
 
-function ItemCard({ item }: { item: ItemDef }) {
+function ItemCard({ item, badge }: { item: ItemDef; badge?: React.ReactNode }) {
   const rarityClass = RARITY_COLORS[item.rarity?.toLowerCase() ?? ''] ?? 'text-parchment-500'
   return (
     <Expandable
       title={item.name}
+      badge={badge}
       meta={<>
         {item.type && <Tag className="bg-parchment-100 text-parchment-600">{item.type}</Tag>}
         {item.rarity && <Tag className={rarityClass.includes('bg-') ? rarityClass : `bg-parchment-50 ${rarityClass}`}>{item.rarity}</Tag>}
@@ -123,11 +127,12 @@ function ItemCard({ item }: { item: ItemDef }) {
   )
 }
 
-function FeatCard({ feat }: { feat: FeatDef }) {
+function FeatCard({ feat, badge }: { feat: FeatDef; badge?: React.ReactNode }) {
   const description = cleanFeatDesc(feat.description)
   return (
     <Expandable
       title={feat.name}
+      badge={badge}
       meta={<>
         {feat.prerequisite && <Tag className="bg-amber-100 text-amber-700">Req: {feat.prerequisite}</Tag>}
         <FeatEffectBadges slug={feat.slug} />
@@ -150,13 +155,14 @@ const ABILITY_LABELS: Record<string, string> = {
   str: 'STR', dex: 'DEX', con: 'CON', int: 'INT', wis: 'WIS', cha: 'CHA',
 }
 
-function RaceCard({ race }: { race: RaceDef }) {
+function RaceCard({ race, badge }: { race: RaceDef; badge?: React.ReactNode }) {
   const bonuses = race.abilityBonuses
     ? Object.entries(race.abilityBonuses).filter(([, v]) => v !== 0).map(([k, v]) => `${ABILITY_LABELS[k] ?? k.toUpperCase()} +${v}`).join(', ')
     : null
   return (
     <Expandable
       title={race.name}
+      badge={badge}
       meta={<>
         {race.category && <Tag className="bg-parchment-100 text-parchment-600">{race.category}</Tag>}
         {bonuses && <Tag className="bg-green-100 text-green-700">{bonuses}</Tag>}
@@ -218,10 +224,11 @@ function RaceCard({ race }: { race: RaceDef }) {
   )
 }
 
-function BackgroundCard({ bg }: { bg: BackgroundDef }) {
+function BackgroundCard({ bg, badge }: { bg: BackgroundDef; badge?: React.ReactNode }) {
   return (
     <Expandable
       title={bg.name}
+      badge={badge}
       meta={<>
         {bg.skillProficiencies.length > 0 && (
           <Tag className="bg-blue-100 text-blue-700">{bg.skillProficiencies.join(', ')}</Tag>
@@ -248,10 +255,11 @@ function BackgroundCard({ bg }: { bg: BackgroundDef }) {
   )
 }
 
-function ClassCard({ cls }: { cls: ClassDef }) {
+function ClassCard({ cls, badge }: { cls: ClassDef; badge?: React.ReactNode }) {
   return (
     <Expandable
       title={cls.name}
+      badge={badge}
       meta={<>
         <Tag className="bg-parchment-100 text-parchment-600">d{cls.hitDie}</Tag>
         {cls.spellcastingAbility && (
@@ -436,44 +444,26 @@ export default function Lookup() {
       <div className="space-y-2">
         {shown.map((entry, i) => {
           const kindBadge = category === 'all'
-            ? <span key="kind" className={`text-xs rounded px-1.5 py-0.5 ${KIND_COLOR[entry.kind]}`}>{KIND_LABEL[entry.kind]}</span>
+            ? <span className={`text-xs rounded px-1.5 py-0.5 shrink-0 ${KIND_COLOR[entry.kind]}`}>{KIND_LABEL[entry.kind]}</span>
             : null
 
           if (entry.kind === 'spell') return (
-            <div key={`spell-${entry.data.slug}`}>
-              {kindBadge && <div className="mb-0.5">{kindBadge}</div>}
-              <SpellCard spell={entry.data} />
-            </div>
+            <SpellCard key={`spell-${entry.data.slug}`} spell={entry.data} badge={kindBadge} />
           )
           if (entry.kind === 'item') return (
-            <div key={`item-${entry.data.slug}`}>
-              {kindBadge && <div className="mb-0.5">{kindBadge}</div>}
-              <ItemCard item={entry.data} />
-            </div>
+            <ItemCard key={`item-${entry.data.slug}`} item={entry.data} badge={kindBadge} />
           )
           if (entry.kind === 'feat') return (
-            <div key={`feat-${entry.data.slug}`}>
-              {kindBadge && <div className="mb-0.5">{kindBadge}</div>}
-              <FeatCard feat={entry.data} />
-            </div>
+            <FeatCard key={`feat-${entry.data.slug}`} feat={entry.data} badge={kindBadge} />
           )
           if (entry.kind === 'race') return (
-            <div key={`race-${entry.data.slug}`}>
-              {kindBadge && <div className="mb-0.5">{kindBadge}</div>}
-              <RaceCard race={entry.data} />
-            </div>
+            <RaceCard key={`race-${entry.data.slug}`} race={entry.data} badge={kindBadge} />
           )
           if (entry.kind === 'background') return (
-            <div key={`bg-${entry.data.slug}`}>
-              {kindBadge && <div className="mb-0.5">{kindBadge}</div>}
-              <BackgroundCard bg={entry.data} />
-            </div>
+            <BackgroundCard key={`bg-${entry.data.slug}`} bg={entry.data} badge={kindBadge} />
           )
           if (entry.kind === 'class') return (
-            <div key={`class-${entry.data.slug}`}>
-              {kindBadge && <div className="mb-0.5">{kindBadge}</div>}
-              <ClassCard cls={entry.data} />
-            </div>
+            <ClassCard key={`class-${entry.data.slug}`} cls={entry.data} badge={kindBadge} />
           )
           return null
         })}

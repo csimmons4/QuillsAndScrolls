@@ -80,6 +80,7 @@ app.get('/api/homebrew', (_req, res) => {
     feats:    readCategory('feats'),
     races:    readCategory('races'),
     classes:  readCategory('classes'),
+    backgrounds: readCategory('backgrounds'),
   })
 })
 

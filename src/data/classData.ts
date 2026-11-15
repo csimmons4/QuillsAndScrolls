@@ -45,7 +45,7 @@ export const MULTICLASS_SLOT_TABLE: readonly number[][] = [
   [4, 3, 3, 3, 3, 2, 2, 1, 1], // 20
 ]
 
-function resolveCasterType(cc: CharacterClass): CasterType {
+export function resolveCasterType(cc: CharacterClass): CasterType {
   const def = CASTER_TYPE[cc.classSlug]
   if (!def) return 'none'
   return typeof def === 'function' ? def(cc.subclassSlug) : def
@@ -120,6 +120,42 @@ export interface SubclassDef {
    *  tools as display names). Auto-applied when the subclass is chosen.
    *  `languages` is a count of free language choices, surfaced as a note. */
   grantedProficiencies?: { skills?: string[]; tools?: string[]; languages?: number }
+}
+
+export interface SubclassProficiencies { armor?: string[]; weapons?: string[]; skills?: string[]; tools?: string[]; languages?: string[] }
+
+// Armor, weapon and language proficiencies a subclass grants outright (no choice involved).
+// Skills and tools mostly live on the subclass's own `grantedProficiencies`.
+const SUBCLASS_EXTRA_PROFICIENCIES: Record<string, SubclassProficiencies> = {
+  'cleric:life':      { armor: ['heavy'] },
+  'cleric:nature':    { armor: ['heavy'] },
+  'cleric:order':     { armor: ['heavy'] },
+  'cleric:forge':     { armor: ['heavy'], tools: ["Smith's Tools"] },
+  'cleric:tempest':   { armor: ['heavy'], weapons: ['martial'] },
+  'cleric:war':       { armor: ['heavy'], weapons: ['martial'] },
+  'cleric:twilight':  { armor: ['heavy'], weapons: ['martial'] },
+  'cleric:death':     { weapons: ['martial'] },
+  'bard:valor':       { armor: ['medium', 'shields'], weapons: ['martial'] },
+  'bard:swords':      { armor: ['medium'], weapons: ['scimitars'] },
+  'warlock:hexblade': { armor: ['medium', 'shields'], weapons: ['martial'] },
+  'wizard:bladesinging':   { armor: ['light'] },
+  'artificer:alchemist':   { tools: ["Alchemist's Supplies"] },
+  'artificer:artillerist': { tools: ["Woodcarver's Tools"] },
+  'artificer:armorer':     { armor: ['heavy'], tools: ["Smith's Tools"] },
+  'artificer:battle-smith': { weapons: ['martial'], tools: ["Smith's Tools"] },
+  'rogue:scout':      { skills: ['nature', 'survival'] },
+  'sorcerer:draconic': { languages: ['Draconic'] },
+}
+
+/** Everything a subclass grants outright when it's chosen. */
+export function subclassProficiencies(classSlug: string, subclassSlug: string): SubclassProficiencies {
+  const own = CLASS_OPTIONS[classSlug]?.subclasses.find(s => s.slug === subclassSlug)?.grantedProficiencies
+  const extra = SUBCLASS_EXTRA_PROFICIENCIES[`${classSlug}:${subclassSlug}`] ?? {}
+  return {
+    armor: extra.armor ?? [], weapons: extra.weapons ?? [], languages: extra.languages ?? [],
+    skills: [...(own?.skills ?? []), ...(extra.skills ?? [])],
+    tools: [...(own?.tools ?? []), ...(extra.tools ?? [])],
+  }
 }
 
 /** Compact builder for subclass granted spells: `gs(classLevel, spellLevel, name)`.
@@ -359,10 +395,10 @@ export const CLASS_OPTIONS: Record<string, ClassOptionsDef> = {
     skillChoices: ['Acrobatics', 'Animal Handling', 'Arcana', 'Athletics', 'Deception', 'History', 'Insight', 'Intimidation', 'Investigation', 'Medicine', 'Nature', 'Perception', 'Performance', 'Persuasion', 'Religion', 'Sleight of Hand', 'Stealth', 'Survival'],
     numSkillChoices: 3,
     cantripsKnown: 2,
-    cantripsAtLevel: [10],
+    cantripsAtLevel: [4, 10],
     spellsKnownAtL1: 4,
     spellsKnownTable: [4,5,6,7,8,9,10,11,12,14,15,15,16,18,19,19,20,22,22,22],
-    expertiseAt: [1, 3],
+    expertiseAt: [3, 10],
     expertiseCount: 2,
     subclasses: [
       { slug: 'lore', name: 'College of Lore', level: 3, description: 'Cutting Words (reaction: subtract Bardic Inspiration die from enemy\'s roll). 3 bonus skill proficiencies. Magical Secrets at L6.', features: [
@@ -1359,7 +1395,7 @@ export const CLASS_OPTIONS: Record<string, ClassOptionsDef> = {
     cantripsKnown: 2,
     cantripsAtLevel: [4, 10],
     spellsKnownAtL1: 2,
-    spellsKnownTable: [2,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12,13],
+    spellsKnownTable: [2,3,4,5,6,7,8,9,10,10,11,11,12,12,13,13,14,14,15,15],
     invocationsAtLevel: [0,2,2,2,3,3,4,4,5,5,5,6,6,6,7,7,7,8,8,8],
     pactMagic: true,
     subclasses: [
@@ -1578,7 +1614,7 @@ export const INITIAL_SPELL_SLOTS: Record<string, Record<string, { max: number; u
   druid:     { '1': { max: 2, used: 0 } },
   sorcerer:  { '1': { max: 2, used: 0 } },
   wizard:    { '1': { max: 2, used: 0 } },
-  warlock:   { '1': { max: 1, used: 0 } },
+  warlock:   {},  // Pact Magic slots live in char.pactSlots (see PACT_SLOT_TABLE)
   paladin:   {},
   ranger:    {},
   fighter:   {},
@@ -1599,15 +1635,16 @@ export const THIRD_CASTER_SLOT_TABLE: readonly number[][] = [
 export function slotsForLevel(
   classSlug: string,
   newLevel: number,
-  spellSlotTable?: number[][]
+  spellSlotTable?: number[][],
+  subclassSlug?: string,
 ): Record<string, { max: number; used: number }> | null {
   if (classSlug === 'warlock') return null
-  const table = spellSlotTable ?? (() => {
-    const ct = CASTER_TYPE[classSlug]
-    const type = typeof ct === 'function' ? ct() : ct
-    if (type === 'third') return THIRD_CASTER_SLOT_TABLE as number[][]
-    return null
-  })()
+  // Third casters (Eldritch Knight, Arcane Trickster) are only casters with their subclass
+  const table = spellSlotTable ?? (
+    resolveCasterType({ classSlug, subclassSlug, level: newLevel, hitDieRolls: [] }) === 'third'
+      ? THIRD_CASTER_SLOT_TABLE as number[][]
+      : null
+  )
   if (!table) return null
   const row = table[newLevel - 1]
   if (!row) return null
@@ -1616,6 +1653,85 @@ export function slotsForLevel(
     if (count > 0) slots[String(i + 1)] = { max: count, used: 0 }
   })
   return slots
+}
+
+// ── Ranger choices ─────────────────────────────────────────────────────────
+
+export const FAVORED_ENEMY_TYPES = ['Aberrations', 'Beasts', 'Celestials', 'Constructs', 'Dragons', 'Elementals', 'Fey', 'Fiends', 'Giants', 'Humanoids', 'Monstrosities', 'Oozes', 'Plants', 'Undead', 'Two humanoid types']
+export const FAVORED_TERRAINS = ['Arctic', 'Coast', 'Desert', 'Forest', 'Grassland', 'Mountain', 'Swamp', 'Underdark']
+
+// ── Spell progression per class entry ──────────────────────────────────────
+
+export interface SpellProgression {
+  spellList: string            // the class list its spells come from
+  startLevel: number           // class level spellcasting starts at
+  cantripsKnown: number        // cantrips known when casting starts
+  cantripsAtLevel: number[]    // class levels that each add one more cantrip
+  spellsKnownTable?: number[]  // known casters only: total known per class level (index = level - 1)
+  preparedCaster: boolean
+  isSpellbookCaster: boolean
+}
+
+// Eldritch Knight (PHB p.75) and Arcane Trickster (PHB p.98) learn wizard spells by class level
+const THIRD_CASTER_SPELLS_KNOWN = [0, 0, 3, 4, 4, 4, 5, 6, 6, 7, 8, 8, 9, 10, 10, 11, 11, 11, 12, 13]
+
+/** How a class entry learns spells — its class's rules, or its subclass's for Eldritch Knight
+ *  and Arcane Trickster. Null for entries that don't cast. */
+export function spellProgression(classSlug: string, subclassSlug?: string): SpellProgression | null {
+  const type = resolveCasterType({ classSlug, subclassSlug, level: 1, hitDieRolls: [] })
+  if (type === 'none') return null
+  if (type === 'third') {
+    return {
+      spellList: 'wizard', startLevel: 3,
+      // Arcane Tricksters get Mage Hand plus two cantrips; Eldritch Knights get two
+      cantripsKnown: classSlug === 'rogue' ? 3 : 2, cantripsAtLevel: [10],
+      spellsKnownTable: THIRD_CASTER_SPELLS_KNOWN, preparedCaster: false, isSpellbookCaster: false,
+    }
+  }
+  const opts = CLASS_OPTIONS[classSlug]
+  // College of Lore's Additional Magical Secrets (level 6) are two spells beyond the bard table
+  const loreBard = classSlug === 'bard' && subclassSlug === 'lore'
+  return {
+    spellList: classSlug, startLevel: type === 'half' ? 2 : 1,
+    cantripsKnown: opts?.cantripsKnown ?? 0, cantripsAtLevel: opts?.cantripsAtLevel ?? [],
+    spellsKnownTable: loreBard ? opts?.spellsKnownTable?.map((n, i) => (i >= 5 ? n + 2 : n)) : opts?.spellsKnownTable,
+    preparedCaster: !!opts?.preparedCaster, isSpellbookCaster: !!opts?.isSpellbookCaster,
+  }
+}
+
+/** Bard levels whose new spells may come from any class's list (Magical Secrets, PHB p.54;
+ *  College of Lore also at 6). */
+export function hasMagicalSecretsAt(classSlug: string, subclassSlug: string | undefined, level: number): boolean {
+  return classSlug === 'bard' && ([10, 14, 18].includes(level) || (subclassSlug === 'lore' && level === 6))
+}
+
+/** Mystic Arcanum (PHB p.108): warlock level → the spell level its arcanum is. Each is one
+ *  spell cast once per long rest without a slot, stored as a spell entry with this freeUseKey. */
+export const MYSTIC_ARCANUM_LEVELS: Record<number, number> = { 11: 6, 13: 7, 15: 8, 17: 9 }
+export const mysticArcanumKey = (spellLevel: number) => `mystic-arcanum-${spellLevel}`
+
+/** A Mystic Arcanum spell entry for the character's spell list. */
+export function mysticArcanumEntry(spell: { slug: string; name: string; level: number }) {
+  return {
+    spellSlug: spell.slug, name: spell.name, classSlug: 'warlock', prepared: true, isHomebrew: false,
+    usesPerLongRest: 1, freeUseKey: mysticArcanumKey(spell.level),
+  }
+}
+
+/** Total cantrips a class entry knows at `level`. */
+export function cantripsKnownAt(p: SpellProgression | null, level: number): number {
+  if (!p || !p.cantripsKnown || level < p.startLevel) return 0
+  return p.cantripsKnown + p.cantripsAtLevel.filter(l => l <= level).length
+}
+
+/** Highest spell level a class entry can learn or prepare at `level`, as if single-classed
+ *  (PHB p.164: multiclass characters pick spells for each class separately). */
+export function maxSpellLevelAt(classSlug: string, level: number, spellSlotTable?: number[][], subclassSlug?: string): number {
+  if (level < 1) return 0
+  if (classSlug === 'warlock') return PACT_SLOT_TABLE[Math.min(level, 20) - 1][0]
+  const slots = slotsForLevel(classSlug, level, spellSlotTable, subclassSlug) ?? {}
+  const fromTable = Math.max(0, ...Object.keys(slots).map(k => parseInt(k, 10)))
+  return fromTable || (INITIAL_SPELL_SLOTS[classSlug]?.['1'] ? 1 : 0)
 }
 
 // ── Artificer Infusions ────────────────────────────────────────────────────

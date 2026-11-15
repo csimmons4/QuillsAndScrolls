@@ -11,7 +11,7 @@
 // Standard cantrip scaling: base die count at L1, +1 die per tier (L5/11/17)
 const CANTRIP_SCALING: Record<string, { die: string; base: number }> = {
   'acid-splash':          { die: 'd6',  base: 1 },
-  'booming-blade':        { die: 'd8',  base: 0 }, // special: 0 + 1d8 / 1d8 / 2d8 / 3d8 thunder
+  'booming-blade':        { die: 'd8',  base: 1 }, // the damage if the target moves: 1d8 → 4d8 (on hit it's one die fewer)
   'chill-touch':          { die: 'd8',  base: 1 },
   'create-bonfire':       { die: 'd8',  base: 1 },
   'eldritch-blast':       { die: 'd10', base: 1 }, // special: beams scale, not dice
@@ -36,32 +36,30 @@ const CANTRIP_SCALING: Record<string, { die: string; base: number }> = {
   'wrathful-smite':       { die: 'd6',  base: 1 },
 }
 
-// Spells with known ritual tag (not in scraped data)
+// Ritual spells, as tagged on the wiki ("1st-level divination (ritual)"). The scraper records
+// the tag on each spell too; this list is the fallback for spell data scraped before it did.
 export const RITUAL_SLUGS = new Set([
-  'alarm', 'animal-messenger', 'augury', 'beast-bond', 'beast-sense',
-  'ceremony', 'comprehend-languages', 'contact-other-plane', 'continual-flame',
-  'detect-magic', 'detect-poison-and-disease', 'detect-thoughts',
-  'drawmijs-instant-summons', 'etherealness', 'feather-fall',
-  'find-familiar', 'forbiddance', 'gentle-repose', 'identify',
-  'illusory-script', 'leomunds-tiny-hut', 'leomund-tiny-hut',
-  'locate-animals-or-plants', 'mages-manifold', 'magic-mouth',
-  'nondetection', 'pass-without-trace', 'phantom-steed',
-  'purify-food-and-drink', 'rary-telepathic-bond', 'rite-of-the-frozen-one',
-  'rope-trick', 'see-invisibility', 'speak-with-animals',
-  'speak-with-dead', 'speak-with-plants', 'tenser-floating-disk',
-  'tongues', 'unseen-servant', 'water-breathing', 'water-walk',
-  'wind-wall', 'witch-bolt',
+  'alarm', 'animal-messenger', 'augury', 'beast-sense', 'ceremony', 'commune',
+  'commune-with-city', 'commune-with-nature', 'comprehend-languages',
+  'contact-other-plane', 'detect-magic', 'detect-poison-and-disease', 'divination',
+  'drawmijs-instant-summons', 'feign-death', 'find-familiar', 'forbiddance',
+  'gentle-repose', 'guiding-hand-ua', 'identify', 'illusory-script', 'leomunds-tiny-hut',
+  'locate-animals-or-plants', 'magic-mouth', 'meld-into-stone', 'phantom-steed',
+  'purify-food-and-drink', 'rarys-telepathic-bond', 'silence', 'skywrite',
+  'speak-with-animals', 'tensers-floating-disk', 'unseen-servant', 'water-breathing',
+  'water-walk', 'wild-cunning', 'wristpocket',
 ])
 
-/** Get cantrip damage dice at the given character level. Returns null for non-cantrips or unknown cantrips. */
-export function cantripDiceAtLevel(spellSlug: string, charLevel: number): string | null {
-  const sc = CANTRIP_SCALING[spellSlug]
-  if (!sc) return null
-  if (spellSlug === 'eldritch-blast') {
-    const beams = charLevel >= 17 ? 4 : charLevel >= 11 ? 3 : charLevel >= 5 ? 2 : 1
-    return `${beams}× ${sc.die} force`
-  }
+/** Cantrip damage dice at the given character level, without the damage type. `baseDice` is the
+ *  spell's level-1 dice ("1d6"), used to scale cantrips that aren't in the table. */
+export function cantripDiceAtLevel(spellSlug: string, charLevel: number, baseDice?: string): string | null {
   const tier = charLevel >= 17 ? 3 : charLevel >= 11 ? 2 : charLevel >= 5 ? 1 : 0
+  const sc = CANTRIP_SCALING[spellSlug]
+  if (!sc) {
+    const m = baseDice?.match(/^(\d+)(d\d+)$/)
+    return m ? `${parseInt(m[1], 10) + tier}${m[2]}` : null
+  }
+  if (spellSlug === 'eldritch-blast') return `${tier + 1}× 1${sc.die}`  // more beams, not more dice
   const count = sc.base + tier
-  return count > 0 ? `${count}${sc.die}` : `${sc.die}`
+  return count > 0 ? `${count}${sc.die}` : null  // Green-Flame Blade adds no dice before level 5
 }

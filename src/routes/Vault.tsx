@@ -5,6 +5,7 @@ import { importCharacter } from '../storage/ioFile'
 import { listCharactersFromDisk, saveCharacterToDisk, deleteCharacterFromDisk, type CharacterLoadFailure } from '../storage/charApi'
 import { totalLevel } from '../character/derive'
 import { useContent } from '../content/ContentProvider'
+import { useRecentCharacter } from '../storage/recentCharacter'
 import { v4 as uuidv4 } from 'uuid'
 
 export default function Vault() {
@@ -14,6 +15,7 @@ export default function Vault() {
   const [loading, setLoading] = useState(true)
   const fileRef = useRef<HTMLInputElement>(null)
   const { races, classes } = useContent()
+  const { recent, setRecent } = useRecentCharacter()
   const navigate = useNavigate()
 
   async function refresh() {
@@ -35,7 +37,8 @@ export default function Vault() {
     if (!file) return
     try {
       const char = await importCharacter(file)
-      await saveCharacterToDisk(char)
+      // Never overwrite a character already in the vault: an older export comes in beside it
+      await saveCharacterToDisk(characters.some(c => c.id === char.id) ? { ...char, id: uuidv4() } : char)
       await refresh()
       setError('')
     } catch {
@@ -47,6 +50,7 @@ export default function Vault() {
   async function handleDelete(id: string, name: string) {
     if (!confirm(`Delete "${name}"? This cannot be undone.`)) return
     await deleteCharacterFromDisk(id)
+    if (recent?.id === id) setRecent(null)
     await refresh()
   }
 

@@ -9,6 +9,9 @@ type Category = 'items' | 'spells' | 'feats' | 'races' | 'classes' | 'background
 const CATEGORY_LABELS: Record<Category, string> = {
   items: 'Items', spells: 'Spells', feats: 'Feats', races: 'Races', classes: 'Classes', backgrounds: 'Backgrounds',
 }
+const CATEGORY_SINGULAR: Record<Category, string> = {
+  items: 'Item', spells: 'Spell', feats: 'Feat', races: 'Race', classes: 'Class', backgrounds: 'Background',
+}
 
 const SKILLS = [
   'acrobatics','animal-handling','arcana','athletics','deception',
@@ -555,11 +558,26 @@ function SpellForm({ initial, onSave, onCancel }: { initial?: Record<string, unk
 interface FeatFormState {
   slug: string; name: string; prerequisite: string; description: string
   grantedSkillProficiencies: string[]; grantedSkillExpertise: string[]
-  abilityScoreIncrease: string
+  abilityScoreIncrease: string[]  // abilities the feat's +1 can go to (empty = no increase)
 }
 
+const FEAT_ABILITIES = ['str', 'dex', 'con', 'int', 'wis', 'cha'] as const
+
 function emptyFeatForm(): FeatFormState {
-  return { slug: '', name: '', prerequisite: '', description: '', grantedSkillProficiencies: [], grantedSkillExpertise: [], abilityScoreIncrease: '' }
+  return { slug: '', name: '', prerequisite: '', description: '', grantedSkillProficiencies: [], grantedSkillExpertise: [], abilityScoreIncrease: [] }
+}
+
+/** Read a saved feat's ASI: the structured { choose, from } shape, or the free text older
+ *  versions of this form saved (e.g. "+1 STR or DEX"), which FeatSchema can't load. */
+function parseFeatAsi(raw: unknown): string[] {
+  if (raw && typeof raw === 'object' && Array.isArray((raw as { from?: unknown }).from)) {
+    return ((raw as { from: unknown[] }).from).filter((a): a is string => typeof a === 'string')
+  }
+  if (typeof raw !== 'string' || !raw.trim()) return []
+  const text = raw.toLowerCase()
+  if (/\bany\b/.test(text)) return [...FEAT_ABILITIES]
+  const names: Record<string, string> = { strength: 'str', dexterity: 'dex', constitution: 'con', intelligence: 'int', wisdom: 'wis', charisma: 'cha' }
+  return FEAT_ABILITIES.filter(a => new RegExp(`\\b${a}\\b`).test(text) || Object.entries(names).some(([n, k]) => k === a && text.includes(n)))
 }
 
 function deserializeFeat(entry: Record<string, unknown>): FeatFormState {
@@ -569,7 +587,7 @@ function deserializeFeat(entry: Record<string, unknown>): FeatFormState {
     description: s(entry.description),
     grantedSkillProficiencies: (entry.grantedSkillProficiencies as string[]) ?? [],
     grantedSkillExpertise: (entry.grantedSkillExpertise as string[]) ?? [],
-    abilityScoreIncrease: s(entry.abilityScoreIncrease ?? ''),
+    abilityScoreIncrease: parseFeatAsi(entry.abilityScoreIncrease),
   }
 }
 
@@ -582,7 +600,7 @@ function serializeFeat(f: FeatFormState): Record<string, unknown> {
   if (f.prerequisite) entry.prerequisite = f.prerequisite
   if (f.grantedSkillProficiencies.length) entry.grantedSkillProficiencies = f.grantedSkillProficiencies
   if (f.grantedSkillExpertise.length) entry.grantedSkillExpertise = f.grantedSkillExpertise
-  if (f.abilityScoreIncrease) entry.abilityScoreIncrease = f.abilityScoreIncrease
+  if (f.abilityScoreIncrease.length) entry.abilityScoreIncrease = { choose: 1, from: f.abilityScoreIncrease, max: 20 }
   return entry
 }
 
@@ -604,8 +622,18 @@ function FeatForm({ initial, onSave, onCancel }: { initial?: Record<string, unkn
       <Field label="Prerequisite (optional)">
         <input className="input" value={f.prerequisite} onChange={e => up('prerequisite', e.target.value)} placeholder="e.g. Strength 13 or higher" />
       </Field>
-      <Field label="Ability Score Increase (optional)" hint="e.g. +1 STR, or choose any">
-        <input className="input" value={f.abilityScoreIncrease} onChange={e => up('abilityScoreIncrease', e.target.value)} placeholder="e.g. +2 STR or +1 to any two" />
+      <Field label="Ability Score Increase (optional)" hint="Half-feat: +1 to one of the ticked abilities (the player picks when they take it). Tick one for a fixed +1.">
+        <div className="flex flex-wrap gap-1.5">
+          {FEAT_ABILITIES.map(a => {
+            const on = f.abilityScoreIncrease.includes(a)
+            return (
+              <button key={a} type="button"
+                onClick={() => up('abilityScoreIncrease', on ? f.abilityScoreIncrease.filter(x => x !== a) : [...f.abilityScoreIncrease, a])}
+                className={`px-2.5 py-1 rounded border text-xs font-semibold uppercase transition-colors ${on ? 'bg-parchment-600 text-parchment-50 border-parchment-600' : 'border-parchment-300 text-parchment-600 hover:border-parchment-500'}`}
+              >{a}</button>
+            )
+          })}
+        </div>
       </Field>
       <Field label="Description">
         <textarea className="input min-h-[100px]" value={f.description} onChange={e => up('description', e.target.value)} />
@@ -1075,7 +1103,7 @@ export default function Homebrew() {
         {/* Form panel */}
         <div className="card">
           <h2 className="section-header mb-4">
-            {editIdx !== null ? `Edit ${CATEGORY_LABELS[category]}` : `New ${CATEGORY_LABELS[category]}`}
+            {editIdx !== null ? `Edit ${CATEGORY_SINGULAR[category]}` : `New ${CATEGORY_SINGULAR[category]}`}
           </h2>
           {category === 'items' && <ItemForm key={editIdx ?? 'new'} initial={editEntry ?? undefined} {...formProps} />}
           {category === 'spells' && <SpellForm key={editIdx ?? 'new'} initial={editEntry ?? undefined} {...formProps} />}

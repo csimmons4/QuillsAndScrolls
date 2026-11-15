@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { Character, Summon, SKILLS, SKILL_LABELS, ABILITIES } from '../character/model'
+import { Character, Summon, SKILLS, SKILL_LABELS, SKILL_ABILITY, ABILITIES } from '../character/model'
 import { listCharactersFromDisk, saveCharacterToDisk } from '../storage/charApi'
 import { useContent } from '../content/ContentProvider'
 import {
@@ -9,23 +9,38 @@ import {
   spellSaveDC, spellAttackBonus,
   deriveClassResources, shortRestResourceKeys, longRestResourceKeys,
   hasBardJackOfAllTrades, monkSpeedBonus, sneakAttackDice, paladinAuraBonus,
+  initiativeBonus, spellcastingAbilityFor,
+  type ClassResource,
 } from '../character/derive'
 import { touchUpdated } from '../character/create'
 import {
   CLASS_OPTIONS, ELDRITCH_INVOCATIONS, METAMAGIC_OPTIONS, ARTIFICER_INFUSIONS,
   LAND_CIRCLE_SPELLS, RUNE_KNIGHT_RUNES, HUNTER_CHOICES,
   TOTEM_ANIMALS, STORM_AURA_OPTIONS, FOUR_ELEMENTS_DISCIPLINES,
-  isMulticlassSpellcaster, multiclassSpellSlotsMax, CASTER_TYPE, effectiveCasterLevel,
+  isMulticlassSpellcaster, multiclassSpellSlotsMax, CASTER_TYPE, effectiveCasterLevel, resolveCasterType,
+  MULTICLASS_PROF_GRANTS, spellProgression, cantripsKnownAt, maxSpellLevelAt,
+  MYSTIC_ARCANUM_LEVELS, mysticArcanumKey, mysticArcanumEntry,
 } from '../data/classData'
 import { asiLevelsForClass } from '../character/levelUp'
-import { DRACONIC_ANCESTRIES, RACE_OPTIONS } from '../data/raceData'
+import {
+  DRACONIC_ANCESTRIES, RACE_OPTIONS, LANGUAGES_STANDARD, LANGUAGES_EXOTIC,
+  languageChoiceCount, languageChoicePlaceholder, splitRaceLanguages,
+} from '../data/raceData'
 import { STRIXHAVEN_COLLEGES } from '../data/strixhavenSpells'
 import { SpellStatBlock, cleanHigherLevels } from '../components/SpellStatBlock'
 import { WeaponStatBlock, ArmorStatBlock, MagicItemStatBlock } from '../components/ItemStatBlock'
 import { sumFeatBonuses } from '../character/featBonuses'
-import { sumItemBonuses, effectiveAbilityScores } from '../character/itemBonuses'
+import { sumItemBonuses, effectiveAbilityScores, itemIsActive } from '../character/itemBonuses'
 import { cantripDiceAtLevel } from '../data/spellMeta'
 import { exportCharacter } from '../storage/ioFile'
+import { type Coin, COIN_CP, normalizePurse, addValue, spendValue, formatPurse } from '../character/currency'
+import { RollingNumber } from '../components/RollingNumber'
+import { CoinEmblem, PouchIcon, ScaleIcon, QuillIcon } from '../components/PurseIcons'
+import { useRecentCharacter } from '../storage/recentCharacter'
+import { applyFeatAbilityIncrease, featAbilityPick, resolveFeatGrants, applyGrantPicks, withFeatClassChoice } from '../character/grants'
+import { FeatGrantsBlock } from '../components/FeatGrantsBlock'
+import { runningPotions, sumPotionEffects, describePotionEffects } from '../character/potionEffects'
+import { FeatAbilityPicker } from '../components/FeatAbilityPicker'
 import { BATTLE_MASTER_MANEUVERS } from '../data/classData'
 import type { WeaponStats, ArmorStats, ItemDef } from '../content/loaders'
 
@@ -37,15 +52,24 @@ function slugify(s: string): string {
   return s.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
 }
 
+// True when `baseSlug` appears in `slug` as whole hyphen-separated words, so
+// "flame-tongue-longsword" contains "longsword" but "nimbus-coronet" doesn't contain "net".
+function hasSlugWords(slug: string, baseSlug: string): boolean {
+  return `-${slug}-`.includes(`-${baseSlug}-`)
+}
+
+const AMMO_RE = /\b(bullets?|arrows?|bolts?|needles?|ammunition)\b/i
+
 function resolveWeapon(item: { itemSlug: string; name: string }, items: ItemDef[]): WeaponStats | undefined {
   const direct = items.find(i => i.slug === item.itemSlug)?.weaponStats
   if (direct) return direct
   const byName = items.find(i => i.slug === slugify(item.name))?.weaponStats
   if (byName) return byName
   // Fuzzy: for magic weapons like "Flame Tongue Longsword" match the base weapon.
+  if (AMMO_RE.test(item.name)) return undefined
   const lower = slugify(item.name)
   for (const i of items) {
-    if (i.weaponStats && lower.includes(i.slug)) return i.weaponStats
+    if (i.weaponStats && hasSlugWords(lower, i.slug)) return i.weaponStats
   }
   return undefined
 }
@@ -57,26 +81,38 @@ function resolveArmor(item: { itemSlug: string; name: string }, items: ItemDef[]
   if (byName) return byName
   const lower = slugify(item.name)
   for (const i of items) {
-    if (i.armorStats && lower.includes(i.slug)) return i.armorStats
+    if (i.armorStats && hasSlugWords(lower, i.slug)) return i.armorStats
   }
   return undefined
 }
 
 type BodySlotKey = 'helmet' | 'eyes' | 'amulet' | 'cloak' | 'robe' | 'bracers' | 'gloves' | 'belt' | 'boots' | 'backpack'
 
-function detectBodySlot(name: string): BodySlotKey | null {
-  const n = name.toLowerCase()
-  if (/\b(helm|helmet|crown|circlet|\bhat\b|\bcap\b|headband|tiara|diadem)/.test(n)) return 'helmet'
-  if (/\b(goggles|mask\b|masque|spectacles|lenses of|eyes of)/.test(n)) return 'eyes'
-  if (/\b(amulet|necklace|periapt|pendant|talisman|choker)/.test(n)) return 'amulet'
-  if (/\b(cloak|cape|mantle)/.test(n)) return 'cloak'
-  if (/\b(robe|vestments|garb)/.test(n)) return 'robe'
-  if (/\b(bracers|bracer|bracelet|wristband|armband)/.test(n)) return 'bracers'
-  if (/\b(gloves|glove|gauntlets|gauntlet)/.test(n)) return 'gloves'
-  if (/\b(belt|girdle|sash)/.test(n)) return 'belt'
-  if (/\b(boots|boot|slippers|slipper|sandals|shoes)/.test(n)) return 'boots'
-  if (/\b(bag of holding|haversack|sack of|portable hole|bag of tricks)/.test(n)) return 'backpack'
+function slotFromWords(text: string): BodySlotKey | null {
+  const n = text.toLowerCase()
+  if (/\b(helm|helmet|crown|circlet|coronet|hat|cap|hood|headband|headdress|tiara|diadem|wreath|turban)\b/.test(n)) return 'helmet'
+  if (/\b(goggles|mask|masque|spectacles|lenses|visor|monocle|eye ?patch|eyes of)\b/.test(n)) return 'eyes'
+  if (/\b(amulet|necklace|periapt|pendant|talisman|choker|medallion|locket|torc|brooch|badge|medal|insignia|emblem|scarab)\b/.test(n)) return 'amulet'
+  if (/\b(cloak|cape|mantle|shroud|wings)\b/.test(n)) return 'cloak'
+  if (/\b(robes?|vestments|garb|clothes|clothing|apron|bib|suit|tunic)\b/.test(n)) return 'robe'
+  if (/\b(bracers?|bracelets?|wristbands?|armbands?|vambraces?)\b/.test(n)) return 'bracers'
+  if (/\b(gloves?|gauntlets?|claws)\b/.test(n)) return 'gloves'
+  if (/(belt|girdle)\b|\bsash\b/.test(n)) return 'belt'
+  if (/\b(boots?|slippers?|sandals|shoes|greaves)\b/.test(n)) return 'boots'
+  if (/\b(bag of holding|haversack|sack of|portable hole|bag of tricks|backpack|pack)\b/.test(n)) return 'backpack'
   return null
+}
+
+// Which body slot an item can be worn in — from its name, or failing that from the
+// "while wearing this X" wording in its description. Null = no fixed slot (just Equip).
+function detectBodySlot(name: string, description?: string): BodySlotKey | null {
+  // Magic armor variants ("Mariner's Armor", "Mithral Plate") are armor, not a body-slot item.
+  if (/\b(armor|mail|breastplate)\b/i.test(name)) return null
+  const byName = slotFromWords(name)
+  if (byName) return byName
+  const worn = description?.match(/\bwear(?:ing)?\s+(?:this|these|the)\s+([a-z' -]{2,30}?)(?=[,.;:]|\s(?:and|you|or|on|to|for|while|over|around|that|it|in|of)\b)/i)
+  if (!worn || /\b(armor|mail|breastplate)\b/i.test(worn[1])) return null
+  return slotFromWords(worn[1])
 }
 
 // +1/+2/+3 bonus from magic weapon name ("Longsword +1", "+2 Longsword")
@@ -85,9 +121,52 @@ function magicBonus(name: string): number {
   return m ? parseInt(m[1]) : 0
 }
 
+// Any skill spelling ("Animal Handling", "animal-handling", "animalHandling") → its SKILLS key,
+// so granted skills from backgrounds/races/feats/items line up with char.skillProficiencies.
+const SKILL_KEY_BY_LETTERS = new Map<string, string>(SKILLS.map(s => [s.toLowerCase(), s]))
+function toSkillKey(s: string): string {
+  return SKILL_KEY_BY_LETTERS.get(s.toLowerCase().replace(/[^a-z]/g, '')) ?? s
+}
+
+/**
+ * For characters saved before proficiencies and languages were recorded: what to fill in from
+ * their class, race and background. Only completely empty fields are filled, so nothing the
+ * player set is overwritten. Unpicked language choices become a placeholder the sheet asks about.
+ */
+function missingProficiencies(char: Character, content: ReturnType<typeof useContent>): Partial<Character> | null {
+  const updates: Partial<Character> = {}
+  const [primary, ...others] = char.classes
+  if (primary && char.armorProficiencies.length === 0 && char.weaponProficiencies.length === 0) {
+    const cls = content.classes.find(c => c.slug === primary.classSlug)
+    const grants = others.map(c => MULTICLASS_PROF_GRANTS[c.classSlug]).filter(Boolean)
+    const armor = [...(cls?.armorProficiencies ?? []), ...grants.flatMap(g => g.armor ?? [])]
+    const weapons = [...(cls?.weaponProficiencies ?? []), ...grants.flatMap(g => g.weapons ?? [])]
+    if (armor.length) updates.armorProficiencies = [...new Set(armor)]
+    if (weapons.length) updates.weaponProficiencies = [...new Set(weapons)]
+  }
+  if (char.languages.length === 0) {
+    const raceDef = content.races.find(r => r.slug === char.raceSlug)
+    const race = splitRaceLanguages(raceDef?.grantedLanguages)
+    race.choices += raceDef?.subraces?.find(sr => sr.slug === char.subraceSlug)?.extraLanguages ?? 0
+    const bgChoices = content.backgrounds.find(b => b.slug === char.backgroundSlug)?.languages ?? 0
+    const hasClass = (slug: string) => char.classes.some(c => c.classSlug === slug)
+    const secret = [...(hasClass('druid') ? ['Druidic'] : []), ...(hasClass('rogue') ? ["Thieves' Cant"] : [])]
+    const toPick = languageChoicePlaceholder(race.choices + bgChoices)
+    updates.languages = [...new Set([...race.fixed, ...secret, ...(toPick ? [toPick] : [])])]
+  }
+  return Object.keys(updates).length ? updates : null
+}
+
+// Fighting styles: picked in the Creator ('fighting-style') or at level-up ('fighting-style-<class>')
+function fightingStyles(char: Character): Set<string> {
+  return new Set(char.featuresChosen
+    .filter(fc => fc.key === 'fighting-style' || fc.key.startsWith('fighting-style-'))
+    .map(fc => typeof fc.value === 'string' ? fc.value : fc.value[0]))
+}
+
 function weaponAttackBonus(char: Character, ws: WeaponStats, pb: number, bonus = 0): number {
   const str = abilityModFor(char, 'str'), dex = abilityModFor(char, 'dex')
-  if (ws.ranged) return dex + pb + bonus
+  if (ws.ranged) return dex + pb + bonus + (fightingStyles(char).has('archery') ? 2 : 0)
   if (ws.finesse) return Math.max(str, dex) + pb + bonus
   return str + pb + bonus
 }
@@ -106,6 +185,7 @@ function computeFullAC(
   items: ItemDef[],
   raceDef: { naturalArmor?: { base: number; addDex: boolean } } | undefined,
   itemAcBonus = 0,
+  mediumDexCap = 2,  // 3 with Medium Armor Master
 ): { ac: number; source: string; stealthDisadv: boolean } {
   const dex = abilityModFor(char, 'dex')
   const equipped = char.equipment.filter(e => e.equipped)
@@ -130,8 +210,9 @@ function computeFullAC(
   if (armorStat) {
     const mb = magicBonus(armorName)
     if (armorStat.type === 'light')       { baseAC = armorStat.acBase + dex + mb;             source = armorName }
-    else if (armorStat.type === 'medium') { baseAC = armorStat.acBase + Math.min(dex, 2) + mb; source = armorName }
+    else if (armorStat.type === 'medium') { baseAC = armorStat.acBase + Math.min(dex, mediumDexCap) + mb; source = armorName }
     else                                  { baseAC = armorStat.acBase + mb;                    source = armorName }
+    if (fightingStyles(char).has('defense')) { baseAC += 1; source += ' + Defense' }
   } else {
     // Unarmored — collect all candidates and take the best
     const candidates: Array<{ ac: number; label: string }> = []
@@ -139,7 +220,8 @@ function computeFullAC(
     candidates.push({ ac: 10 + dex, label: 'Unarmored' })
 
     for (const cc of char.classes) {
-      if (cc.classSlug === 'monk') {
+      // Monk Unarmored Defense doesn't work with a shield (Barbarian's does)
+      if (cc.classSlug === 'monk' && !hasShield) {
         candidates.push({ ac: 10 + dex + abilityModFor(char, 'wis'), label: 'Unarmored Defense (Monk)' })
       }
       if (cc.classSlug === 'barbarian') {
@@ -189,22 +271,32 @@ const SIMPLE_WEAPON_SLUGS = new Set([
   'quarterstaff','sickle','spear','crossbow-light','dart','shortbow','sling',
 ])
 
-function isWeaponProficient(char: Character, slug: string): boolean {
-  const profs = char.weaponProficiencies.map(p => p.toLowerCase())
-  if (profs.includes('martial') || profs.includes('martial weapons')) return true
-  if ((profs.includes('simple') || profs.includes('simple weapons')) && SIMPLE_WEAPON_SLUGS.has(slug)) return true
-  if (profs.includes(slug)) return true
-  // Match by partial name (e.g. "longswords" covers "longsword")
-  return profs.some(p => slug.includes(p.replace(/s$/, '')) || p.includes(slug))
+function isWeaponProficient(char: Character, item: { itemSlug: string; name: string }): boolean {
+  // The inventory slug and the name both count, so "+1 Longsword" or a renamed item still match
+  const slugs = [item.itemSlug, slugify(item.name)]
+  const isA = (base: string) => slugs.some(s => hasSlugWords(s, base))
+  for (const raw of char.weaponProficiencies) {
+    const p = raw.toLowerCase().replace(/\s+weapons?$/, '').trim()
+    if (p === 'martial') return true
+    if (p === 'simple') {
+      if ([...SIMPLE_WEAPON_SLUGS].some(isA)) return true
+      continue
+    }
+    // A named weapon: "hand crossbows" covers the slug "crossbow-hand", "longswords" covers "longsword"
+    const words = p.split(/[\s-]+/).map(w => w.replace(/s$/, ''))
+    if (slugs.some(s => { const have = new Set(s.split('-')); return words.every(w => have.has(w)) })) return true
+  }
+  return false
 }
 
 function isArmorProficient(char: Character, as_: ArmorStats): boolean {
+  // Stored as "light" / "Light Armor" / "all" / "shields (non-metal)" depending on the source
   const profs = char.armorProficiencies.map(p => p.toLowerCase())
-  if (as_.type === 'shield') return profs.includes('shields') || profs.includes('shield')
-  if (profs.includes('heavy') || profs.includes('heavy armor')) return true
-  if ((profs.includes('medium') || profs.includes('medium armor')) && (as_.type === 'medium' || as_.type === 'light')) return true
-  if ((profs.includes('light') || profs.includes('light armor')) && as_.type === 'light') return true
-  return false
+  const has = (kind: string) => profs.some(p => p.startsWith(kind))
+  if (as_.type === 'shield') return has('shield')
+  if (has('all') || has('heavy')) return true
+  if (has('medium') && (as_.type === 'medium' || as_.type === 'light')) return true
+  return has('light') && as_.type === 'light'
 }
 
 // Aggregate all resistances, immunities, condition immunities and advantages
@@ -212,13 +304,14 @@ function deriveResistances(
   raceDef: { resistances?: string[]; immunities?: string[]; conditionImmunities?: string[]; advantages?: string[] } | undefined,
   featBonuses: ReturnType<typeof sumFeatBonuses>,
   itemBonuses: { resistances: string[]; immunities: string[]; conditionImmunities: string[] },
+  potionFx: { resistances: string[]; conditionImmunities: string[]; advantages: string[] },
 ) {
   const unique = (arr: string[]) => [...new Set(arr.map(s => s.toLowerCase()))]
   return {
-    resistances: unique([...(raceDef?.resistances ?? []), ...featBonuses.resistances, ...itemBonuses.resistances]),
+    resistances: unique([...(raceDef?.resistances ?? []), ...featBonuses.resistances, ...itemBonuses.resistances, ...potionFx.resistances]),
     immunities: unique([...(raceDef?.immunities ?? []), ...featBonuses.immunities, ...itemBonuses.immunities]),
-    conditionImmunities: unique([...(raceDef?.conditionImmunities ?? []), ...featBonuses.conditionImmunities, ...itemBonuses.conditionImmunities]),
-    advantages: unique([...(raceDef?.advantages ?? []), ...featBonuses.advantages]),
+    conditionImmunities: unique([...(raceDef?.conditionImmunities ?? []), ...featBonuses.conditionImmunities, ...itemBonuses.conditionImmunities, ...potionFx.conditionImmunities]),
+    advantages: unique([...(raceDef?.advantages ?? []), ...featBonuses.advantages, ...potionFx.advantages]),
   }
 }
 
@@ -243,7 +336,7 @@ function deriveSkillSources(
   const autoProfs = new Set<string>()
   const autoExpert = new Set<string>()
 
-  const toSlug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+  const toSlug = toSkillKey
 
   const addProf = (skill: string, tag: SkillSourceTag) => {
     const s = toSlug(skill)
@@ -277,7 +370,7 @@ function deriveSkillSources(
   for (const slot of char.equipment) {
     const def = itemBySlug.get(slot.itemSlug)
     if (!def) continue
-    const active = slot.equipped || def.type === 'Ring'
+    const active = itemIsActive(slot, def)
     if (!active) continue
     def.grantedSkillProficiencies?.forEach(s => { addProf(s, { label: def.name, kind: 'item' }); autoProfs.add(toSlug(s)) })
     def.grantedSkillExpertise?.forEach(s => { addExpert(s, { label: def.name, kind: 'item' }); autoExpert.add(toSlug(s)) })
@@ -398,6 +491,32 @@ function CampaignBoardManager({
   const [activeId, setActiveId] = useState<string>(initActive || initBoards[0]?.id || '')
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renameVal, setRenameVal] = useState('')
+  // Full screen: the board fills the window (and the screen too, where the browser allows it)
+  const [fullscreen, setFullscreen] = useState(false)
+  const rootRef = useRef<HTMLDivElement>(null)
+
+  function enterFullscreen() {
+    setFullscreen(true)
+    rootRef.current?.requestFullscreen?.().catch(() => { /* window-filling overlay still works */ })
+  }
+  function exitFullscreen() {
+    setFullscreen(false)
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {})
+  }
+
+  useEffect(() => {
+    // Browser fullscreen ended (e.g. Esc) → leave the overlay too
+    const onFsChange = () => { if (!document.fullscreenElement) setFullscreen(false) }
+    document.addEventListener('fullscreenchange', onFsChange)
+    return () => document.removeEventListener('fullscreenchange', onFsChange)
+  }, [])
+
+  useEffect(() => {
+    if (!fullscreen) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !document.fullscreenElement) setFullscreen(false) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [fullscreen])
 
   function save(next: Board[], nextActive: string) {
     setBoards(next); onChange(next, nextActive)
@@ -431,9 +550,9 @@ function CampaignBoardManager({
   const active = boards.find(b => b.id === activeId) ?? boards[0]
 
   return (
-    <div className="card p-0 overflow-hidden">
+    <div ref={rootRef} className={fullscreen ? 'fixed inset-0 z-50 flex flex-col bg-parchment-100' : 'card p-0 overflow-hidden'}>
       {/* Board tabs */}
-      <div className="flex items-center gap-0 border-b border-parchment-200 bg-parchment-50 overflow-x-auto">
+      <div className="flex items-center gap-0 border-b border-parchment-200 bg-parchment-50 overflow-x-auto shrink-0">
         {boards.map(b => (
           <div key={b.id}
             className={`flex items-center gap-1 px-3 py-2 border-r border-parchment-200 cursor-pointer shrink-0 group ${
@@ -496,6 +615,8 @@ function CampaignBoardManager({
           connections={active.connections}
           onChange={onBoardChange}
           boardName={active.name}
+          fullscreen={fullscreen}
+          onToggleFullscreen={fullscreen ? exitFullscreen : enterFullscreen}
         />
       ) : null}
     </div>
@@ -513,11 +634,13 @@ const NOTE_BG: Record<string, { card: string; pin: string; text: string; sub: st
 
 function CampaignBoard({
   notes: initNotes, connections: initConns,
-  onChange, boardName,
+  onChange, boardName, fullscreen, onToggleFullscreen,
 }: {
   notes: BoardNote[]; connections: BoardConn[]
   onChange: (notes: BoardNote[], connections: BoardConn[]) => void
   boardName: string
+  fullscreen: boolean
+  onToggleFullscreen: () => void
 }) {
   const [notes, setNotes] = useState<BoardNote[]>(initNotes)
   const [conns, setConns] = useState<BoardConn[]>(initConns)
@@ -557,11 +680,32 @@ function CampaignBoard({
   }
 
 
+  // Ctrl/⌘ + scroll (or trackpad pinch) zooms around the cursor. Needs a non-passive
+  // listener so the browser's own page zoom can be prevented.
+  useEffect(() => {
+    const outer = outerRef.current
+    if (!outer) return
+    function onWheel(e: WheelEvent) {
+      if (!e.ctrlKey && !e.metaKey) return
+      e.preventDefault()
+      const el = outerRef.current!
+      const rect = el.getBoundingClientRect()
+      const s = scaleRef.current
+      const next = Math.min(MAX_SCALE, Math.max(MIN_SCALE, s * (e.deltaY < 0 ? 1.1 : 1 / 1.1)))
+      const px = e.clientX - rect.left, py = e.clientY - rect.top
+      const bx = (el.scrollLeft + px) / s, by = (el.scrollTop + py) / s
+      setScale(next)
+      requestAnimationFrame(() => { el.scrollLeft = bx * next - px; el.scrollTop = by * next - py })
+    }
+    outer.addEventListener('wheel', onWheel, { passive: false })
+    return () => outer.removeEventListener('wheel', onWheel)
+  }, [])
+
   function addNote() {
     const outer = outerRef.current!
     const s = scaleRef.current
     const vpW = outer.clientWidth / s
-    const vpH = VIEWPORT_H / s
+    const vpH = outer.clientHeight / s
     const scrollX = outer.scrollLeft / s
     const scrollY = outer.scrollTop / s
     const w = 200, h = 200
@@ -651,11 +795,13 @@ function CampaignBoard({
   }
 
   return (
-    <div className="select-none">
+    <div className={fullscreen ? 'select-none flex flex-col flex-1 min-h-0' : 'select-none'}>
       {/* Toolbar */}
-      <div className="flex items-center gap-2 px-3 py-2 bg-[#8a6642]">
+      <div className="flex items-center gap-2 px-3 py-2 bg-[#8a6642] shrink-0">
         <span className="text-xs text-parchment-200 font-semibold opacity-60 italic">{boardName}</span>
-        {connectingFrom && <span className="text-xs text-red-200 font-medium animate-pulse ml-2">Click a note to connect — Esc to cancel</span>}
+        {connectingFrom
+          ? <span className="text-xs text-red-200 font-medium animate-pulse ml-2">Click a note to connect — Esc to cancel</span>
+          : <span className="text-[10px] text-parchment-300/70 ml-2 hidden sm:inline">Drag to pan · Ctrl/⌘ + scroll to zoom</span>}
         <div className="flex-1" />
         {/* Zoom controls */}
         <div className="flex items-center gap-1">
@@ -671,13 +817,18 @@ function CampaignBoard({
           className="text-xs bg-black/30 text-parchment-100 hover:bg-black/50 rounded px-3 py-1 font-semibold transition-colors border border-white/10 ml-1">
           + Add Note
         </button>
+        <button type="button" onClick={onToggleFullscreen}
+          title={fullscreen ? 'Exit full screen (Esc)' : 'Open the board full screen'}
+          className="text-xs bg-black/30 text-parchment-100 hover:bg-black/50 rounded px-3 py-1 font-semibold transition-colors border border-white/10">
+          {fullscreen ? '✕ Exit full screen' : '⛶ Full screen'}
+        </button>
       </div>
 
       {/* Scrollable viewport */}
       <div
         ref={outerRef}
-        className="overflow-auto"
-        style={{ height: VIEWPORT_H, cursor: connectingFrom ? 'crosshair' : isPanning ? 'grabbing' : 'grab' }}
+        className={fullscreen ? 'overflow-auto flex-1 min-h-0' : 'overflow-auto'}
+        style={{ height: fullscreen ? undefined : VIEWPORT_H, cursor: connectingFrom ? 'crosshair' : isPanning ? 'grabbing' : 'grab' }}
         onMouseDown={onBoardMouseDown}
         onMouseMove={onBoardMouseMove}
         onMouseUp={onBoardMouseUp}
@@ -925,7 +1076,18 @@ export default function Sheet() {
   const [journeyOpen, setJourneyOpen] = useState(true)
   const [damageInput, setDamageInput] = useState('')
   const [txAmount, setTxAmount] = useState('')
-  const [txCoin, setTxCoin] = useState<'cp' | 'sp' | 'ep' | 'gp' | 'pp'>('gp')
+  const [txCoin, setTxCoin] = useState<Coin>('gp')
+  const [txNote, setTxNote] = useState('')
+  // "+25 gp" / "−30 sp" labels floating up from the purse balance
+  const [purseFloats, setPurseFloats] = useState<{ id: number; text: string; kind: 'gain' | 'spend' }[]>([])
+  // Purse ledger open/closed — remembered in this browser (localStorage, a UI convenience)
+  const [ledgerOpen, setLedgerOpenState] = useState(() => {
+    try { return localStorage.getItem('qs:ledgerOpen') !== 'false' } catch { return true }
+  })
+  const setLedgerOpen = (open: boolean) => {
+    setLedgerOpenState(open)
+    try { localStorage.setItem('qs:ledgerOpen', String(open)) } catch { /* storage unavailable */ }
+  }
   const [expandedCondition, setExpandedCondition] = useState<string | null>(null)
   const [healInput, setHealInput] = useState('')
   const [shortRestOpen, setShortRestOpen] = useState(false)
@@ -936,9 +1098,22 @@ export default function Sheet() {
   const [newSummonForm, setNewSummonForm] = useState<{ name: string; hp: string; ac: string } | null>(null)
   const [addFeatOpen, setAddFeatOpen] = useState(false)
   const [addFeatSearch, setAddFeatSearch] = useState('')
+  const [spellTabClass, setSpellTabClass] = useState<string | null>(null)  // multiclass casters: class shown on Spells tab
+  const [addFeatPending, setAddFeatPending] = useState<string | null>(null)  // half-feat awaiting its +1 pick
+  const [addFeatAbility, setAddFeatAbility] = useState('')
+  const [addFeatApplyAsi, setAddFeatApplyAsi] = useState(true)
+  // Spells a feat lets you choose (Fey Touched, Magic Initiate, …)
+  const [addFeatClass, setAddFeatClass] = useState('')
+  const [addFeatGrants, setAddFeatGrants] = useState<Record<string, string[]>>({})
   const [newResourceName, setNewResourceName] = useState('')
   const [newResourceMax, setNewResourceMax] = useState('')
   const [newResourceRecharge, setNewResourceRecharge] = useState<'short' | 'long'>('long')
+  const [addResourceOpen, setAddResourceOpen] = useState(false)
+  // Healing potion being drunk (inventory index) + the HP the player rolled for it
+  const [drinkingIdx, setDrinkingIdx] = useState<number | null>(null)
+  const [drinkRoll, setDrinkRoll] = useState('')
+  const [drinkChoice, setDrinkChoice] = useState('')         // Resistance damage type / weapon to coat
+  const [drinkFailedSave, setDrinkFailedSave] = useState(false)  // Potion of Poison
   const saveFlashTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const charRef = useRef<Character | null>(null)
 
@@ -946,7 +1121,12 @@ export default function Sheet() {
     if (!id) return
     listCharactersFromDisk()
       .then(({ characters: chars }) => {
-        const found = chars.find(c => c.id === id)
+        let found = chars.find(c => c.id === id)
+        // Characters made before skill tracking existed: their current skills become the baseline
+        if (found && !found.skillBaseline) {
+          found = { ...found, skillBaseline: { proficiencies: [...found.skillProficiencies], expertise: [...found.skillExpertise] } }
+          saveCharacterToDisk(found).catch(err => console.warn('Saving skill baseline failed:', err))
+        }
         if (found) { setChar(found); charRef.current = found }
         else setLoadError('Character not found — it may have been deleted.')
       })
@@ -1000,6 +1180,32 @@ export default function Sheet() {
     charRef.current = char
   }, [char])
 
+  // Remember this sheet so the nav bar can offer "← <name>" from other pages
+  const { setRecent } = useRecentCharacter()
+  useEffect(() => {
+    if (char) setRecent({ id: char.id, name: char.name })
+  }, [char?.id, char?.name, setRecent])
+
+  // At 0 HP the death screen takes over the whole window — freeze the page underneath
+  const dying = !!char && char.hp.current <= 0
+  useEffect(() => {
+    if (!dying) return
+    const root = document.documentElement
+    const prev = { overflow: root.style.overflow, gutter: root.style.scrollbarGutter }
+    root.style.overflow = 'hidden'
+    root.style.scrollbarGutter = 'auto'
+    return () => { root.style.overflow = prev.overflow; root.style.scrollbarGutter = prev.gutter }
+  }, [dying])
+
+  // Older characters: fill in missing proficiencies/languages once, when the sheet first opens
+  const backfilledId = useRef<string | null>(null)
+  useEffect(() => {
+    if (!char || content.loading || backfilledId.current === char.id) return
+    backfilledId.current = char.id
+    const updates = missingProficiencies(char, content)
+    if (updates) save({ ...char, ...updates })
+  }, [char, content, save])
+
   function patch(updates: Partial<Character>) {
     if (!char) return
     save({ ...char, ...updates })
@@ -1031,8 +1237,23 @@ export default function Sheet() {
   const featBonuses = sumFeatBonuses(featSlugs, content.feats)
   const itemBonuses = sumItemBonuses(char.equipment, content.items)
 
-  // Apply ability score overrides/bonuses from equipped items
-  const effectiveScores = effectiveAbilityScores(char.abilityScores as Record<string, number>, itemBonuses)
+  // Active potions still running (not out of rounds or uses), and everything they change
+  const running = runningPotions(char, content.items)
+  const potionFx = sumPotionEffects(running)
+  const potionScoreOverrides = potionFx.abilityOverrides
+  // Potion effects on a weapon's numbers, shared by the attacks table and the inventory cards:
+  // Oil of Sharpness (+N to hit and damage on the coated weapon), Bless dice on attack rolls,
+  // Enlarge/Reduce dice on damage
+  const potionWeaponMods = (itemName: string) => ({
+    bonus: potionFx.weaponBonus.get(itemName) ?? 0,
+    attackDice: potionFx.rollBonusDice.map(d => ` ${d}`).join(''),
+    damageDice: potionFx.weaponDamageDice.map(d => ` ${d}`).join(''),
+  })
+
+  // Apply ability score overrides/bonuses from equipped items and active potions (Giant Strength)
+  const scoreOverrides = { ...itemBonuses.abilityScoreOverrides }
+  for (const [ab, v] of Object.entries(potionScoreOverrides)) scoreOverrides[ab] = Math.max(scoreOverrides[ab] ?? 0, v)
+  const effectiveScores = effectiveAbilityScores(char.abilityScores as Record<string, number>, { ...itemBonuses, abilityScoreOverrides: scoreOverrides })
   const effectiveChar = effectiveScores === (char.abilityScores as Record<string, number>)
     ? char
     : { ...char, abilityScores: effectiveScores as typeof char.abilityScores }
@@ -1040,7 +1261,7 @@ export default function Sheet() {
   const raceDef = content.races.find(r => r.slug === char.raceSlug)
 
   // effectiveCharSkills: merge ALL auto-granted skill profs/expertise so mods are always correct
-  const _toSlug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+  const _toSlug = toSkillKey
   const _bgProfs = content.backgrounds.find(b => b.slug === char.backgroundSlug)?.skillProficiencies.map(_toSlug) ?? []
   const _raceProfs = raceDef?.grantedSkills?.map(_toSlug) ?? []
   const _featProfs = featSlugs.flatMap(slug => content.feats.find(f => f.slug === slug)?.grantedSkillProficiencies?.map(_toSlug) ?? [])
@@ -1053,7 +1274,7 @@ export default function Sheet() {
 
   // Collect all free spells from feats + race/subrace
   // Single source of truth for granted/innate spells (feats, race, subclass) — rendered once.
-  const freeSpells: Array<{ key: string; slug: string; name: string; level: number; source: string; usesPerLongRest?: number; alwaysPrepared?: boolean }> = []
+  const freeSpells: Array<{ key: string; slug: string; name: string; level: number; source: string; usesPerLongRest?: number; alwaysPrepared?: boolean; castLevel?: number }> = []
   for (const slug of featSlugs) {
     const e = content.feats.find(f => f.slug === slug)
     if (!e) continue
@@ -1064,7 +1285,8 @@ export default function Sheet() {
   }
   const subraceOpts = raceDef?.subraces?.find(s => s.slug === char.subraceSlug)
   for (const s of [...(raceDef?.grantedSpells ?? []), ...(subraceOpts?.grantedSpells ?? [])]) {
-    freeSpells.push({ key: `race:${char.raceSlug}:${char.subraceSlug ?? ''}:${s.slug}`, slug: s.slug, name: s.name, level: s.level, source: raceDef?.name ?? char.raceSlug, usesPerLongRest: s.usesPerLongRest })
+    if ((s.minLevel ?? 1) > totalLevel(char)) continue
+    freeSpells.push({ key: `race:${char.raceSlug}:${char.subraceSlug ?? ''}:${s.slug}`, slug: s.slug, name: s.name, level: s.level, source: raceDef?.name ?? char.raceSlug, usesPerLongRest: s.usesPerLongRest, castLevel: s.castLevel })
   }
   // Subclass-granted "always prepared" spells (domain/oath/circle/patron), gated by class level.
   for (const cc of char.classes) {
@@ -1088,26 +1310,84 @@ export default function Sheet() {
     }
   }
 
-  const maxHp = hpMax(effectiveChar, content) + featBonuses.hpBonusPerLevel * level
-  const { ac, source: acSource, stealthDisadv } = computeFullAC(effectiveChar, featBonuses.naturalArmorBase, content.items, raceDef, itemBonuses.acBonus)
-  const initiative = abilityModFor(effectiveChar, 'dex') + featBonuses.initiativeBonus
-  const passive = passivePerception(effectiveChar) + featBonuses.passivePerceptionBonus + itemBonuses.abilityCheckBonus
+  const baseMaxHp = hpMax(effectiveChar, content) + featBonuses.hpBonusPerLevel * level
+  const maxHp = baseMaxHp * potionFx.hpMultiplier  // Giant Size doubles it
+
+  // Conditions a potion added come off when it ends (unless something else still gives them)
+  const conditionsWithout = (ending: typeof char.activePotions) => {
+    const keep = new Set(char.activePotions.filter(p => !ending.includes(p)).flatMap(p => p.addedConditions ?? []))
+    const drop = new Set(ending.flatMap(p => p.addedConditions ?? []).filter(c => !keep.has(c)))
+    return char.conditions.filter(c => !drop.has(c))
+  }
+
+  // End an active potion. Giant Size: HP above the restored maximum become temporary HP.
+  const endPotion = (id: string) => {
+    const ending = char.activePotions.filter(p => p.id === id)
+    const m = running.find(r => r.active.id === id)?.def?.hpMaxMultiplier
+    let hp = char.hp
+    if (m) {
+      const newMax = Math.round(maxHp / m)
+      if (hp.current > newMax) hp = { ...hp, current: newMax, temp: Math.max(hp.temp, hp.current - newMax) }
+    }
+    patch({ activePotions: char.activePotions.filter(p => p.id !== id), hp, conditions: conditionsWithout(ending) })
+  }
+
+  // Potions that run out during a rest of `restMinutes` (60 short, 480 long)
+  const potionsAfterRest = (restMinutes: number) => {
+    const ending = char.activePotions.filter(p => p.minutes <= restMinutes)
+    return { activePotions: char.activePotions.filter(p => p.minutes > restMinutes), conditions: conditionsWithout(ending) }
+  }
+
+  const mediumDexCap = featSlugs.includes('medium-armor-master') ? 3 : 2
+  const { ac: armorAc, source: armorAcSource, stealthDisadv } = computeFullAC(effectiveChar, featBonuses.naturalArmorBase, content.items, raceDef, itemBonuses.acBonus, mediumDexCap)
+  const ac = armorAc + potionFx.acBonus  // Speed (Haste) +2
+  const acSource = armorAcSource + (potionFx.acBonus ? ` +${potionFx.acBonus} potion` : '')
+  const initiative = initiativeBonus(effectiveChar) + featBonuses.initiativeBonus + itemBonuses.abilityCheckBonus
+  const passive = passivePerception(effectiveCharSkills) + featBonuses.passivePerceptionBonus + itemBonuses.abilityCheckBonus
   const passiveInvestigation = 10 + skillMod(effectiveCharSkills, 'investigation') + featBonuses.passiveInvestigationBonus + itemBonuses.abilityCheckBonus
   const passiveInsight = 10 + skillMod(effectiveCharSkills, 'insight') + itemBonuses.abilityCheckBonus
-  const raceSpeed = raceDef?.speed ?? 30
-  const monkMovement = monkSpeedBonus(char)
-  const speed = raceSpeed + featBonuses.speedBonus + monkMovement
+  const raceSpeed = subraceOpts?.speed ?? raceDef?.speed ?? 30
+  // Armor worn affects movement features: Monk needs no armor or shield, Barbarian no heavy armor
+  const wornArmor = char.equipment.filter(e => e.equipped).map(e => resolveArmor(e, content.items)).filter((a): a is ArmorStats => !!a)
+  const bodyArmorType = wornArmor.find(a => a.type !== 'shield')?.type
+  const shieldWorn = wornArmor.some(a => a.type === 'shield')
+  const monkMovement = !bodyArmorType && !shieldWorn ? monkSpeedBonus(char) : 0
+  const fastMovement = char.classes.some(c => c.classSlug === 'barbarian' && c.level >= 5) && bodyArmorType !== 'heavy' ? 10 : 0
+  const walkSpeed = raceSpeed + featBonuses.speedBonus + monkMovement + fastMovement
+  const speed = walkSpeed * potionFx.speedMultiplier  // Speed (Haste) doubles it
+  // Fly/swim/climb speeds from potions ("equal to your walking speed" uses the current speed)
+  const potionSpeedNotes = potionFx.extraSpeeds.map(s =>
+    `${s.mode[0].toUpperCase()}${s.mode.slice(1)} ${s.feet ?? speed}ft${s.hover ? ' (hover)' : ''}`)
   const sneakDice = sneakAttackDice(char)
   const paladinAura = paladinAuraBonus(char)
 
   const attuned = char.equipment.filter(e => e.attuned).length
   const skillInfo = deriveSkillSources(char, content, raceDef, CLASS_OPTIONS, featSlugs)
+
+  // Skill changes made by hand on the sheet, compared with creation/level-up (skillBaseline)
+  const skillBaseProf = new Set(char.skillBaseline?.proficiencies ?? char.skillProficiencies)
+  const skillBaseExpert = new Set(char.skillBaseline?.expertise ?? char.skillExpertise)
+  const skillChanged = (skill: string) =>
+    skillBaseProf.has(skill) !== char.skillProficiencies.includes(skill) ||
+    skillBaseExpert.has(skill) !== char.skillExpertise.includes(skill)
+  const resetSkill = (skill: string) => {
+    const restore = (current: string[], base: Set<string>) =>
+      base.has(skill) ? [...new Set([...current, skill])] : current.filter(s => s !== skill)
+    patch({
+      skillProficiencies: restore(char.skillProficiencies, skillBaseProf),
+      skillExpertise: restore(char.skillExpertise, skillBaseExpert),
+    })
+  }
+  const resetAllSkills = () => {
+    if (!confirm('Reset all hand-changed skills back to what creation and level-ups gave you?')) return
+    patch({ skillProficiencies: [...skillBaseProf], skillExpertise: [...skillBaseExpert] })
+  }
   const classResources = deriveClassResources(char)
   const isMulticlassCaster = isMulticlassSpellcaster(char.classes)
   const multiclassMaxes = isMulticlassCaster ? multiclassSpellSlotsMax(char.classes) : null
   const jackOfAllTrades = hasBardJackOfAllTrades(char)
-  const resistances = deriveResistances(raceDef, featBonuses, itemBonuses)
-  const spellClass = char.classes.find(c => content.classes.find(cl => cl.slug === c.classSlug)?.spellcastingAbility)
+  const resistances = deriveResistances(raceDef, featBonuses, itemBonuses, potionFx)
+  const spellClass = char.classes.find(c => spellcastingAbilityFor(c, content))
   const spellClassSlug = spellClass?.classSlug
 
   const TABS: { key: Tab; label: string }[] = [
@@ -1136,14 +1416,21 @@ export default function Sheet() {
     const newCurrent = Math.max(0, char.hp.current - overflow)
     const update: Partial<Character> = { hp: { ...char.hp, temp: newTemp, current: newCurrent } }
 
-    // Concentration check on damage (RAW: CON save DC = max(10, damage/2); auto-fail at 0 HP)
+    // Massive damage (PHB p.197): damage left over after dropping to 0 that equals or exceeds
+    // your hit point maximum kills outright
+    if (char.hp.current > 0 && overflow - char.hp.current >= maxHp) {
+      update.deathSaves = { successes: 0, failures: 3 }
+    }
+
+    // Concentration check on damage (RAW: CON save DC = max(10, damage/2); auto-fail at 0 HP).
+    // Damage soaked by temporary HP still counts, and the DC uses the whole hit.
     if (char.concentratingOn && amount > 0) {
       const spellName = content.spells.find(s => s.slug === char.concentratingOn)?.name ?? char.concentratingOn
       if (newCurrent === 0) {
         update.concentratingOn = undefined
         setTimeout(() => alert(`Dropped concentration on ${spellName} (knocked to 0 HP).`), 0)
-      } else if (overflow > 0) {
-        const dc = Math.max(10, Math.floor(overflow / 2))
+      } else {
+        const dc = Math.max(10, Math.floor(amount / 2))
         if (!confirm(`Concentration save vs ${spellName} — DC ${dc}. Click OK if you succeeded, Cancel to drop.`)) {
           update.concentratingOn = undefined
         }
@@ -1204,7 +1491,7 @@ export default function Sheet() {
                 type="number"
                 className={`text-3xl font-bold w-16 bg-transparent border-none focus:outline-none focus:border-b-2 focus:border-parchment-400 rounded-none pb-0.5 ${hpTextColor}`}
                 value={char.hp.current}
-                onChange={e => patch({ hp: { ...char.hp, current: parseInt(e.target.value, 10) || 0 } })}
+                onChange={e => patch({ hp: { ...char.hp, current: Math.max(0, Math.min(maxHp, parseInt(e.target.value, 10) || 0)) } })}
               />
               <span className="text-base text-parchment-300 select-none">/</span>
               <span className="text-base font-medium text-parchment-400">{maxHp}</span>
@@ -1286,10 +1573,11 @@ export default function Sheet() {
               type="button"
               disabled={!quickValid}
               className="flex-1 py-1.5 px-2 rounded text-sm font-medium transition-colors bg-blue-100 text-blue-700 border border-blue-200 hover:bg-blue-200 disabled:opacity-40 disabled:cursor-not-allowed"
-              onClick={() => { patch({ hp: { ...char.hp, temp: char.hp.temp + quickN } }); setDamageInput('') }}
+              title="Temporary hit points don't add together — you keep the larger amount"
+              onClick={() => { patch({ hp: { ...char.hp, temp: Math.max(char.hp.temp, quickN) } }); setDamageInput('') }}
             >
-              <div>🛡 +Temp</div>
-              {quickValid && <div className="text-xs opacity-70">→ {char.hp.temp + quickN}</div>}
+              <div>🛡 Temp</div>
+              {quickValid && <div className="text-xs opacity-70">→ {Math.max(char.hp.temp, quickN)}</div>}
             </button>
           </div>
         </div>
@@ -1300,13 +1588,16 @@ export default function Sheet() {
         {[
           { label: 'AC', value: ac, note: acSource + (stealthDisadv ? ' ⚠ Stealth disadv.' : '') },
           { label: 'Initiative', value: formatMod(initiative), note: featBonuses.initiativeBonus ? `+${featBonuses.initiativeBonus} Alert` : undefined },
-          { label: 'Speed', value: `${speed}ft`, note: monkMovement ? `+${monkMovement}ft Unarmored Movement` : featBonuses.speedBonus ? `+${featBonuses.speedBonus}ft feat` : undefined },
+          { label: 'Speed', value: `${speed}ft`, note: [
+            potionFx.speedMultiplier > 1 ? `×${potionFx.speedMultiplier} potion` : monkMovement ? `+${monkMovement}ft Unarmored Movement` : fastMovement ? `+${fastMovement}ft Fast Movement` : featBonuses.speedBonus ? `+${featBonuses.speedBonus}ft feat` : '',
+            ...potionSpeedNotes,
+          ].filter(Boolean).join(' · ') || undefined },
           { label: 'Prof. Bonus', value: formatMod(pb) },
           { label: 'Passive Perc.', value: passive, note: featBonuses.passivePerceptionBonus ? `+${featBonuses.passivePerceptionBonus} Observant` : undefined },
           { label: 'Passive Inv.', value: passiveInvestigation, note: featBonuses.passiveInvestigationBonus ? `+${featBonuses.passiveInvestigationBonus} Observant` : undefined },
           { label: 'Passive Ins.', value: passiveInsight },
         ].map(s => (
-          <div key={s.label} className="stat-box text-center">
+          <div key={s.label} className="stat-box justify-start text-center">
             <div className="text-xs text-parchment-500 uppercase">{s.label}</div>
             <div className="text-xl font-bold">{s.value}</div>
             {s.note && <div className="text-xs text-amber-600 mt-0.5">{s.note}</div>}
@@ -1314,23 +1605,80 @@ export default function Sheet() {
         ))}
       </div>
 
-      {/* Class Resources */}
-      {classResources.length > 0 && (
+      {/* Resources — class resources plus the player's own custom trackers */}
+      {(() => {
+        const trackedResources: Array<ClassResource & { isCustom?: boolean }> = [
+          ...classResources,
+          ...(char.customResources ?? []).map(r => ({
+            key: r.key, name: r.name, max: r.max, recharge: r.recharge, classSlug: 'custom', isCustom: true,
+            current: char.classResources[r.key] ?? r.max,
+          })),
+        ]
+        const addCustomResource = () => {
+          const name = newResourceName.trim()
+          const max = parseInt(newResourceMax, 10)
+          if (!name || !max || max < 1) return
+          const key = `custom-${name.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}`
+          patch({
+            customResources: [...(char.customResources ?? []), { key, name, max, recharge: newResourceRecharge }],
+            classResources: { ...char.classResources, [key]: max },
+          })
+          setNewResourceName(''); setNewResourceMax(''); setNewResourceRecharge('long'); setAddResourceOpen(false)
+        }
+        const removeCustomResource = (key: string, name: string) => {
+          if (!confirm(`Stop tracking "${name}"?`)) return
+          const newClassRes = { ...char.classResources }
+          delete newClassRes[key]
+          patch({ customResources: (char.customResources ?? []).filter(x => x.key !== key), classResources: newClassRes })
+        }
+        return (
         <div className="card mb-4">
-          <div className="mb-3">
-            <h3 className="section-header mb-0">Class Resources</h3>
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <h3 className="section-header mb-0 flex-1">Resources</h3>
+            <button type="button" onClick={() => setAddResourceOpen(o => !o)}
+              title="Track something the sheet doesn't know about: a magic item's uses, a DM-granted boon, a racial ability…"
+              className="text-xs rounded-full px-2.5 py-0.5 border border-parchment-200 text-parchment-500 hover:border-parchment-500 hover:text-parchment-800 transition-colors"
+            >{addResourceOpen ? 'Cancel' : '+ Custom'}</button>
           </div>
+          {addResourceOpen && (
+            <div className="mb-3 p-2 rounded border border-parchment-200 bg-parchment-50 flex gap-2 flex-wrap items-center">
+              <input type="text" placeholder="Name (e.g. Luck Points)" autoFocus value={newResourceName}
+                onChange={e => setNewResourceName(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') addCustomResource() }}
+                className="input py-1 flex-1 min-w-[10rem]" />
+              <input type="number" placeholder="Uses" min={1} value={newResourceMax}
+                onChange={e => setNewResourceMax(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') addCustomResource() }}
+                className="input py-1 w-20" />
+              <select value={newResourceRecharge} onChange={e => setNewResourceRecharge(e.target.value as 'short' | 'long')}
+                className="input py-1 w-auto">
+                <option value="long">Resets on long rest</option>
+                <option value="short">Resets on short rest</option>
+              </select>
+              <button type="button" onClick={addCustomResource} className="btn-primary text-sm px-3 py-1">Add</button>
+            </div>
+          )}
+          {trackedResources.length === 0 && !addResourceOpen && (
+            <p className="text-xs text-parchment-400">No limited-use class resources yet. Use + Custom to track item charges, boons or anything else that resets on a rest.</p>
+          )}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-            {classResources.map(r => {
+            {trackedResources.map(r => {
               const isPool = (r.max ?? 0) > 6  // large pools get a number input
               const current = r.current
               const max = r.max
               return (
-                <div key={r.key} className="p-2 rounded border border-parchment-100 bg-parchment-50">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-semibold text-parchment-700">{r.name}</span>
-                    <span className={`text-xs rounded px-1 ${r.recharge === 'short' ? 'bg-blue-100 text-blue-600' : 'bg-amber-100 text-amber-600'}`}>
-                      {r.recharge === 'short' ? 'SR' : 'LR'}
+                <div key={r.key} className="group p-2 rounded border border-parchment-100 bg-parchment-50">
+                  <div className="flex items-center justify-between gap-1 mb-1">
+                    <span className="text-xs font-semibold text-parchment-700 truncate">{r.name}</span>
+                    <span className="flex items-center gap-1 shrink-0">
+                      {r.isCustom && (
+                        <button type="button" onClick={() => removeCustomResource(r.key, r.name)} title="Stop tracking"
+                          className="text-[10px] text-parchment-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">✕</button>
+                      )}
+                      {r.isCustom && <span className="text-[10px] rounded px-1 bg-parchment-200 text-parchment-600">Custom</span>}
+                      <span className={`text-xs rounded px-1 ${r.recharge === 'short' ? 'bg-blue-100 text-blue-600' : 'bg-amber-100 text-amber-600'}`}>
+                        {r.recharge === 'short' ? 'SR' : 'LR'}
+                      </span>
                     </span>
                   </div>
                   {r.display && <div className="text-xs text-parchment-400 mb-1">{r.display}</div>}
@@ -1387,7 +1735,7 @@ export default function Sheet() {
                           }}
                           className={`w-5 h-5 rounded-full border-2 transition-colors ${
                             i < current
-                              ? 'bg-parchment-600 border-parchment-600'
+                              ? 'bg-[rgb(var(--accent))] border-[rgb(var(--accent))]'
                               : 'border-parchment-300 hover:border-parchment-500'
                           }`}
                           title={i < current ? 'Click to use' : 'Click to restore'}
@@ -1401,7 +1749,8 @@ export default function Sheet() {
             })}
           </div>
         </div>
-      )}
+        )
+      })()}
 
       {char.hp.current <= 0 ? (
         /* ── Death screen ── */
@@ -1417,30 +1766,35 @@ export default function Sheet() {
             setHealInput('')
           }
           return (
+            // Covers the whole window (nav bar and sheet included) until healed
             <div
-              className="death-screen rounded-xl border overflow-hidden relative text-white"
+              className="death-screen fixed inset-0 z-50 overflow-y-auto overscroll-contain text-white"
+              role="dialog" aria-modal="true" aria-label={`${char.name} is making death saving throws`}
               style={{
                 backgroundColor: '#0a0a0a',
-                borderColor: isStabilized ? 'rgba(21,128,61,0.5)' : isDead ? 'rgba(40,0,0,0.9)' : 'rgba(153,27,27,0.7)',
                 boxShadow: isStabilized
-                  ? 'inset 0 0 130px rgba(21,128,61,0.35), inset 0 0 50px rgba(21,128,61,0.2)'
+                  ? 'inset 0 0 220px rgba(21,128,61,0.35), inset 0 0 80px rgba(21,128,61,0.2)'
                   : isDead
-                    ? 'inset 0 0 160px rgba(0,0,0,0.95), inset 0 0 60px rgba(80,0,0,0.4)'
-                    : 'inset 0 0 120px rgba(153,27,27,0.45), inset 0 0 40px rgba(153,27,27,0.25)',
+                    ? 'inset 0 0 260px rgba(0,0,0,0.95), inset 0 0 100px rgba(80,0,0,0.4)'
+                    : 'inset 0 0 200px rgba(153,27,27,0.45), inset 0 0 70px rgba(153,27,27,0.25)',
               }}
             >
+              <Link to="/" className="absolute top-4 left-5 text-xs uppercase tracking-widest text-white/25 hover:text-white/70 transition-colors">
+                ← Vault
+              </Link>
+              <div className="min-h-full max-w-xl mx-auto flex flex-col justify-center">
               {/* Header */}
               <div
-                className="text-center pt-12 pb-8 px-4 border-b"
+                className="text-center pt-10 pb-6 px-4 border-b"
                 style={{ borderColor: isStabilized ? 'rgba(21,128,61,0.25)' : 'rgba(153,27,27,0.3)' }}
               >
                 <h2 className="text-3xl font-bold text-parchment-100 mb-3">{char.name}</h2>
-                <p className={`text-xs uppercase tracking-[0.35em] mb-6 ${isStabilized ? 'text-green-600' : isDead ? 'text-red-900' : 'text-red-600'}`}>
+                <p className={`text-xs uppercase tracking-[0.35em] mb-4 ${isStabilized ? 'text-green-600' : isDead ? 'text-red-900' : 'text-red-600'}`}>
                   {isStabilized ? 'has stabilized' : isDead ? 'has perished' : 'has fallen'}
                 </p>
 
                 {/* Orb */}
-                <div className="flex flex-col items-center gap-2 mb-4">
+                <div className="flex flex-col items-center gap-4 mb-4">
                   <div
                     className="w-10 h-10 rounded-full mx-auto"
                     style={isDead ? {
@@ -1489,7 +1843,7 @@ export default function Sheet() {
 
               {/* Saves — shown while in progress */}
               {!isStabilized && !isDead && (
-                <div className="py-12 px-4 flex flex-col items-center gap-10">
+                <div className="py-9 px-4 flex flex-col items-center gap-8">
                   <div className="flex flex-col items-center gap-4">
                     <span className="text-xs font-semibold uppercase tracking-widest text-green-500/80">Successes</span>
                     <div className="flex gap-5">
@@ -1498,12 +1852,9 @@ export default function Sheet() {
                           key={i}
                           onClick={() => {
                             const newSuccesses = char.deathSaves.successes === i + 1 ? i : i + 1
-                            if (newSuccesses >= 3) {
-                              // Auto-stabilize: 3 successes → set HP to 1, clear saves
-                              patch({ hp: { ...char.hp, current: 1 }, deathSaves: { successes: 0, failures: 0 } })
-                            } else {
-                              patch({ deathSaves: { ...char.deathSaves, successes: newSuccesses } })
-                            }
+                            // 3 successes → stabilized: stay at 0 HP and show the STABILIZED
+                            // outcome screen. Healing clears the saves via save()'s auto-reset.
+                            patch({ deathSaves: { ...char.deathSaves, successes: newSuccesses } })
                           }}
                           className={`w-14 h-14 rounded-full border-2 transition-all duration-300 ${
                             char.deathSaves.successes > i
@@ -1538,7 +1889,7 @@ export default function Sheet() {
 
               {/* Footer */}
               <div
-                className="border-t px-4 py-6 flex flex-col items-center gap-3"
+                className="border-t px-4 py-5 flex flex-col items-center gap-3"
                 style={{ borderColor: isStabilized ? 'rgba(21,128,61,0.2)' : 'rgba(153,27,27,0.2)' }}
               >
                 {!isDead && (
@@ -1569,6 +1920,7 @@ export default function Sheet() {
                   >Reset saves</button>
                 )}
               </div>
+              </div>
             </div>
           )
         })()
@@ -1578,7 +1930,7 @@ export default function Sheet() {
       <div className="flex gap-5 border-b border-parchment-200 mb-6">
         {TABS.map(t => t.key === 'summons' ? (
           <button key={t.key} onClick={() => setTab(t.key)}
-            className={`pb-2 text-sm font-medium flex items-center gap-1.5 border-b-2 -mb-px transition-colors ${tab === 'summons' ? 'border-amber-500 text-amber-700' : 'border-transparent text-amber-400 hover:text-amber-600'}`}>
+            className={`pb-2 text-sm font-medium flex items-center gap-1.5 ${tab === 'summons' ? 'tab-active' : 'tab-inactive'}`}>
             {t.label}
             {char.summons.length > 0 && (
               <span className="text-[10px] bg-amber-500 text-white rounded-full px-1.5 py-0.5 font-bold leading-none">
@@ -1621,7 +1973,9 @@ export default function Sheet() {
                       <div className="text-sm font-semibold text-parchment-600">
                         {formatMod(abilityModFor(effectiveChar, a))}
                         {effectiveChar.abilityScores[a] !== char.abilityScores[a] && (
-                          <span className="text-xs text-indigo-500 ml-0.5" title={`Set to ${effectiveChar.abilityScores[a]} by equipped item`}>★</span>
+                          <span className="text-xs text-indigo-500 ml-0.5"
+                            title={`Currently ${effectiveChar.abilityScores[a]} from ${potionScoreOverrides[a] === effectiveChar.abilityScores[a] ? 'an active potion' : 'an equipped item'}`}
+                          >★{effectiveChar.abilityScores[a]}</span>
                         )}
                       </div>
                     </div>
@@ -1649,15 +2003,143 @@ export default function Sheet() {
                       {a === 'con' && featBonuses.concentrationAdvantage && (
                         <span className="text-xs bg-amber-100 text-amber-700 rounded px-1.5 py-0.5">War Caster</span>
                       )}
+                      {/* Active potions: advantage/disadvantage (they cancel out) and Bless dice */}
+                      {potionFx.saveAdvantage.has(a) && !potionFx.saveDisadvantage.has(a) && (
+                        <span className="text-xs bg-teal-100 text-teal-700 rounded px-1.5 py-0.5" title="From an active potion">Adv</span>
+                      )}
+                      {potionFx.saveDisadvantage.has(a) && !potionFx.saveAdvantage.has(a) && (
+                        <span className="text-xs bg-red-100 text-red-700 rounded px-1.5 py-0.5" title="From an active potion">Disadv</span>
+                      )}
+                      {potionFx.rollBonusDice.map(d => (
+                        <span key={d} className="text-xs bg-teal-100 text-teal-700 rounded px-1.5 py-0.5" title="From an active potion">{d}</span>
+                      ))}
                     </div>
                   ))}
                 </div>
               </div>
+
+              {/* Active Potions — added by Drink; minute-long effects count down in rounds */}
+              {char.activePotions.length > 0 && (
+                <div className="card p-4">
+                  <h2 className="section-header">Active Potions</h2>
+                  <div className="space-y-2">
+                    {char.activePotions.map(p => {
+                      const def = content.items.find(i => i.slug === p.itemSlug)?.potion
+                      const outOfUses = p.usesLeft === 0
+                      const ended = p.roundsLeft === 0 || outOfUses
+                      const update = (changes: Partial<typeof p>) =>
+                        patch({ activePotions: char.activePotions.map(x => x.id === p.id ? { ...x, ...changes } : x) })
+                      const action = def?.action
+                      const applied = describePotionEffects(def, p.choice, walkSpeed)
+                      // Potion of Poison after a failed save: usesLeft counts the damage dice still to come
+                      const poisonFx = def?.onDrink?.damage
+                      const isPoison = !!poisonFx?.ongoingDice && !def?.uses
+                      return (
+                        <div key={p.id} className={`rounded-lg border px-3 py-2 ${ended ? 'border-parchment-200 bg-parchment-50 opacity-70' : 'border-teal-200 bg-teal-50'}`}>
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <div className="text-sm font-semibold text-parchment-900 truncate">{p.name}</div>
+                              <span className="inline-block mt-0.5 text-[11px] font-semibold rounded px-1.5 py-0.5 bg-teal-100 text-teal-700">{p.effect}</span>
+                            </div>
+                            <button type="button" onClick={() => endPotion(p.id)}
+                              title="End this effect"
+                              className="shrink-0 text-xs rounded border border-parchment-300 px-2 py-0.5 text-parchment-600 hover:border-red-400 hover:text-red-600 transition-colors"
+                            >End</button>
+                          </div>
+                          {/* What the potion lets you do — its own DC, not yours */}
+                          {action && !ended && (
+                            <div className="mt-1.5 rounded border border-teal-200 bg-parchment-50 px-2 py-1.5 text-xs space-y-0.5">
+                              <div className="font-semibold text-parchment-800">
+                                {action.name}
+                                <span className="font-normal text-parchment-500"> · {action.timing}{action.range ? ` · ${action.range}` : ''}</span>
+                              </div>
+                              {(action.save || action.damage) && (
+                                <div className="text-parchment-700">
+                                  {action.save && <>DC {action.save.dc} {ABILITY_FULL[action.save.ability]} save</>}
+                                  {action.save && action.damage && ' · '}
+                                  {action.damage && <span className="font-semibold">{action.damage}</span>}
+                                  {action.onSave === 'half' && ' (half on a success)'}
+                                </div>
+                              )}
+                              {action.text && <div className="text-parchment-500">{action.text}</div>}
+                            </div>
+                          )}
+                          {/* Poison: damage each turn until saves wear it down */}
+                          {isPoison && p.usesLeft! > 0 && (
+                            <div className="mt-1.5 rounded border border-red-200 bg-red-50 px-2 py-1.5 text-xs space-y-1">
+                              <div className="text-red-800">
+                                Start of your turn: take <strong>{p.usesLeft}{poisonFx!.dice.replace(/^\d+/, '')} {poisonFx!.type}</strong>.
+                                End of your turn: DC {poisonFx!.save.dc} {ABILITY_FULL[poisonFx!.save.ability]} save; a success removes one die.
+                              </div>
+                              <button type="button"
+                                onClick={() => p.usesLeft === 1 ? endPotion(p.id) : update({ usesLeft: p.usesLeft! - 1 })}
+                                className="text-[11px] font-semibold rounded border border-red-300 bg-parchment-50 px-2 py-0.5 text-red-700 hover:bg-red-100 transition-colors"
+                              >Saved (−1 die){p.usesLeft === 1 ? ': poison ends' : ''}</button>
+                            </div>
+                          )}
+                          {/* Limited uses (Fire Breath ×3, Fragments of Possibility ×2…) */}
+                          {p.usesLeft !== undefined && !isPoison && (
+                            <div className="flex items-center gap-1.5 mt-1.5">
+                              {Array.from({ length: def?.uses ?? p.usesLeft }).map((_, i) => (
+                                <span key={i} className={`w-3 h-3 rounded-full border-2 ${i < p.usesLeft! ? 'bg-teal-500 border-teal-500' : 'border-teal-300'}`} />
+                              ))}
+                              <span className={`text-xs font-semibold ml-1 ${outOfUses ? 'text-red-600' : 'text-teal-800'}`}>
+                                {outOfUses ? 'All used' : `${p.usesLeft} left`}
+                              </span>
+                              {!outOfUses && (
+                                <button type="button" onClick={() => update({ usesLeft: p.usesLeft! - 1 })}
+                                  className="ml-auto text-[11px] font-semibold rounded border border-teal-400 bg-teal-100 px-2 py-0.5 text-teal-800 hover:bg-teal-200 transition-colors"
+                                >Use</button>
+                              )}
+                            </div>
+                          )}
+                          {/* What it's doing to your sheet right now */}
+                          {applied.length > 0 && !ended && (
+                            <ul className="mt-1.5 text-xs font-semibold text-indigo-600 space-y-0.5">
+                              {applied.map(line => <li key={line}>✓ {line}</li>)}
+                            </ul>
+                          )}
+                          {def?.note && !ended && <div className="text-[11px] text-parchment-600 mt-1">{def.note}</div>}
+                          {outOfUses || isPoison ? null : p.roundsLeft !== undefined ? (
+                            <div className="flex items-center gap-2 mt-1.5">
+                              <span className={`text-xs font-semibold ${ended ? 'text-red-600' : 'text-teal-800'}`}>
+                                {ended ? 'Duration over' : `${p.roundsLeft} round${p.roundsLeft === 1 ? '' : 's'} left`}
+                              </span>
+                              <span className="text-[11px] text-parchment-400">({p.duration})</span>
+                              {!ended && (
+                                <button type="button" onClick={() => update({ roundsLeft: Math.max(0, p.roundsLeft! - 1) })}
+                                  className="ml-auto text-[11px] rounded border border-teal-300 px-1.5 py-0.5 text-teal-700 hover:bg-teal-100 transition-colors"
+                                >−1 round</button>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="text-xs text-teal-800 mt-1.5">Lasts {p.duration}</div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                  <p className="text-[11px] text-parchment-400 mt-2">Short rests end effects of up to 1 hour; long rests up to 8 hours.</p>
+                </div>
+              )}
             </div>
 
             {/* Col 2: Skills */}
             <div className="card p-4 self-start">
-              <h2 className="section-header mb-2">Skills</h2>
+              {(() => {
+                const changed = SKILLS.filter(s => skillChanged(s))
+                return (
+                  <div className="flex items-center gap-2 mb-2">
+                    <h2 className="section-header mb-0 flex-1">Skills</h2>
+                    {changed.length > 0 && (
+                      <button type="button" onClick={resetAllSkills}
+                        title={`Changed by hand: ${changed.map(s => SKILL_LABELS[s]).join(', ')}. Click to restore them.`}
+                        className="text-xs rounded-full px-2.5 py-0.5 border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors shrink-0"
+                      >↺ Reset {changed.length} changed</button>
+                    )}
+                  </div>
+                )
+              })()}
               <div className="space-y-0.5">
                 {SKILLS.map(skill => {
                   const profTags = skillInfo.profTags.get(skill) ?? []
@@ -1679,9 +2161,11 @@ export default function Sheet() {
                     return 'bg-parchment-100 text-parchment-500'
                   }
 
+                  const isModified = skillChanged(skill)
+
                   return (
                     <div key={skill} className="py-0.5">
-                      <div className={`flex items-center gap-1.5 text-sm px-1 py-0.5 rounded hover:bg-parchment-50`}>
+                      <div className={`flex items-center gap-1.5 text-sm px-1 py-0.5 rounded ${isModified ? 'bg-amber-50' : 'hover:bg-parchment-50'}`}>
                         {/* Prof checkbox — manual only; auto profs show as locked */}
                         <input
                           type="checkbox"
@@ -1708,6 +2192,21 @@ export default function Sheet() {
                         />
                         <span className="w-8 font-mono text-right text-xs text-parchment-700 shrink-0">{formatMod(skillMod(effectiveCharSkills, skill) + itemBonuses.abilityCheckBonus)}</span>
                         <span className={`flex-1 min-w-0 ${effectiveExpert ? 'font-semibold' : ''}`}>{SKILL_LABELS[skill]}</span>
+                        {(() => {
+                          // Active potions giving advantage/disadvantage on this skill's ability checks
+                          const ab = SKILL_ABILITY[skill]
+                          const adv = potionFx.checkAdvantage.has(ab), dis = potionFx.checkDisadvantage.has(ab)
+                          if (adv === dis) return null
+                          return adv
+                            ? <span className="text-[10px] font-semibold rounded px-1.5 py-0.5 bg-teal-100 text-teal-700 shrink-0" title="From an active potion">Adv</span>
+                            : <span className="text-[10px] font-semibold rounded px-1.5 py-0.5 bg-red-100 text-red-700 shrink-0" title="From an active potion">Disadv</span>
+                        })()}
+                        {isModified && (
+                          <button type="button" onClick={() => resetSkill(skill)}
+                            title={`Changed by hand. Originally ${skillBaseProf.has(skill) ? (skillBaseExpert.has(skill) ? 'expertise' : 'proficient') : 'not proficient'}. Click to reset.`}
+                            className="text-[11px] font-semibold text-amber-700 hover:text-amber-900 shrink-0"
+                          >↺ reset</button>
+                        )}
                         {/* Source tags */}
                         <div className="flex items-center gap-1 flex-wrap justify-end">
                           {profTags.map((tag, i) => (
@@ -1742,11 +2241,37 @@ export default function Sheet() {
             <div className="space-y-4">
               <div className="card p-4">
                 <h2 className="section-header">Status</h2>
-                <label className="flex items-center gap-2 text-sm mb-4 cursor-pointer">
-                  <input type="checkbox" checked={char.inspiration} onChange={e => patch({ inspiration: e.target.checked })} />
-                  <span className={`font-medium ${char.inspiration ? 'text-amber-600' : ''}`}>Inspiration</span>
-                  {char.inspiration && <span className="text-amber-500 text-xs ml-auto">✦ active</span>}
-                </label>
+                {/* Inspiration token — a glowing gold coin while held */}
+                <button type="button" onClick={() => patch({ inspiration: !char.inspiration })}
+                  aria-pressed={char.inspiration}
+                  title={char.inspiration ? 'Spend Inspiration' : 'Gain Inspiration'}
+                  className={`w-full flex items-center gap-3 rounded-lg border-2 px-3 py-2.5 mb-4 text-left transition-colors ${
+                    char.inspiration ? 'border-amber-300 bg-amber-50' : 'border-dashed border-parchment-300 hover:border-amber-300 hover:bg-parchment-50'
+                  }`}>
+                  <span className="relative w-11 h-11 shrink-0 flex items-center justify-center">
+                    {char.inspiration && (
+                      <span className="inspire-rays absolute inset-0 rounded-full"
+                        style={{ background: 'repeating-conic-gradient(rgba(245,158,11,0.3) 0deg 10deg, transparent 10deg 30deg)' }} />
+                    )}
+                    <span key={String(char.inspiration)}
+                      className={`relative w-9 h-9 rounded-full flex items-center justify-center text-lg ${
+                        char.inspiration
+                          ? 'inspire-token-active bg-gradient-to-br from-amber-200 via-amber-400 to-amber-600 text-white'
+                          : 'bg-parchment-100 border border-parchment-300 text-parchment-300'
+                      }`}>✦</span>
+                  </span>
+                  <span className="flex-1 min-w-0">
+                    <span className={`block text-sm font-bold ${char.inspiration ? 'text-amber-700' : 'text-parchment-600'}`}>
+                      {char.inspiration ? 'Inspired!' : 'Inspiration'}
+                    </span>
+                    <span className="block text-[11px] text-parchment-500 leading-snug">
+                      {char.inspiration ? 'Spend it for advantage on one attack, save or check.' : 'Not held. Click when your DM awards it.'}
+                    </span>
+                  </span>
+                  {char.inspiration && (
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-amber-700 border border-amber-300 rounded-full px-2 py-0.5 shrink-0">Spend</span>
+                  )}
+                </button>
                 <div className="text-xs font-semibold text-parchment-600 uppercase tracking-wide mb-1.5">Exhaustion</div>
                 <div className="flex gap-1 mb-1">
                   {[1,2,3,4,5,6].map(lvl => (
@@ -1829,13 +2354,17 @@ export default function Sheet() {
                     const unarmedDie = isMon
                       ? (monkLevel >= 17 ? '1d10' : monkLevel >= 11 ? '1d8' : monkLevel >= 5 ? '1d6' : '1d4')
                       : hasTB ? '1d4' : '1'
-                    const strMod = abilityModFor(char, 'str')
-                    const atkMod = isMon ? Math.max(strMod, abilityModFor(char, 'dex')) : strMod
+                    const strMod = abilityModFor(effectiveChar, 'str')
+                    const atkMod = isMon ? Math.max(strMod, abilityModFor(effectiveChar, 'dex')) : strMod
+                    // A flat 1 + modifier is shown as its total (STR 8 → "0", not "1 -1")
+                    const unarmedDamage = unarmedDie === '1'
+                      ? `${Math.max(0, 1 + atkMod)}`
+                      : `${unarmedDie}${atkMod !== 0 ? ` ${formatMod(atkMod)}` : ''}`
                     return (
                       <tr>
                         <td className="py-1.5 pr-4 font-medium">Unarmed Strike</td>
                         <td className="py-1.5 pr-4 font-mono">{formatMod(atkMod + pb)}</td>
-                        <td className="py-1.5 pr-4">{unarmedDie}{strMod !== 0 ? ` ${formatMod(atkMod)}` : ''} bludgeoning</td>
+                        <td className="py-1.5 pr-4">{unarmedDamage} bludgeoning</td>
                         <td className="py-1.5 text-parchment-400 text-xs">{isMon ? `Monk d${monkLevel >= 17 ? 10 : monkLevel >= 11 ? 8 : monkLevel >= 5 ? 6 : 4}` : hasTB ? 'Tavern Brawler' : ''}</td>
                       </tr>
                     )
@@ -1843,8 +2372,8 @@ export default function Sheet() {
                   {featSlugs.includes('dragon-hide') && (
                     <tr>
                       <td className="py-1.5 pr-4 font-medium">Claws (Dragon Hide)</td>
-                      <td className="py-1.5 pr-4 font-mono">{formatMod(abilityModFor(char, 'str') + pb)}</td>
-                      <td className="py-1.5 pr-4">1d4 {formatMod(abilityModFor(char, 'str'))} slashing</td>
+                      <td className="py-1.5 pr-4 font-mono">{formatMod(abilityModFor(effectiveChar, 'str') + pb)}</td>
+                      <td className="py-1.5 pr-4">1d4 {formatMod(abilityModFor(effectiveChar, 'str'))} slashing</td>
                       <td className="py-1.5 text-parchment-400 text-xs">Natural weapon</td>
                     </tr>
                   )}
@@ -1852,24 +2381,37 @@ export default function Sheet() {
                     const ws = resolveWeapon(item, content.items)
                     if (!ws) return null
                     const bonus = magicBonus(item.name)
-                    const proficient = isWeaponProficient(char, item.itemSlug)
+                    const proficient = isWeaponProficient(char, item)
                     const effectivePb = proficient ? pb : 0
-                    const atk = weaponAttackBonus(char, ws, effectivePb, bonus)
-                    const dmgMod = weaponDamageMod(char, ws, bonus)
+                    const styles = fightingStyles(char)
+                    // Dueling: a one-handed melee weapon and no other weapon held
+                    const equippedWeaponCount = char.equipment.filter(e => e.equipped && resolveWeapon(e, content.items)).length
+                    const dueling = styles.has('dueling') && !ws.ranged && !ws.twoHanded
+                      && item.slot !== 'both' && item.slot !== 'dual' && equippedWeaponCount === 1
+                    const pw = potionWeaponMods(item.name)
+                    const oilBonus = pw.bonus
+                    const atk = weaponAttackBonus(effectiveChar, ws, effectivePb, bonus) + oilBonus
+                    const dmgMod = weaponDamageMod(effectiveChar, ws, bonus) + (dueling ? 2 : 0) + oilBonus
                     const dmgStr = ws.damage === '—' ? '—'
-                      : `${ws.damage}${dmgMod !== 0 ? ` ${formatMod(dmgMod)}` : ''} ${ws.damageType}`
+                      : `${ws.damage}${dmgMod !== 0 ? ` ${formatMod(dmgMod)}` : ''}${pw.damageDice} ${ws.damageType}`
                     const tags = [
                       proficient ? '' : '⚠ Not proficient',
                       ws.finesse ? 'Finesse' : '',
                       ws.ranged ? 'Ranged' : '',
                       ws.versatile ? `Versatile (${ws.versatile})` : '',
                       bonus ? `Magic +${bonus}` : '',
+                      ws.ranged && styles.has('archery') ? 'Archery +2' : '',
+                      dueling ? 'Dueling +2 dmg' : '',
+                      oilBonus ? `Oil of Sharpness +${oilBonus}` : '',
                       item.attuned ? '✦ Attuned' : '',
                     ].filter(Boolean).join(' · ')
                     return (
                       <tr key={idx} className={item.attuned ? 'bg-indigo-50' : !proficient ? 'bg-red-50' : ''}>
                         <td className="py-1.5 pr-4 font-medium">{item.name}</td>
-                        <td className="py-1.5 pr-4 font-mono">{formatMod(atk)}{!proficient && <span className="text-red-500 ml-1 text-xs">(no prof)</span>}</td>
+                        <td className="py-1.5 pr-4 font-mono">
+                          {formatMod(atk)}{pw.attackDice}
+                          {!proficient && <span className="text-red-500 ml-1 text-xs">(no prof)</span>}
+                        </td>
                         <td className="py-1.5 pr-4">{dmgStr}</td>
                         <td className="py-1.5 text-parchment-400 text-xs">{tags || '—'}</td>
                       </tr>
@@ -1890,7 +2432,7 @@ export default function Sheet() {
                     if (!dragon) return null
                     const charLevel = totalLevel(char)
                     const damageDice = charLevel >= 16 ? '5d6' : charLevel >= 11 ? '4d6' : charLevel >= 6 ? '3d6' : '2d6'
-                    const conMod = abilityModFor(char, 'con')
+                    const conMod = abilityModFor(effectiveChar, 'con')
                     const saveDC = 8 + conMod + pb
                     const used = (char.classResources['breath-weapon-used'] ?? 0) >= 1
                     return (
@@ -1943,13 +2485,30 @@ export default function Sheet() {
               <div>
                 <div className="font-semibold text-parchment-700 mb-1">Tools</div>
                 {char.toolProficiencies.length > 0
-                  ? <div className="flex flex-wrap gap-1">{char.toolProficiencies.map(p => <span key={p} className="bg-parchment-100 text-parchment-700 rounded px-2 py-0.5 text-xs">{p}</span>)}</div>
+                  ? <div className="flex flex-wrap gap-1">{char.toolProficiencies.map(p => <span key={p} className="bg-parchment-100 text-parchment-700 rounded px-2 py-0.5 text-xs capitalize">{p}</span>)}</div>
                   : <span className="text-parchment-400 text-xs">None recorded</span>}
               </div>
               <div>
                 <div className="font-semibold text-parchment-700 mb-1">Languages</div>
                 {char.languages.length > 0
-                  ? <div className="flex flex-wrap gap-1">{char.languages.map(l => <span key={l} className="bg-parchment-100 text-parchment-700 rounded px-2 py-0.5 text-xs capitalize">{l}</span>)}</div>
+                  ? <div className="flex flex-wrap gap-1">{char.languages.map(l => {
+                      const picks = languageChoiceCount(l)
+                      if (!picks) return <span key={l} className="bg-parchment-100 text-parchment-700 rounded px-2 py-0.5 text-xs capitalize">{l}</span>
+                      // "one language of your choice" left over from creation — ask for it here
+                      const known = new Set(char.languages)
+                      return (
+                        <select key={l} value="" aria-label="Choose a language"
+                          className="rounded px-1.5 py-0.5 text-xs border border-amber-300 bg-amber-50 text-amber-800"
+                          onChange={e => {
+                            const rest = languageChoicePlaceholder(picks - 1)
+                            patch({ languages: char.languages.flatMap(x => x === l ? [e.target.value, ...(rest ? [rest] : [])] : [x]) })
+                          }}>
+                          <option value="">Choose {picks > 1 ? `${picks} languages` : 'a language'}…</option>
+                          <optgroup label="Standard">{LANGUAGES_STANDARD.filter(x => !known.has(x)).map(x => <option key={x}>{x}</option>)}</optgroup>
+                          <optgroup label="Exotic">{LANGUAGES_EXOTIC.filter(x => !known.has(x)).map(x => <option key={x}>{x}</option>)}</optgroup>
+                        </select>
+                      )
+                    })}</div>
                   : <span className="text-parchment-400 text-xs">None recorded</span>}
               </div>
             </div>
@@ -1989,91 +2548,6 @@ export default function Sheet() {
               </div>
             </div>
           </div>
-          {/* Custom Resources */}
-          <div className="card">
-            <h3 className="section-header mb-3">Custom Resources</h3>
-            {(char.customResources ?? []).length > 0 && (
-              <div className="space-y-3 mb-4">
-                {(char.customResources ?? []).map(r => {
-                  const current = char.classResources[r.key] ?? r.max
-                  return (
-                    <div key={r.key} className="flex items-center gap-2">
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium text-parchment-800 truncate">{r.name}</div>
-                        <div className="text-xs text-parchment-400">{r.recharge === 'short' ? 'Short rest' : 'Long rest'} · {r.max} max</div>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => patch({ classResources: { ...char.classResources, [r.key]: Math.max(0, current - 1) } })}
-                          className="w-6 h-6 rounded border border-parchment-300 text-parchment-600 hover:bg-parchment-100 text-sm font-bold flex items-center justify-center"
-                        >−</button>
-                        <span className="text-sm font-mono w-10 text-center">{current}/{r.max}</span>
-                        <button
-                          onClick={() => patch({ classResources: { ...char.classResources, [r.key]: Math.min(r.max, current + 1) } })}
-                          className="w-6 h-6 rounded border border-parchment-300 text-parchment-600 hover:bg-parchment-100 text-sm font-bold flex items-center justify-center"
-                        >+</button>
-                        <button
-                          onClick={() => {
-                            const updated = (char.customResources ?? []).filter(x => x.key !== r.key)
-                            const newClassRes = { ...char.classResources }
-                            delete newClassRes[r.key]
-                            patch({ customResources: updated, classResources: newClassRes })
-                          }}
-                          className="w-6 h-6 rounded border border-red-200 text-red-400 hover:bg-red-50 text-xs flex items-center justify-center ml-1"
-                          title="Remove resource"
-                        >✕</button>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-            <div className="border-t border-parchment-200 pt-3">
-              <div className="text-xs text-parchment-500 mb-2 font-medium">Add Resource</div>
-              <div className="flex gap-2 flex-wrap">
-                <input
-                  type="text"
-                  placeholder="Name"
-                  value={newResourceName}
-                  onChange={e => setNewResourceName(e.target.value)}
-                  className="border border-parchment-300 rounded px-2 py-1 text-sm flex-1 min-w-0 bg-parchment-50"
-                />
-                <input
-                  type="number"
-                  placeholder="Max"
-                  min={1}
-                  value={newResourceMax}
-                  onChange={e => setNewResourceMax(e.target.value)}
-                  className="border border-parchment-300 rounded px-2 py-1 text-sm w-16 bg-parchment-50"
-                />
-                <select
-                  value={newResourceRecharge}
-                  onChange={e => setNewResourceRecharge(e.target.value as 'short' | 'long')}
-                  className="border border-parchment-300 rounded px-2 py-1 text-sm bg-parchment-50"
-                >
-                  <option value="long">Long Rest</option>
-                  <option value="short">Short Rest</option>
-                </select>
-                <button
-                  onClick={() => {
-                    const name = newResourceName.trim()
-                    const max = parseInt(newResourceMax, 10)
-                    if (!name || !max || max < 1) return
-                    const key = `custom-${name.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}`
-                    const newRes = { key, name, max, recharge: newResourceRecharge }
-                    patch({
-                      customResources: [...(char.customResources ?? []), newRes],
-                      classResources: { ...char.classResources, [key]: max },
-                    })
-                    setNewResourceName('')
-                    setNewResourceMax('')
-                    setNewResourceRecharge('long')
-                  }}
-                  className="btn-primary text-sm px-3 py-1"
-                >Add</button>
-              </div>
-            </div>
-          </div>
         </div>
       )}
 
@@ -2081,49 +2555,61 @@ export default function Sheet() {
       {tab === 'spells' && (
         <div className="space-y-4">
           {spellClassSlug ? (() => {
-            const primaryClass = char.classes[0]
+            // The tab works on one casting class at a time; multiclass casters pick which.
+            const casterClasses = char.classes.filter(c => spellcastingAbilityFor(c, content))
+            const primaryClass = casterClasses.find(c => c.classSlug === spellTabClass) ?? casterClasses[0]
             const primarySlug = primaryClass?.classSlug ?? ''
-            const classOpts = CLASS_OPTIONS[primarySlug]
-            const isPrepared = classOpts?.preparedCaster ?? false
-            const isSpellbookCaster = classOpts?.isSpellbookCaster ?? false
+            // How this class learns spells (Eldritch Knight / Arcane Trickster: via the subclass)
+            const progression = spellProgression(primarySlug, primaryClass?.subclassSlug)
+            const isPrepared = progression?.preparedCaster ?? false
+            const isSpellbookCaster = progression?.isSpellbookCaster ?? false
             const classLevel = primaryClass?.level ?? 1
-            const spellAbility = content.classes.find(c => c.slug === primarySlug)?.spellcastingAbility ?? 'int'
-            const abilMod = abilityModFor(char, spellAbility as 'str'|'dex'|'con'|'int'|'wis'|'cha')
+            const spellAbility = (primaryClass && spellcastingAbilityFor(primaryClass, content)) ?? 'int'
+            const abilMod = abilityModFor(effectiveChar, spellAbility)
+            // Half casters (Paladin, Artificer) prepare ability mod + half their level, rounded down
             const prepLimit = isPrepared
-              ? Math.max(1, ['paladin','artificer','ranger'].includes(primarySlug)
-                  ? abilMod + Math.floor(classLevel / 2)
-                  : abilMod + classLevel)
+              ? Math.max(1, ['paladin', 'artificer'].includes(primarySlug) ? abilMod + Math.floor(classLevel / 2) : abilMod + classLevel)
               : null
+            // Only this class's own spells count toward its limits (feat/Strixhaven spells and
+            // free once-a-day spells like Mystic Arcanum are extra)
             const preparedCount = char.spells.filter(s => {
               const def = content.spells.find(d => d.slug === s.spellSlug)
-              // Strixhaven-granted spells are bonus/always-prepared — don't count against the limit.
-              return s.prepared && s.classSlug !== 'strixhaven' && (def?.level ?? 0) > 0
+              return s.prepared && s.classSlug === primarySlug && (def?.level ?? 0) > 0 && !s.freeUseKey
             }).length
-            const cantripBase = classOpts?.cantripsKnown ?? 0
-            const cantripBonus = (classOpts?.cantripsAtLevel ?? []).filter(l => l <= classLevel).length
-            const cantripMax = cantripBase + cantripBonus
+            const cantripMax = cantripsKnownAt(progression, classLevel)
             const cantripCount = char.spells.filter(s => {
               const def = content.spells.find(d => d.slug === s.spellSlug)
-              return s.classSlug !== 'strixhaven' && (def?.level ?? 0) === 0
+              return s.classSlug === primarySlug && (def?.level ?? 0) === 0
             }).length
             const atCantripCap = cantripMax > 0 && cantripCount >= cantripMax
+            // Eldritch Knights and Arcane Tricksters learn from the wizard list
+            const spellListSlug = progression?.spellList ?? primarySlug
             const matchesClassFn = (spellClasses: string[]) =>
-              spellClasses.some(c => c.toLowerCase().replace(/\s*\(.*?\)/g, '').trim() === primarySlug)
-            const maxSlotLevel = Math.max(0, ...Object.entries(char.spellSlots)
-              .filter(([, v]) => v.max > 0).map(([k]) => parseInt(k, 10)))
+              spellClasses.some(c => c.toLowerCase().replace(/\s*\(.*?\)/g, '').trim() === spellListSlug)
+            // Highest spell level this class can learn or prepare, as if single-classed (PHB p.164)
+            const maxSlotLevel = maxSpellLevelAt(primarySlug, classLevel,
+              content.classes.find(c => c.slug === primarySlug)?.spellSlotTable, primaryClass?.subclassSlug)
             const knownSlugs = new Set(char.spells.map(s => s.spellSlug))
             const availableSpells = content.spells
               .filter(s => matchesClassFn(s.classes))
               .filter(s => !knownSlugs.has(s.slug))
               .filter(s => s.level === 0 || s.level <= Math.max(maxSlotLevel, 1))
-            const preparedSpells = char.spells.filter(s => s.prepared)
+            // Spells ready to cast: prepared ones, every cantrip, and everything a known caster
+            // (bard, sorcerer, warlock, ranger, Eldritch Knight, Arcane Trickster) has learned
+            const preparedSpells = char.spells.filter(s => {
+              if (s.prepared) return true
+              if ((content.spells.find(d => d.slug === s.spellSlug)?.level ?? 0) === 0) return true
+              const entry = char.classes.find(c => c.classSlug === s.classSlug)
+              const prog = entry && spellProgression(entry.classSlug, entry.subclassSlug)
+              return !!prog && !prog.preparedCaster
+            })
             const atPrepCap = isPrepared && prepLimit !== null && preparedCount >= prepLimit
             // Spells-known cap for known casters (Bard/Sorcerer/Warlock/Ranger — they learn a
             // fixed number of spells rather than preparing from a list each day).
-            const knownMax = !isPrepared ? classOpts?.spellsKnownTable?.[classLevel - 1] : undefined
+            const knownMax = !isPrepared ? progression?.spellsKnownTable?.[classLevel - 1] : undefined
             const knownCount = char.spells.filter(s => {
               const def = content.spells.find(d => d.slug === s.spellSlug)
-              return s.classSlug === primarySlug && (def?.level ?? 0) > 0
+              return s.classSlug === primarySlug && (def?.level ?? 0) > 0 && !s.freeUseKey
             }).length
             const atKnownCap = !!knownMax && knownCount >= knownMax
             const ordinals = ['Cantrips','1st','2nd','3rd','4th','5th','6th','7th','8th','9th']
@@ -2140,9 +2626,9 @@ export default function Sheet() {
             // Resolve which caster class a given spell entry uses for its DC/attack.
             // Falls back to the primary spell class for non-caster tags (e.g. Strixhaven).
             const classForEntry = (entryClassSlug?: string) =>
-              (entryClassSlug && content.classes.find(c => c.slug === entryClassSlug)?.spellcastingAbility)
+              (entryClassSlug && spellSaveDC(effectiveChar, entryClassSlug, content) > 0)
                 ? entryClassSlug
-                : (spellClassSlug as string)
+                : primarySlug
 
             // Item-aware spell DC/attack — use effectiveChar (ability overrides applied) + item bonuses.
             const totalSpellDC  = (cls: string) => spellSaveDC(effectiveChar, cls, content)  + itemBonuses.spellDCBonus
@@ -2156,9 +2642,20 @@ export default function Sheet() {
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
-                        <h2 className="text-base font-bold text-parchment-800 uppercase tracking-widest">
-                          {content.classes.find(c => c.slug === primarySlug)?.name ?? primarySlug}
-                        </h2>
+                        {casterClasses.length > 1 ? (
+                          // Multiclass caster: choose which class's spells, limits and list to work with
+                          <div className="flex rounded-md border border-parchment-300 overflow-hidden">
+                            {casterClasses.map(c => (
+                              <button key={c.classSlug} type="button" onClick={() => setSpellTabClass(c.classSlug)}
+                                className={`px-2.5 py-1 text-xs font-bold uppercase tracking-widest transition-colors ${c.classSlug === primarySlug ? 'bg-parchment-600 text-parchment-50' : 'text-parchment-600 hover:bg-parchment-100'}`}
+                              >{content.classes.find(cl => cl.slug === c.classSlug)?.name ?? c.classSlug} {c.level}</button>
+                            ))}
+                          </div>
+                        ) : (
+                          <h2 className="text-base font-bold text-parchment-800 uppercase tracking-widest">
+                            {content.classes.find(c => c.slug === primarySlug)?.name ?? primarySlug}
+                          </h2>
+                        )}
                         {isMulticlassCaster && (
                           <span className="text-xs bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-full px-2 py-0.5 font-semibold">Multiclass</span>
                         )}
@@ -2453,9 +2950,10 @@ export default function Sheet() {
                               )}
                               {tabSpells.map(s => {
                                 const def = content.spells.find(d => d.slug === s.spellSlug)
-                                const cantripDmg = (isCantrip && def) ? cantripDiceAtLevel(def.slug, level) : null
                                 const rawDmg = def?.damage ?? null
-                                const dmgDisplay = cantripDmg ?? (rawDmg ? `${rawDmg.dice}${rawDmg.type ? ` ${rawDmg.type}` : ''}` : null)
+                                const cantripDmg = (isCantrip && def) ? cantripDiceAtLevel(def.slug, level, rawDmg?.dice) : null
+                                // Dice only — the damage type is added once where the badge is drawn
+                                const dmgDisplay = cantripDmg ?? rawDmg?.dice ?? null
                                 const isOpen = browserSelectedSpell === s.spellSlug
                                 const isConcentrating = char.concentratingOn === s.spellSlug
                                 const aoe = def ? extractAoE(def.range) : null
@@ -2752,6 +3250,39 @@ export default function Sheet() {
                   </div>
                 )}
 
+                {/* ── Mystic Arcanum owed (Warlock 11+) but never picked ── */}
+                {(() => {
+                  const wlLevel = char.classes.find(c => c.classSlug === 'warlock')?.level ?? 0
+                  const owed = Object.entries(MYSTIC_ARCANUM_LEVELS)
+                    .filter(([at, spLvl]) => wlLevel >= Number(at) && !char.spells.some(s => s.freeUseKey === mysticArcanumKey(spLvl)))
+                    .map(([, spLvl]) => spLvl)
+                  if (owed.length === 0) return null
+                  return (
+                    <div className="card border-amber-300">
+                      <h3 className="text-sm font-bold text-parchment-700 uppercase tracking-wider mb-1">Mystic Arcanum</h3>
+                      <p className="text-xs text-parchment-500 mb-3">Choose a warlock spell for each arcanum. Each can be cast once without a spell slot per long rest.</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {owed.map(spLvl => (
+                          <label key={spLvl} className="block">
+                            <span className="text-sm text-parchment-600">{ordinals[spLvl]} level</span>
+                            <select className="input text-sm" value=""
+                              onChange={e => {
+                                const def = content.spells.find(d => d.slug === e.target.value)
+                                if (def) patch({ spells: [...char.spells, mysticArcanumEntry(def)] })
+                              }}>
+                              <option value="">— choose a spell —</option>
+                              {content.spells
+                                .filter(d => d.level === spLvl && (d.classLists ?? []).includes('warlock') && !char.spells.some(s => s.spellSlug === d.slug))
+                                .sort((a, b) => a.name.localeCompare(b.name))
+                                .map(d => <option key={d.slug} value={d.slug}>{d.name}</option>)}
+                            </select>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })()}
+
                 {/* ── Innate / Free Spells (feats, race, subclass — single source of truth) ── */}
                 {freeSpells.length > 0 && (
                   <div className="card">
@@ -2766,7 +3297,12 @@ export default function Sheet() {
                             <div className="space-y-1.5">
                               {group.map(spell => {
                                 const def = content.spells.find(s => s.slug === spell.slug)
-                                const dmg = def?.damage ?? null
+                                // Cast with a higher slot (Tiefling's Hellish Rebuke at 2nd level): scale the dice
+                                const upcastBy = def && spell.castLevel ? spell.castLevel - def.level : 0
+                                const upcastInc = upcastBy > 0 && def?.higherLevels ? parseUpcastScaling(def.higherLevels) : null
+                                const dmg = def?.damage && upcastInc
+                                  ? { ...def.damage, dice: computeUpcastDamage(def.damage.dice, upcastInc.dice, upcastBy) ?? def.damage.dice }
+                                  : def?.damage ?? null
                                 const usesMax = spell.usesPerLongRest
                                 const usesLeft = usesMax !== undefined
                                   ? Math.max(0, usesMax - (char.freeSpellUses?.[spell.key] ?? 0))
@@ -2786,6 +3322,7 @@ export default function Sheet() {
                                           <div className="flex items-center gap-1.5 flex-wrap">
                                             <span className={`font-semibold text-sm ${isSpent ? 'line-through text-parchment-400' : 'text-parchment-900'}`}>{spell.name}</span>
                                             <span className="text-xs bg-parchment-100 text-parchment-500 rounded px-1.5 py-0.5">{spell.source}</span>
+                                            {upcastBy > 0 && <span className="text-xs bg-parchment-100 text-parchment-500 rounded px-1.5 py-0.5">as {ordinals[spell.castLevel!]} level</span>}
                                             {isAlwaysPrepared && <span className="text-xs bg-indigo-50 text-indigo-700 border border-indigo-200 rounded px-1.5 py-0.5">Always Prepared</span>}
                                             {isAtWill && <span className="text-xs bg-green-50 text-green-700 border border-green-200 rounded px-1.5 py-0.5">At Will</span>}
                                             {hasTracker && <span className={`text-xs rounded px-1.5 py-0.5 border ${isSpent ? 'bg-red-50 text-red-400 border-red-200' : 'bg-blue-50 text-blue-700 border-blue-200'}`}>{usesLeft}/{usesMax} / LR</span>}
@@ -2990,7 +3527,7 @@ export default function Sheet() {
                                         <button type="button"
                                           className="px-4 py-1.5 rounded font-semibold text-sm transition-colors bg-amber-600 text-white hover:bg-amber-700"
                                           onClick={() => {
-                                            patch({ spells: [...char.spells, { spellSlug: s.slug, name: s.name, classSlug: spellClassSlug ?? primarySlug, prepared: false, isHomebrew: s.source.site === 'homebrew' }] })
+                                            patch({ spells: [...char.spells, { spellSlug: s.slug, name: s.name, classSlug: primarySlug, prepared: false, isHomebrew: s.source.site === 'homebrew' }] })
                                             setBrowserSelectedSpell(null)
                                           }}
                                         >Add to Spellbook</button>
@@ -2998,7 +3535,7 @@ export default function Sheet() {
                                           disabled={atPrepCap}
                                           className="px-4 py-1.5 rounded font-semibold text-sm transition-colors bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-40 disabled:cursor-not-allowed"
                                           onClick={() => {
-                                            patch({ spells: [...char.spells, { spellSlug: s.slug, name: s.name, classSlug: spellClassSlug ?? primarySlug, prepared: true, isHomebrew: s.source.site === 'homebrew' }] })
+                                            patch({ spells: [...char.spells, { spellSlug: s.slug, name: s.name, classSlug: primarySlug, prepared: true, isHomebrew: s.source.site === 'homebrew' }] })
                                             setBrowserSelectedSpell(null)
                                           }}
                                         >Prepare Directly</button>
@@ -3010,7 +3547,7 @@ export default function Sheet() {
                                           disabled={atPrepCap}
                                           className="px-4 py-1.5 rounded font-semibold text-sm transition-colors bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-40 disabled:cursor-not-allowed"
                                           onClick={() => {
-                                            patch({ spells: [...char.spells, { spellSlug: s.slug, name: s.name, classSlug: spellClassSlug ?? primarySlug, prepared: true, isHomebrew: s.source.site === 'homebrew' }] })
+                                            patch({ spells: [...char.spells, { spellSlug: s.slug, name: s.name, classSlug: primarySlug, prepared: true, isHomebrew: s.source.site === 'homebrew' }] })
                                             setBrowserSelectedSpell(null)
                                           }}
                                         >{isPrepared ? 'Prepare' : 'Learn'}</button>
@@ -3044,102 +3581,172 @@ export default function Sheet() {
       {tab === 'inventory' && (
         <div>
           {/* Top row: Currency + Attunement */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5">
-            {/* Currency */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 items-start gap-3 mb-5">
+            {/* Coin purse — a merchant's ledger: gold-leaf rolling balance, coin buttons, wax-seal
+                Gain/Spend and a transaction log. The balance is one total, shown in gold. */}
             {(() => {
-              const COIN_DOT: Record<string, string> = {
-                cp: 'bg-amber-600', sp: 'bg-slate-400', ep: 'bg-cyan-500',
-                gp: 'bg-yellow-400', pp: 'bg-purple-300',
+              const METAL: Record<Coin, { name: string; light: string; mid: string; edge: string; ink: string }> = {
+                cp: { name: 'Copper',   light: '#eaa36a', mid: '#b5642f', edge: '#6b3618', ink: '#4a2410' },
+                sp: { name: 'Silver',   light: '#f1f3f5', mid: '#a9b0b7', edge: '#5f656c', ink: '#3b4046' },
+                ep: { name: 'Electrum', light: '#f0eabd', mid: '#b8b183', edge: '#6f6942', ink: '#48442a' },
+                gp: { name: 'Gold',     light: '#fbe08a', mid: '#d4a33a', edge: '#7d5512', ink: '#5c3d0c' },
+                pp: { name: 'Platinum', light: '#f6f9fc', mid: '#b9c4d0', edge: '#66717f', ink: '#3d4550' },
               }
+              const purse = normalizePurse(char.currency)  // older saves may still hold ep/pp
+              const amount = parseInt(txAmount, 10)
+              const cp = amount > 0 ? amount * COIN_CP[txCoin] : null
+              const afterGain = cp !== null ? addValue(char.currency, cp) : null
+              const afterSpend = cp !== null ? spendValue(char.currency, cp) : null
+              const commit = (kind: 'gain' | 'spend') => {
+                const next = kind === 'gain' ? afterGain : afterSpend
+                if (!next) return
+                const note = txNote.trim()
+                const entry = { id: `${Date.now()}`, at: new Date().toISOString(), kind, coin: txCoin, amount, ...(note ? { note } : {}) }
+                patch({ currency: next, purseLog: [entry, ...char.purseLog].slice(0, 30) })
+                const floatId = Date.now() + Math.random()
+                setPurseFloats(f => [...f, { id: floatId, text: `${kind === 'gain' ? '+' : '−'}${amount} ${txCoin}`, kind }])
+                setTimeout(() => setPurseFloats(f => f.filter(x => x.id !== floatId)), 1300)
+                setTxAmount(''); setTxNote('')
+              }
+              const timeAgo = (iso: string) => {
+                const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000)
+                if (mins < 1) return 'just now'
+                if (mins < 60) return `${mins}m ago`
+                if (mins < 1440) return `${Math.floor(mins / 60)}h ago`
+                return `${Math.floor(mins / 1440)}d ago`
+              }
+              const change = [purse.sp ? `${purse.sp} sp` : '', purse.cp ? `${purse.cp} cp` : ''].filter(Boolean).join(' · ')
+              const recent = char.purseLog.slice(0, 5)
               return (
-              <div className="card p-3">
-                <div className="text-xs font-bold text-parchment-500 uppercase tracking-wider mb-3">Currency</div>
-                <div className="flex justify-between">
-                  {(['cp', 'sp', 'ep', 'gp', 'pp'] as const).map(coin => (
-                    <div key={coin} className="flex flex-col items-center gap-1">
-                      <div className={`w-2.5 h-2.5 rounded-full ${COIN_DOT[coin]}`} />
-                      <input
-                        type="number"
-                        min={0}
-                        className="input-coin font-semibold"
-                        style={{ width: `calc(${Math.max(3, String(char.currency[coin]).length)}ch + 1rem)` }}
-                        value={char.currency[coin]}
-                        onChange={e => patch({ currency: { ...char.currency, [coin]: parseInt(e.target.value, 10) || 0 } })}
-                      />
-                      <div className="text-xs text-parchment-400 font-medium">{coin.toUpperCase()}</div>
-                    </div>
+              <div className="card p-4">
+                {/* Ornamental header */}
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="h-px flex-1 bg-gradient-to-r from-transparent to-parchment-300" />
+                  <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.25em] text-parchment-500">
+                    <PouchIcon className="w-4 h-4 text-amber-700" />Coin Purse
+                  </span>
+                  <span className="h-px flex-1 bg-gradient-to-l from-transparent to-parchment-300" />
+                </div>
+
+                {/* Balance — gold leaf, odometer digits; floating +/- labels */}
+                <div className="relative flex flex-col items-center py-2">
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-5xl font-bold"><RollingNumber value={purse.gp} digitClassName="gold-leaf" /></span>
+                    {/* leading-none: the gold-leaf gradient repeats every 1em, so the box must be 1em tall */}
+                    <span className="text-xl font-bold leading-none gold-leaf">gp</span>
+                  </div>
+                  <div className="text-xs italic text-parchment-500 h-4">{change ? `and ${change}` : ''}</div>
+                  {purseFloats.map(f => (
+                    <span key={f.id}
+                      className={`purse-float pointer-events-none absolute right-2 top-2 text-sm font-bold ${f.kind === 'gain' ? 'text-green-700' : 'text-red-700'}`}
+                    >{f.text}</span>
                   ))}
                 </div>
-                <div className="mt-3 pt-2 border-t border-parchment-200 space-y-2">
-                  <div className="flex items-center gap-1.5">
-                    <input
-                      type="number"
-                      min={1}
-                      placeholder="Amount"
-                      className="input-coin"
-                      style={{ width: `calc(${Math.max(8, txAmount.length || 0)}ch + 1rem)` }}
-                      value={txAmount}
-                      onChange={e => setTxAmount(e.target.value)}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') {
-                          const n = parseInt(txAmount, 10)
-                          if (!n || n <= 0) return
-                          patch({ currency: { ...char.currency, [txCoin]: char.currency[txCoin] + n } })
-                          setTxAmount('')
-                        }
-                      }}
-                    />
-                    <div className="flex gap-1">
-                      {(['cp', 'sp', 'ep', 'gp', 'pp'] as const).map(coin => (
-                        <button
-                          key={coin}
-                          className={`w-8 h-7 text-xs rounded font-semibold border transition-colors ${txCoin === coin ? 'bg-parchment-600 text-parchment-50 border-parchment-600' : 'bg-parchment-100 text-parchment-600 border-parchment-300 hover:bg-parchment-200'}`}
-                          onClick={() => setTxCoin(coin)}
-                        >{coin.toUpperCase()}</button>
-                      ))}
-                    </div>
+
+                {/* Coin choice — what the amount is counted in */}
+                <div className="flex justify-center gap-2 mt-1" role="radiogroup" aria-label="Coin">
+                  {(['cp', 'sp', 'ep', 'gp', 'pp'] as Coin[]).map(coin => {
+                    const m = METAL[coin]
+                    const selected = txCoin === coin
+                    return (
+                      <button key={coin} type="button" role="radio" aria-checked={selected} onClick={() => setTxCoin(coin)}
+                        title={m.name}
+                        className={`group flex flex-col items-center gap-0.5 transition-transform ${selected ? '-translate-y-1' : ''}`}>
+                        <span key={selected ? `on-${coin}` : coin}
+                          className={`w-9 h-9 rounded-full flex items-center justify-center transition-opacity ${selected ? 'coin-flip' : 'opacity-70 group-hover:opacity-100'}`}
+                          style={{
+                            background: `radial-gradient(circle at 36% 30%, ${m.light}, ${m.mid} 58%, ${m.edge})`,
+                            color: m.ink,
+                            boxShadow: selected
+                              ? `0 0 0 2px rgb(var(--accent)), 0 3px 8px rgba(0,0,0,0.35), inset 0 0 0 2px rgba(255,255,255,0.3)`
+                              : `0 1px 3px rgba(0,0,0,0.3), inset 0 0 0 2px rgba(255,255,255,0.25)`,
+                          }}><CoinEmblem coin={coin} className="coin-emblem w-[18px] h-[18px] opacity-80" /></span>
+                        <span className={`text-[9px] uppercase tracking-wide ${selected ? 'font-bold text-parchment-800' : 'text-parchment-700'}`}>{m.name}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+
+                {/* Amount + optional note */}
+                <div className="flex gap-1.5 mt-3">
+                  <input type="number" min={1} placeholder="Amount"
+                    className="input-coin w-28 text-base font-semibold"
+                    value={txAmount}
+                    onChange={e => setTxAmount(e.target.value)} />
+                  <input type="text" placeholder="Note (optional), e.g. sold the goblin's dagger"
+                    className="input-coin flex-1 min-w-0 text-left px-2 italic"
+                    value={txNote}
+                    onChange={e => setTxNote(e.target.value)} />
+                </div>
+
+                {/* Wax-seal Gain / Spend */}
+                <div className="flex justify-center gap-10 mt-3">
+                  {(['gain', 'spend'] as const).map(kind => {
+                    const after = kind === 'gain' ? afterGain : afterSpend
+                    return (
+                      <div key={kind} className="flex flex-col items-center gap-1 w-24">
+                        <button type="button" disabled={!after} onClick={() => commit(kind)}
+                          title={kind === 'gain' ? 'Add to your purse' : 'Pay from your purse (makes change automatically)'}
+                          className={`wax-seal ${kind === 'gain' ? 'wax-seal-green' : 'wax-seal-red'} w-14 h-14 flex items-center justify-center disabled:opacity-35 disabled:cursor-not-allowed`}
+                        >{kind === 'gain' ? <PouchIcon className="w-7 h-7" /> : <ScaleIcon className="w-7 h-7" />}</button>
+                        <span className="text-xs font-bold uppercase tracking-wider text-parchment-700">{kind === 'gain' ? 'Gain' : 'Spend'}</span>
+                        <span className="text-[10px] text-parchment-500 text-center leading-tight h-3">
+                          {cp === null ? '' : after ? `→ ${formatPurse(after)}` : 'not enough'}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                {/* The ledger — collapsible; shows the latest entry when closed */}
+                <div className="mt-3 pt-2 border-t border-parchment-200">
+                  <div className="flex items-center gap-2">
+                    <button type="button" onClick={() => setLedgerOpen(!ledgerOpen)} aria-expanded={ledgerOpen}
+                      className="flex items-center gap-1.5 flex-1 min-w-0 text-left group">
+                      <QuillIcon className="w-4 h-4 text-parchment-500 shrink-0" />
+                      <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-parchment-500 group-hover:text-parchment-800">Ledger</span>
+                      {char.purseLog.length > 0 && (
+                        <span className="text-[10px] rounded-full px-1.5 bg-parchment-100 text-parchment-500 font-semibold">{char.purseLog.length}</span>
+                      )}
+                      {!ledgerOpen && recent[0] && (
+                        <span className="text-[11px] italic text-parchment-500 truncate">
+                          last: {recent[0].kind === 'gain' ? '+' : '−'}{recent[0].amount} {recent[0].coin}{recent[0].note ? `, ${recent[0].note}` : ''}
+                        </span>
+                      )}
+                      <span className={`ml-auto text-parchment-400 text-xs transition-transform ${ledgerOpen ? 'rotate-90' : ''}`}>▸</span>
+                    </button>
+                    {ledgerOpen && char.purseLog.length > 0 && (
+                      <button type="button" className="text-[10px] text-parchment-400 hover:text-red-600 shrink-0"
+                        onClick={() => { if (confirm('Clear the purse ledger? Your balance stays the same.')) patch({ purseLog: [] }) }}
+                      >clear</button>
+                    )}
                   </div>
-                  <div className="flex gap-2">
-                    <button
-                      className="flex-1 py-1.5 text-xs rounded font-semibold bg-green-700 text-white hover:bg-green-800 active:bg-green-900 transition-colors disabled:opacity-40"
-                      disabled={!txAmount || parseInt(txAmount, 10) <= 0}
-                      onClick={() => {
-                        const n = parseInt(txAmount, 10)
-                        if (!n || n <= 0) return
-                        patch({ currency: { ...char.currency, [txCoin]: char.currency[txCoin] + n } })
-                        setTxAmount('')
-                      }}
-                    >+ Add</button>
-                    <button
-                      className="flex-1 py-1.5 text-xs rounded font-semibold bg-red-700 text-white hover:bg-red-800 active:bg-red-900 transition-colors disabled:opacity-40"
-                      disabled={!txAmount || parseInt(txAmount, 10) <= 0}
-                      onClick={() => {
-                        const n = parseInt(txAmount, 10)
-                        if (!n || n <= 0) return
-                        patch({ currency: { ...char.currency, [txCoin]: Math.max(0, char.currency[txCoin] - n) } })
-                        setTxAmount('')
-                      }}
-                    >− Spend</button>
-                  </div>
-                  {/* Convert down */}
-                  <div className="pt-2 border-t border-parchment-200">
-                    <div className="text-xs text-parchment-400 mb-1.5">Break into smaller coins</div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {([
-                        { from: 'pp', to: 'gp', rate: 10, label: '1 pp → 10 gp' },
-                        { from: 'gp', to: 'sp', rate: 10, label: '1 gp → 10 sp' },
-                        { from: 'ep', to: 'sp', rate: 5,  label: '1 ep → 5 sp'  },
-                        { from: 'sp', to: 'cp', rate: 10, label: '1 sp → 10 cp' },
-                      ] as const).map(({ from, to, rate, label }) => (
-                        <button
-                          key={label}
-                          disabled={char.currency[from] < 1}
-                          className="px-2 py-1 text-xs rounded border border-parchment-300 bg-parchment-50 text-parchment-600 hover:bg-parchment-100 disabled:opacity-30 transition-colors"
-                          onClick={() => patch({ currency: { ...char.currency, [from]: char.currency[from] - 1, [to]: char.currency[to] + rate } })}
-                        >{label}</button>
-                      ))}
-                    </div>
-                  </div>
+                  {ledgerOpen && (
+                    <>
+                      <div className="ledger-lines pl-2 mt-1 min-h-[44px]">
+                        {recent.length === 0 ? (
+                          <p className="text-xs italic text-parchment-400 leading-[22px]">No entries yet.</p>
+                        ) : recent.map(e => {
+                          const m = METAL[e.coin]
+                          return (
+                            <div key={e.id} className="flex items-center gap-2 text-xs leading-[22px] h-[22px]">
+                              {/* a tiny coin in the entry's metal */}
+                              <span className="w-3 h-3 rounded-full shrink-0"
+                                style={{ background: `radial-gradient(circle at 36% 30%, ${m.light}, ${m.mid} 58%, ${m.edge})` }} />
+                              <span className={`font-bold tabular-nums shrink-0 ${e.kind === 'gain' ? 'text-green-700' : 'text-red-700'}`}>
+                                {e.kind === 'gain' ? '+' : '−'}{e.amount} {e.coin}
+                              </span>
+                              <span className="italic text-parchment-700 truncate flex-1">{e.note ?? (e.kind === 'gain' ? 'gained' : 'spent')}</span>
+                              <span className="text-[10px] text-parchment-400 shrink-0">{timeAgo(e.at)}</span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                      {char.purseLog.length > recent.length && (
+                        <p className="text-[10px] text-parchment-400 mt-1">+ {char.purseLog.length - recent.length} earlier</p>
+                      )}
+                    </>
+                  )}
                 </div>
               </div>
               )
@@ -3202,25 +3809,12 @@ export default function Sheet() {
               { cat: 'Consumables', items: ['Antitoxin','Acid (vial)',"Alchemist's Fire",'Holy Water (flask)','Smoke Bomb','Thunderstone'] },
             ]
 
+            // Mundane consumables (gear). Potions carry their own `potion` data on the item def.
             const CONSUMABLE_DATA: Record<string, { badge: string; badgeColor: string; text: string }> = {
-              'Potion of Healing':           { badge: '2d4+2 HP',    badgeColor: 'bg-rose-100 text-rose-700',    text: 'Drink to regain 2d4+2 hit points. Takes an action to drink yourself, or a bonus action if someone else administers it.' },
-              'Potion of Greater Healing':   { badge: '4d4+4 HP',    badgeColor: 'bg-rose-100 text-rose-700',    text: 'Drink to regain 4d4+4 hit points. Takes an action to drink yourself, or a bonus action if someone else administers it.' },
-              'Potion of Superior Healing':  { badge: '8d4+8 HP',    badgeColor: 'bg-rose-200 text-rose-800',    text: 'Drink to regain 8d4+8 hit points. Takes an action to drink yourself, or a bonus action if someone else administers it.' },
-              'Potion of Supreme Healing':   { badge: '10d4+20 HP',  badgeColor: 'bg-rose-300 text-rose-900',    text: 'Drink to regain 10d4+20 hit points. Takes an action to drink yourself, or a bonus action if someone else administers it.' },
               'Antitoxin':                   { badge: 'vs Poison',   badgeColor: 'bg-green-100 text-green-700',  text: 'Advantage on saving throws against poison for 1 hour. Not magical — works even inside an antimagic field.' },
               'Acid (vial)':                 { badge: '2d6 acid',    badgeColor: 'bg-yellow-100 text-yellow-700',text: 'Action: throw up to 20 ft. On hit, 2d6 acid damage. Treat as improvised weapon.' },
               "Alchemist's Fire":            { badge: '1d4 fire/rnd',badgeColor: 'bg-orange-100 text-orange-700',text: 'Action: throw up to 20 ft. On hit, 1d4 fire damage at the start of each of the target\'s turns until extinguished. DC 10 Dexterity (action) to put out.' },
               'Holy Water (flask)':          { badge: '2d6 radiant', badgeColor: 'bg-yellow-50 text-yellow-700', text: 'Action: throw up to 20 ft. On hit, 2d6 radiant damage to fiends and undead only.' },
-              'Potion of Climbing':          { badge: '1 hour',      badgeColor: 'bg-teal-100 text-teal-700',    text: 'Gain a climbing speed equal to your walking speed and advantage on Strength (Athletics) checks to climb for 1 hour.' },
-              'Potion of Water Breathing':   { badge: '1 hour',      badgeColor: 'bg-teal-100 text-teal-700',    text: 'Breathe underwater for 1 hour.' },
-              'Potion of Fire Resistance':   { badge: '1 hour',      badgeColor: 'bg-orange-100 text-orange-700',text: 'Resistance to fire damage for 1 hour.' },
-              'Potion of Animal Friendship': { badge: 'DC 13 · 24 hr',badgeColor: 'bg-green-100 text-green-700', text: 'Cast Animal Friendship targeting one beast (DC 13 Wisdom save) for 24 hours.' },
-              'Potion of Heroism':           { badge: '10 temp HP',  badgeColor: 'bg-amber-100 text-amber-700',  text: 'Gain 10 temporary hit points for 1 hour. While they last, you are also under the Bless effect — add 1d4 to attack rolls and saving throws.' },
-              'Potion of Speed':             { badge: 'Haste · 1 min',badgeColor: 'bg-cyan-100 text-cyan-700',   text: 'Under the effect of Haste for 1 minute (no concentration). Double speed, +2 AC, advantage on Dex saves, and one additional attack on the Attack action.' },
-              'Potion of Invisibility':      { badge: '1 hour',      badgeColor: 'bg-slate-100 text-slate-600',  text: 'Become invisible for 1 hour. Attacking or casting a spell ends the invisibility immediately.' },
-              'Potion of Flying':            { badge: '60 ft · 1 hr',badgeColor: 'bg-sky-100 text-sky-700',      text: 'Gain a flying speed of 60 feet for 1 hour. If the effect ends while airborne, you fall.' },
-              'Potion of Mind Reading':      { badge: 'DC 13 · 1 min',badgeColor: 'bg-violet-100 text-violet-700',text: 'Cast Detect Thoughts (DC 13 Wisdom save) for 1 minute with no concentration required.' },
-              'Potion of Poison':            { badge: '3d6 poison',  badgeColor: 'bg-green-200 text-green-900',  text: 'Looks like a Potion of Healing. Drinking it: DC 13 Constitution save or 3d6 poison damage and poisoned for 24 hours (half damage on success, not poisoned).' },
               'Smoke Bomb':                  { badge: '20 ft cloud', badgeColor: 'bg-slate-100 text-slate-600',  text: 'Action: throw up to 20 ft. Creates a 20-foot-radius sphere of opaque smoke for 1 minute. Heavily obscured. A strong wind disperses it.' },
               'Thunderstone':                { badge: '2d6 thunder', badgeColor: 'bg-indigo-100 text-indigo-700',text: 'Action: throw up to 20/60 ft. On hit, 2d6 thunder damage and target is deafened until end of its next turn (DC 13 Constitution save negates deafen).' },
             }
@@ -3311,8 +3905,9 @@ export default function Sheet() {
               patch({ equipment: eq })
             }
 
-            const itemRow = ({ item, idx, badge, badgeColor, descriptionText, showAttune, consumable }: {
+            const itemRow = ({ item, idx, badge, badgeColor, descriptionText, showAttune, consumable, potion }: {
               item: typeof char.equipment[0]; idx: number; badge?: string | null; badgeColor?: string; descriptionText?: string | null; showAttune?: boolean; consumable?: boolean
+              potion?: ItemDef['potion']
             }) => {
               const isExpanded = expandedInventoryItem === idx
               const def = content.items.find(i => i.slug === item.itemSlug)
@@ -3347,6 +3942,107 @@ export default function Sheet() {
                   const eq = [...char.equipment]; eq[idx] = { ...eq[idx], equipped: !item.equipped }; patch({ equipment: eq })
                 }
               }
+
+              // Potions: drinking uses one up; healing potions also take the HP the player rolled.
+              const equipmentAfterDrink = () => item.quantity <= 1
+                ? char.equipment.filter((_, i) => i !== idx)
+                : char.equipment.map((e, i) => i === idx ? { ...e, quantity: e.quantity - 1 } : e)
+              const resetDrink = () => { setDrinkingIdx(null); setDrinkRoll(''); setDrinkChoice(''); setDrinkFailedSave(false) }
+              const poison = potion?.onDrink?.damage
+              // Weapons Oil of Sharpness can coat: slashing or piercing ones you carry
+              const coatable = potion?.choice?.kind === 'weapon'
+                ? [...new Set(char.equipment.filter(e => ['slashing', 'piercing'].includes(resolveWeapon(e, content.items)?.damageType ?? '')).map(e => e.name))]
+                : []
+              const choiceOptions = potion?.choice?.kind === 'weapon' ? coatable : (potion?.choice?.options ?? [])
+              // Drinking needs input first when there's a roll to enter or a choice to make
+              const needsInput = !!(potion?.healing || poison || potion?.choice)
+              const roll = parseInt(drinkRoll, 10)
+              const inputReady = (!(potion?.healing || poison) || roll > 0) && (!potion?.choice || !!drinkChoice)
+
+              const finishDrink = () => {
+                if (!potion) return
+                if (item.quantity <= 1) setExpandedInventoryItem(null)
+                resetDrink()
+                let hp = { ...char.hp }
+                let conditions = [...char.conditions]
+                let exhaustionLevel = char.exhaustionLevel
+                if (potion.healing && roll > 0) hp.current = Math.min(maxHp, Math.max(0, hp.current) + roll)
+                if (poison && roll > 0) {
+                  // Damage comes off temporary HP first
+                  const fromTemp = Math.min(hp.temp, roll)
+                  hp = { ...hp, temp: hp.temp - fromTemp, current: Math.max(0, hp.current - (roll - fromTemp)) }
+                }
+                if (potion.onDrink?.removeConditions) conditions = conditions.filter(c => !potion.onDrink!.removeConditions!.includes(c))
+                if (potion.onDrink?.clearExhaustion) exhaustionLevel = 0
+                // Temp HP don't stack — keep the higher (Heroism); Giant Size doubles current HP with the max
+                if (potion.tempHp) hp.temp = Math.max(hp.temp, potion.tempHp)
+                if (potion.hpMaxMultiplier && hp.current > 0) hp.current *= potion.hpMaxMultiplier
+                // Conditions the potion gives you while it lasts (Invisible; Poisoned on a failed save)
+                const poisoned = !!(poison && drinkFailedSave)
+                const gives = [...(potion.conditions ?? []), ...(poisoned && poison!.failCondition ? [poison!.failCondition] : [])]
+                const added = gives.filter(c => !conditions.includes(c))
+                conditions = [...conditions, ...added]
+                // Lasting effects go into the Active Potions box (a failed Poison save lasts until it wears off)
+                const d = potion.duration ?? (poisoned && poison!.ongoingDice ? { label: 'until the poison wears off', minutes: 60 } : undefined)
+                const started = d ? [{
+                  id: `${item.itemSlug}-${Date.now()}`, itemSlug: item.itemSlug, name: item.name, effect: potion.effect,
+                  duration: d.label, minutes: d.minutes,
+                  ...(potion.duration && d.minutes <= 10 ? { roundsLeft: d.minutes * 10 } : {}),
+                  ...(potion.uses ? { usesLeft: potion.uses } : poisoned && poison!.ongoingDice ? { usesLeft: poison!.ongoingDice } : {}),
+                  ...(drinkChoice ? { choice: drinkChoice } : {}),
+                  ...(added.length ? { addedConditions: added } : {}),
+                }] : []
+                patch({
+                  hp, conditions, exhaustionLevel,
+                  equipment: equipmentAfterDrink(),
+                  ...(started.length ? { activePotions: [...char.activePotions, ...started] } : {}),
+                })
+              }
+              const qtyLabel = item.quantity > 1 ? `(${item.quantity} left)` : '(last one)'
+              const drinkControls = !potion ? null : drinkingIdx === idx && needsInput ? (
+                <div className="flex flex-col gap-1.5 w-full p-2 rounded border border-rose-200 bg-rose-50">
+                  {(potion.healing || poison) && (
+                    <label className="flex items-center gap-1.5 flex-wrap text-xs text-parchment-700">
+                      {potion.healing
+                        ? <>Roll <strong>{potion.healing}</strong>, HP regained:</>
+                        : <>Roll <strong>{poison!.dice}</strong> {poison!.type} damage you take:</>}
+                      <input type="number" min={1} autoFocus className="input-coin w-16" value={drinkRoll}
+                        onChange={e => setDrinkRoll(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter' && inputReady) finishDrink(); if (e.key === 'Escape') resetDrink() }} />
+                    </label>
+                  )}
+                  {poison && (
+                    <label className="flex items-center gap-1.5 text-xs text-parchment-700 cursor-pointer">
+                      <input type="checkbox" checked={drinkFailedSave} onChange={e => setDrinkFailedSave(e.target.checked)} />
+                      Failed the DC {poison.save.dc} {ABILITY_FULL[poison.save.ability]} save{poison.failCondition ? ` (${poison.failCondition.toLowerCase()})` : ''}
+                    </label>
+                  )}
+                  {potion.choice && (
+                    <label className="flex items-center gap-1.5 flex-wrap text-xs text-parchment-700">
+                      {potion.choice.label}
+                      {choiceOptions.length ? (
+                        <select className="input py-0.5 w-auto text-xs" value={drinkChoice} onChange={e => setDrinkChoice(e.target.value)} autoFocus={!potion.healing && !poison}>
+                          <option value="">Choose…</option>
+                          {choiceOptions.map(o => <option key={o} value={o}>{o}</option>)}
+                        </select>
+                      ) : (
+                        <span className="text-red-600">You have no slashing or piercing weapon to coat.</span>
+                      )}
+                    </label>
+                  )}
+                  <div className="flex items-center gap-2">
+                    <button type="button" disabled={!inputReady} onClick={finishDrink}
+                      className="px-2.5 py-1 rounded border text-xs font-semibold transition-colors bg-rose-600 text-white border-rose-600 hover:bg-rose-700 disabled:opacity-40"
+                    >{potion.healing ? 'Heal' : 'Drink'}</button>
+                    <button type="button" className="text-xs text-parchment-400 hover:text-parchment-700" onClick={resetDrink}>Cancel</button>
+                  </div>
+                </div>
+              ) : (
+                <button type="button"
+                  onClick={() => needsInput ? (resetDrink(), setDrinkingIdx(idx)) : finishDrink()}
+                  className="px-2.5 py-1 rounded border text-xs font-semibold transition-colors bg-rose-600 text-white border-rose-600 hover:bg-rose-700"
+                >Drink {qtyLabel}</button>
+              )
 
               return (
                 <div
@@ -3383,18 +4079,26 @@ export default function Sheet() {
                   {isExpanded && (
                     <div className="px-3 pb-3 border-t border-parchment-100 pt-2.5 space-y-2.5">
                       {ws && (
-                        <WeaponStatBlock
-                          ws={ws}
-                          attackBonus={weaponAttackBonus(char, ws, pb, magicBonus(item.name))}
-                          damageMod={weaponDamageMod(char, ws, magicBonus(item.name))}
-                          magicBonus={magicBonus(item.name)}
-                        />
+                        (() => {
+                          const pw = potionWeaponMods(item.name)
+                          return (
+                            <WeaponStatBlock
+                              ws={ws}
+                              attackBonus={weaponAttackBonus(effectiveChar, ws, pb, magicBonus(item.name)) + pw.bonus}
+                              damageMod={weaponDamageMod(effectiveChar, ws, magicBonus(item.name)) + pw.bonus}
+                              magicBonus={magicBonus(item.name)}
+                              attackDice={pw.attackDice}
+                              damageDice={pw.damageDice}
+                              potionBonus={pw.bonus}
+                            />
+                          )
+                        })()
                       )}
                       {as_ && !ws && (
                         <ArmorStatBlock
                           as_={as_}
-                          computedAC={as_.type === 'light' ? as_.acBase + abilityModFor(char, 'dex') + magicBonus(item.name)
-                            : as_.type === 'medium' ? as_.acBase + Math.min(abilityModFor(char, 'dex'), 2) + magicBonus(item.name)
+                          computedAC={as_.type === 'light' ? as_.acBase + abilityModFor(effectiveChar, 'dex') + magicBonus(item.name)
+                            : as_.type === 'medium' ? as_.acBase + Math.min(abilityModFor(effectiveChar, 'dex'), mediumDexCap) + magicBonus(item.name)
                             : as_.type === 'heavy' ? as_.acBase + magicBonus(item.name) || undefined
                             : undefined}
                         />
@@ -3423,7 +4127,7 @@ export default function Sheet() {
                             }}
                           >Use {item.quantity > 1 ? `(${item.quantity} left)` : '(last one)'}</button>
                         )}
-                        {isWeaponOrShield ? (
+                        {potion ? drinkControls : isWeaponOrShield ? (
                           ws?.twoHanded ? (
                             <button type="button"
                               className={`px-2.5 py-1 rounded border text-xs font-semibold transition-colors ${item.equipped ? 'bg-green-600 text-white border-green-600' : 'border-parchment-300 text-parchment-600 hover:border-green-500 hover:text-green-700'}`}
@@ -3503,7 +4207,7 @@ export default function Sheet() {
                             boots:    { label: 'Feet',     active: 'bg-stone-600 text-white border-stone-600',   hover: 'hover:border-stone-400 hover:text-stone-700' },
                             backpack: { label: 'Backpack', active: 'bg-amber-600 text-white border-amber-600',   hover: 'hover:border-amber-400 hover:text-amber-700' },
                           }
-                          const detected = detectBodySlot(item.name)
+                          const detected = detectBodySlot(item.name, def?.description)
                           const wearSlot = (slotKey: BodySlotKey) => {
                             if (item.slot === slotKey) {
                               const eq = [...char.equipment]; eq[idx] = { ...eq[idx], slot: undefined, equipped: false }; patch({ equipment: eq })
@@ -3528,21 +4232,12 @@ export default function Sheet() {
                             )
                           }
 
-                          // Unknown slot type — show Equip + full picker as fallback
+                          // No identifiable body slot — plain Equip only (never a free choice of
+                          // slot, so e.g. a helmet can't end up on the Body or Feet slot).
                           return (
-                            <>
-                              <button type="button" onClick={handleEquip}
-                                className={`px-2.5 py-1 rounded border text-xs font-semibold transition-colors ${item.equipped && !item.slot ? 'bg-green-600 text-white border-green-600' : 'border-parchment-300 text-parchment-600 hover:border-green-500 hover:text-green-700'}`}
-                              >{item.equipped && !item.slot ? '✓ Equipped' : 'Equip'}</button>
-                              {(Object.entries(SLOT_META) as [BodySlotKey, typeof SLOT_META[BodySlotKey]][]).map(([key, meta]) => {
-                                const isWorn = item.slot === key
-                                return (
-                                  <button key={key} type="button" onClick={() => wearSlot(key)}
-                                    className={`px-2.5 py-1 rounded border text-xs font-semibold transition-colors ${isWorn ? meta.active : `border-parchment-300 text-parchment-600 ${meta.hover}`}`}
-                                  >{isWorn ? `✓ ${meta.label}` : meta.label}</button>
-                                )
-                              })}
-                            </>
+                            <button type="button" onClick={handleEquip}
+                              className={`px-2.5 py-1 rounded border text-xs font-semibold transition-colors ${item.equipped ? 'bg-green-600 text-white border-green-600' : 'border-parchment-300 text-parchment-600 hover:border-green-500 hover:text-green-700'}`}
+                            >{item.equipped ? '✓ Equipped' : 'Equip'}</button>
                           )
                         })()}
                         {needsAttunement && (
@@ -3645,29 +4340,22 @@ export default function Sheet() {
               const n = e.name.toLowerCase()
               return /^orb\b/.test(n) || /\bchest\b/.test(n) || /\bbox\b/.test(n) || /\bcandle\b/.test(n) || /\bfigurine\b/.test(n) || /\bpot\b/.test(n)
             }
+            // Only count an item as filling a body slot if that's a slot it can actually go in
+            // (older saves may have e.g. a helmet sitting in the Body slot).
+            const inValidBodySlot = (e: typeof char.equipment[0]) =>
+              !!e.slot && detectBodySlot(e.name, content.items.find(i => i.slug === e.itemSlug)?.description) === e.slot
             const bodySlotItems: Record<string, typeof char.equipment[0] | undefined> = {}
-            for (const { key } of BODY_SLOTS) bodySlotItems[key] = char.equipment.find(e => e.slot === key)
+            for (const { key } of BODY_SLOTS) bodySlotItems[key] = char.equipment.find(e => e.slot === key && inValidBodySlot(e))
             const alwaysWornItems = char.equipment.filter(e => isAlwaysWorn(e) && e.attuned)
             const equippedOther = char.equipment.filter(e =>
-              e.equipped && !isAlwaysWorn(e) && !isNonEquippable(e) &&
-              !(['helmet','eyes','amulet','cloak','robe','bracers','gloves','belt','boots','backpack'] as string[]).includes(e.slot ?? '') &&
+              e.equipped && !isAlwaysWorn(e) && !isNonEquippable(e) && !inValidBodySlot(e) &&
               !resolveWeapon(e, content.items) && !resolveArmor(e, content.items) && implementHandedness(e) === null
             )
             const hasLoadout = equippedArmor || equippedWeapons.length > 0 || equippedShield || equippedImpls.length > 0 ||
               BODY_SLOTS.some(s => bodySlotItems[s.key]) || alwaysWornItems.length > 0 || equippedOther.length > 0
 
-            // compute AC for display
-            const currentAC = (() => {
-              const dex = abilityModFor(char, 'dex')
-              if (equippedArmor) {
-                const a = equippedArmor.as_!
-                const base = a.type === 'light' ? a.acBase + dex
-                  : a.type === 'medium' ? a.acBase + Math.min(dex, 2)
-                  : a.acBase
-                return base + magicBonus(equippedArmor.item.name) + (equippedShield ? equippedShield.as_!.acBase + magicBonus(equippedShield.item.name) : 0)
-              }
-              return null
-            })()
+            // AC shown on the armor slot — same number as the Stats tab (fighting style, feats, items included)
+            const currentAC = equippedArmor ? ac : null
 
             return (
               <div className="space-y-4">
@@ -3727,8 +4415,8 @@ export default function Sheet() {
                       {dualWieldWeapon ? (
                         (() => {
                           const w = dualWieldWeapon
-                          const dmgMod = w.ws!.finesse ? Math.max(abilityModFor(char,'str'),abilityModFor(char,'dex')) : abilityModFor(char,'str')
-                          const atkBonus = dmgMod + pb + magicBonus(w.item.name)
+                          const pw = potionWeaponMods(w.item.name)
+                          const atkBonus = weaponAttackBonus(effectiveChar, w.ws!, pb, magicBonus(w.item.name)) + pw.bonus
                           return (
                             <div className="col-span-1 sm:col-span-2 flex flex-col gap-1 rounded-lg border border-green-200 bg-green-50 px-3 py-2.5">
                               <div className="flex items-center justify-between">
@@ -3737,8 +4425,8 @@ export default function Sheet() {
                               </div>
                               <span className="text-sm font-semibold text-green-900 truncate">{w.item.name} × 2</span>
                               <div className="flex items-center gap-3 mt-0.5">
-                                <span className="text-xs font-bold text-green-700">{w.ws!.damage} {w.ws!.damageType}</span>
-                                <span className="text-xs text-green-600">{formatMod(atkBonus)} to hit</span>
+                                <span className="text-xs font-bold text-green-700">{w.ws!.damage}{(() => { const m = weaponDamageMod(effectiveChar, w.ws!, magicBonus(w.item.name)) + pw.bonus; return m ? ` ${formatMod(m)}` : '' })()}{pw.damageDice} {w.ws!.damageType}</span>
+                                <span className="text-xs text-green-600">{formatMod(atkBonus)}{pw.attackDice} to hit</span>
                               </div>
                             </div>
                           )
@@ -3762,8 +4450,8 @@ export default function Sheet() {
                       ) : hasTwoHanded && mainHandWeapon ? (
                         (() => {
                           const w = mainHandWeapon
-                          const dmgMod = w.ws!.finesse ? Math.max(abilityModFor(char,'str'),abilityModFor(char,'dex')) : w.ws!.ranged ? abilityModFor(char,'dex') : abilityModFor(char,'str')
-                          const atkBonus = dmgMod + pb + magicBonus(w.item.name)
+                          const pw = potionWeaponMods(w.item.name)
+                          const atkBonus = weaponAttackBonus(effectiveChar, w.ws!, pb, magicBonus(w.item.name)) + pw.bonus
                           return (
                             <div className="col-span-1 sm:col-span-2 flex flex-col gap-1 rounded-lg border border-green-200 bg-green-50 px-3 py-2.5">
                               <div className="flex items-center justify-between">
@@ -3772,8 +4460,8 @@ export default function Sheet() {
                               </div>
                               <span className="text-sm font-semibold text-green-900 truncate">{w.item.name}</span>
                               <div className="flex items-center gap-3 mt-0.5">
-                                <span className="text-xs font-bold text-green-700">{w.ws!.damage} {w.ws!.damageType}</span>
-                                <span className="text-xs text-green-600">{formatMod(atkBonus)} to hit</span>
+                                <span className="text-xs font-bold text-green-700">{w.ws!.damage}{(() => { const m = weaponDamageMod(effectiveChar, w.ws!, magicBonus(w.item.name)) + pw.bonus; return m ? ` ${formatMod(m)}` : '' })()}{pw.damageDice} {w.ws!.damageType}</span>
+                                <span className="text-xs text-green-600">{formatMod(atkBonus)}{pw.attackDice} to hit</span>
                               </div>
                             </div>
                           )
@@ -3784,8 +4472,8 @@ export default function Sheet() {
                           {mainHandWeapon ? (
                             (() => {
                               const w = mainHandWeapon
-                              const dmgMod = w.ws!.finesse ? Math.max(abilityModFor(char,'str'),abilityModFor(char,'dex')) : w.ws!.ranged ? abilityModFor(char,'dex') : abilityModFor(char,'str')
-                              const atkBonus = dmgMod + pb + magicBonus(w.item.name)
+                              const pw = potionWeaponMods(w.item.name)
+                              const atkBonus = weaponAttackBonus(effectiveChar, w.ws!, pb, magicBonus(w.item.name)) + pw.bonus
                               return (
                                 <div className="flex flex-col gap-1 rounded-lg border border-green-200 bg-green-50 px-3 py-2.5">
                                   <div className="flex items-center justify-between">
@@ -3795,8 +4483,8 @@ export default function Sheet() {
                                   </div>
                                   <span className="text-sm font-semibold text-green-900 truncate">{w.item.name}</span>
                                   <div className="flex items-center gap-3 mt-0.5">
-                                    <span className="text-xs font-bold text-green-700">{w.ws!.damage} {w.ws!.damageType}</span>
-                                    <span className="text-xs text-green-600">{formatMod(atkBonus)} to hit</span>
+                                    <span className="text-xs font-bold text-green-700">{w.ws!.damage}{(() => { const m = weaponDamageMod(effectiveChar, w.ws!, magicBonus(w.item.name)) + pw.bonus; return m ? ` ${formatMod(m)}` : '' })()}{pw.damageDice} {w.ws!.damageType}</span>
+                                    <span className="text-xs text-green-600">{formatMod(atkBonus)}{pw.attackDice} to hit</span>
                                   </div>
                                 </div>
                               )
@@ -3823,8 +4511,8 @@ export default function Sheet() {
                           {offHandWeapon ? (
                             (() => {
                               const w = offHandWeapon
-                              const dmgMod = w.ws!.finesse ? Math.max(abilityModFor(char,'str'),abilityModFor(char,'dex')) : w.ws!.ranged ? abilityModFor(char,'dex') : abilityModFor(char,'str')
-                              const atkBonus = dmgMod + pb + magicBonus(w.item.name)
+                              const pw = potionWeaponMods(w.item.name)
+                              const atkBonus = weaponAttackBonus(effectiveChar, w.ws!, pb, magicBonus(w.item.name)) + pw.bonus
                               return (
                                 <div className="flex flex-col gap-1 rounded-lg border border-green-200 bg-green-50 px-3 py-2.5">
                                   <div className="flex items-center justify-between">
@@ -3834,8 +4522,8 @@ export default function Sheet() {
                                   </div>
                                   <span className="text-sm font-semibold text-green-900 truncate">{w.item.name}</span>
                                   <div className="flex items-center gap-3 mt-0.5">
-                                    <span className="text-xs font-bold text-green-700">{w.ws!.damage} {w.ws!.damageType}</span>
-                                    <span className="text-xs text-green-600">{formatMod(atkBonus)} to hit</span>
+                                    <span className="text-xs font-bold text-green-700">{w.ws!.damage}{(() => { const m = weaponDamageMod(effectiveChar, w.ws!, magicBonus(w.item.name)) + pw.bonus; return m ? ` ${formatMod(m)}` : '' })()}{pw.damageDice} {w.ws!.damageType}</span>
+                                    <span className="text-xs text-green-600">{formatMod(atkBonus)}{pw.attackDice} to hit</span>
                                   </div>
                                 </div>
                               )
@@ -3901,8 +4589,8 @@ export default function Sheet() {
                       const twfSource = offHandWeapon ?? dualWieldWeapon!
                       const offWs = twfSource.ws!
                       const offMod = offWs.finesse
-                        ? Math.max(abilityModFor(char, 'str'), abilityModFor(char, 'dex'))
-                        : abilityModFor(char, 'str')
+                        ? Math.max(abilityModFor(effectiveChar, 'str'), abilityModFor(effectiveChar, 'dex'))
+                        : abilityModFor(effectiveChar, 'str')
                       const offDmgMod = offMod < 0 ? offMod : 0
                       const hasTWFStyle = char.featuresChosen.some(fc => fc.value === 'two-weapon-fighting')
                       const effectiveMod = hasTWFStyle ? offMod : offDmgMod
@@ -4063,8 +4751,8 @@ export default function Sheet() {
                                             {!addPanelSearch && <div className={`text-xs font-semibold uppercase mb-1 ${section.isMagic ? 'text-violet-500' : 'text-parchment-400'}`}>{section.label}</div>}
                                             <div className="grid grid-cols-2 gap-1">
                                               {items.map(a => {
-                                                const dex = abilityModFor(char, 'dex')
-                                                const calcAC = a.type === 'light' ? a.acBase + dex : a.type === 'medium' ? a.acBase + Math.min(dex,2) : a.acBase
+                                                const dex = abilityModFor(effectiveChar, 'dex')
+                                                const calcAC = a.type === 'light' ? a.acBase + dex : a.type === 'medium' ? a.acBase + Math.min(dex, mediumDexCap) : a.acBase
                                                 const baseName = a.label?.replace(/ \(.*\)$/, '') ?? a.slug
                                                 const acLabel = a.type === 'shield' ? `+${a.acBase} AC` : `AC ${calcAC}`
                                                 return (
@@ -4097,12 +4785,12 @@ export default function Sheet() {
                               <div className="space-y-2">
                                 {grouped.armor.map(({ item, idx }) => {
                                   const as_ = resolveArmor(item, content.items)!
-                                  const dex = abilityModFor(char, 'dex')
+                                  const dex = abilityModFor(effectiveChar, 'dex')
                                   const mb = magicBonus(item.name)
-                                  const calcAC = as_.type === 'shield' ? `+${as_.acBase + mb} AC` : as_.type === 'light' ? `AC ${as_.acBase + dex + mb}` : as_.type === 'medium' ? `AC ${as_.acBase + Math.min(dex,2) + mb}` : `AC ${as_.acBase + mb}`
+                                  const calcAC = as_.type === 'shield' ? `+${as_.acBase + mb} AC` : as_.type === 'light' ? `AC ${as_.acBase + dex + mb}` : as_.type === 'medium' ? `AC ${as_.acBase + Math.min(dex, mediumDexCap) + mb}` : `AC ${as_.acBase + mb}`
                                   const warnings: string[] = []
                                   if (as_.type !== 'shield' && !isArmorProficient(char, as_)) warnings.push('Not proficient')
-                                  if (as_.minStrength && char.abilityScores.str < as_.minStrength) warnings.push(`STR ${as_.minStrength} req.`)
+                                  if (as_.minStrength && effectiveChar.abilityScores.str < as_.minStrength) warnings.push(`STR ${as_.minStrength} req.`)
                                   const def = content.items.find(i => i.slug === item.itemSlug && i.name)
                                   const descParts = [warnings.length ? `⚠ ${warnings.join(' · ')}` : null, def?.description || null, item.notes || null].filter(Boolean)
                                   return itemRow({ item, idx, badge: calcAC, badgeColor: 'bg-blue-100 text-blue-700', descriptionText: descParts.join('\n\n') || null })
@@ -4218,8 +4906,9 @@ export default function Sheet() {
                                 {grouped.weapon.map(({ item, idx }) => {
                                   const ws = resolveWeapon(item, content.items)!
                                   const bonus = magicBonus(item.name)
-                                  const dmgMod = weaponDamageMod(char, ws, bonus)
-                                  const dmgStr = ws.damage === '—' ? ws.damage : `${ws.damage}${dmgMod !== 0 ? formatMod(dmgMod) : ''} ${ws.damageType}`
+                                  const pw = potionWeaponMods(item.name)
+                                  const dmgMod = weaponDamageMod(effectiveChar, ws, bonus) + pw.bonus
+                                  const dmgStr = ws.damage === '—' ? ws.damage : `${ws.damage}${dmgMod !== 0 ? formatMod(dmgMod) : ''}${pw.damageDice} ${ws.damageType}`
                                   const badge = `${dmgStr}${ws.finesse ? ' · Finesse' : ''}${ws.ranged ? ' · Ranged' : ''}`
                                   return itemRow({ item, idx, badge, badgeColor: 'bg-green-100 text-green-700', descriptionText: item.notes || null })
                                 })}
@@ -4308,11 +4997,17 @@ export default function Sheet() {
                               {addPanel === 'add-potion' && magicPicker(it => it.type === 'Potion')}
                               <div className="mt-1 space-y-2">
                                 {grouped.potion.map(({ item, idx }) => {
-                                  const cd = CONSUMABLE_DATA[item.name]
                                   const def = content.items.find(i => i.slug === item.itemSlug && i.name)
                                   const rb = rarityBadge(def?.rarity)
-                                  const descParts = [cd?.text ?? def?.description ?? null, item.notes || null].filter(Boolean)
-                                  return itemRow({ item, idx, badge: cd?.badge ?? rb.badge, badgeColor: cd?.badgeColor ?? rb.badgeColor, descriptionText: descParts.join('\n\n') || null, consumable: !!cd, showAttune: def?.attunement })
+                                  // Every potion gets Drink, even one without curated data
+                                  const potion = def?.potion ?? { effect: rb.badge ?? 'Potion' }
+                                  const descParts = [def?.description || null, item.notes || null].filter(Boolean)
+                                  return itemRow({
+                                    item, idx, potion,
+                                    badge: potion.effect,
+                                    badgeColor: potion.healing ? 'bg-rose-100 text-rose-700' : 'bg-teal-100 text-teal-700',
+                                    descriptionText: descParts.join('\n\n') || null,
+                                  })
                                 })}
                               </div>
                             </div>
@@ -4374,6 +5069,85 @@ export default function Sheet() {
       {/* Features Tab */}
       {tab === 'features' && (
         <div className="flex flex-col gap-4">
+          {/* Class Expertise (Rogue 1/6, Bard 3/10) owed but never picked — e.g. a character made
+              above level 1, or levelled before the level-up wizard asked for it */}
+          {(() => {
+            const owed = char.classes.reduce((n, cc) => {
+              const o = CLASS_OPTIONS[cc.classSlug]
+              return n + (o?.expertiseAt ?? []).filter(l => l <= cc.level).length * (o?.expertiseCount ?? 2)
+            }, 0)
+            if (!owed) return null
+            const TOOLS_KEY = 'expertise-thieves-tools'
+            const featPicks = char.featuresChosen
+              .filter(f => f.key.startsWith('feat-expertise-'))
+              .flatMap(f => Array.isArray(f.value) ? f.value : [f.value]).length
+            const toolPicked = char.featuresChosen.some(f => f.key === TOOLS_KEY)
+            const missing = owed - (char.skillExpertise.length - featPicks + (toolPicked ? 1 : 0))
+            if (missing <= 0) return null
+            const canPickTools = char.classes.some(c => c.classSlug === 'rogue') && !toolPicked
+              && char.toolProficiencies.some(t => /thieves/i.test(t))
+            const pick = (skill: string) => patch({
+              skillExpertise: [...new Set([...char.skillExpertise, skill])],
+              // An official class pick, not a hand edit — record it in the skill baseline
+              skillBaseline: { proficiencies: [...skillBaseProf], expertise: [...new Set([...skillBaseExpert, skill])] },
+            })
+            return (
+              <div className="card border-amber-300 bg-amber-50">
+                <h3 className="font-bold text-amber-800 text-sm mb-1">Expertise</h3>
+                <p className="text-xs text-amber-700 mb-2">
+                  Choose {missing} more proficient skill{missing !== 1 ? 's' : ''} to double your proficiency bonus for.
+                </p>
+                <div className="flex flex-wrap gap-1">
+                  {SKILLS.filter(s => effectiveCharSkills.skillProficiencies.includes(s) && !char.skillExpertise.includes(s)).map(s => (
+                    <button key={s} type="button" onClick={() => pick(s)}
+                      className="text-xs bg-parchment-50 border border-amber-300 text-amber-800 rounded px-2 py-0.5 hover:bg-amber-100"
+                    >{SKILL_LABELS[s]}</button>
+                  ))}
+                  {canPickTools && (
+                    <button type="button" onClick={() => patch({ featuresChosen: [...char.featuresChosen, { key: TOOLS_KEY, value: 'thieves-tools' }] })}
+                      className="text-xs bg-parchment-50 border border-amber-300 text-amber-800 rounded px-2 py-0.5 hover:bg-amber-100"
+                    >Thieves' Tools</button>
+                  )}
+                </div>
+              </div>
+            )
+          })()}
+
+          {/* College of Lore (Bard 3): Bonus Proficiencies — three skills of your choice */}
+          {(() => {
+            const lore = char.classes.find(c => c.classSlug === 'bard' && c.subclassSlug === 'lore' && c.level >= 3)
+            if (!lore) return null
+            const KEY = 'lore-bonus-skills'
+            const fc = char.featuresChosen.find(f => f.key === KEY)
+            const chosen = fc ? (Array.isArray(fc.value) ? fc.value : [fc.value]) : []
+            if (chosen.length >= 3) return null
+            const pick = (skill: string) => {
+              const next = [...chosen, skill]
+              patch({
+                featuresChosen: [...char.featuresChosen.filter(f => f.key !== KEY), { key: KEY, value: next }],
+                skillProficiencies: [...new Set([...char.skillProficiencies, skill])],
+                // An official class pick, not a hand edit — record it in the skill baseline
+                skillBaseline: { proficiencies: [...new Set([...skillBaseProf, skill])], expertise: [...skillBaseExpert] },
+              })
+            }
+            return (
+              <div className="card border-amber-300 bg-amber-50">
+                <h3 className="font-bold text-amber-800 text-sm mb-1">College of Lore: Bonus Proficiencies</h3>
+                <p className="text-xs text-amber-700 mb-2">
+                  Choose {3 - chosen.length} more skill{3 - chosen.length !== 1 ? 's' : ''} to become proficient in
+                  {chosen.length > 0 && <> (chosen: {chosen.map(s => SKILL_LABELS[s as keyof typeof SKILL_LABELS] ?? s).join(', ')})</>}.
+                </p>
+                <div className="flex flex-wrap gap-1">
+                  {SKILLS.filter(s => !effectiveCharSkills.skillProficiencies.includes(s)).map(s => (
+                    <button key={s} type="button" onClick={() => pick(s)}
+                      className="text-xs bg-parchment-50 border border-amber-300 text-amber-800 rounded px-2 py-0.5 hover:bg-amber-100"
+                    >{SKILL_LABELS[s]}</button>
+                  ))}
+                </div>
+              </div>
+            )
+          })()}
+
           {/* Config warnings */}
           {(() => {
             const warnings: string[] = []
@@ -4457,7 +5231,9 @@ export default function Sheet() {
               }
 
               // Fighting style
-              const fightingStyleChoice = char.featuresChosen.find(fc => fc.key === 'fighting-style')
+              // Creator stores 'fighting-style'; level-ups store 'fighting-style-<class>'
+              const fightingStyleChoice = char.featuresChosen.find(fc => fc.key === `fighting-style-${cc.classSlug}`)
+                ?? (cc === char.classes[0] ? char.featuresChosen.find(fc => fc.key === 'fighting-style') : undefined)
               const fightingStyleValue = typeof fightingStyleChoice?.value === 'string' ? fightingStyleChoice.value : null
               const fightingStyleDef = opts?.fightingStyles?.find(fs => fs.slug === fightingStyleValue)
 
@@ -4797,7 +5573,7 @@ export default function Sheet() {
                         const maxCannons = artLevel >= 15 ? 2 : 1
                         const hasActiveCannon = cannonCount > 0
                         const atCannonCap = cannonCount >= maxCannons
-                        const intMod = abilityModFor(char, 'int')
+                        const intMod = abilityModFor(effectiveChar, 'int')
                         const dc = spellSaveDC(effectiveChar, 'artificer', content) + itemBonuses.spellDCBonus
                         const atkBonus = spellAttackBonus(effectiveChar, 'artificer', content) + itemBonuses.spellAttackBonus
                         const freeUsed = (char.classResources['cannon-free-used'] ?? 0) >= 1
@@ -4915,7 +5691,7 @@ export default function Sheet() {
                       (() => {
                         const druidLevel = cc.level
                         const spiritMaxHp = 5 * druidLevel
-                        const wisMod = abilityModFor(char, 'wis')
+                        const wisMod = abilityModFor(effectiveChar, 'wis')
                         const wisStr = wisMod >= 0 ? `+${wisMod}` : `${wisMod}`
                         const dc = spellSaveDC(effectiveChar, 'druid', content) + itemBonuses.spellDCBonus
                         const atkBonus = spellAttackBonus(effectiveChar, 'druid', content) + itemBonuses.spellAttackBonus
@@ -5111,7 +5887,7 @@ export default function Sheet() {
                 {/* Monk: Martial Arts + Ki summary */}
                 {cc.classSlug === 'monk' && (() => {
                   const maDie = `d${cc.level >= 17 ? 10 : cc.level >= 11 ? 8 : cc.level >= 5 ? 6 : 4}`
-                  const kiSaveDC = 8 + profBonus(char) + Math.max(0, abilityModFor(char, 'wis'))
+                  const kiSaveDC = 8 + profBonus(char) + Math.max(0, abilityModFor(effectiveChar, 'wis'))
                   return (
                     <div className="mb-3 p-3 rounded border border-amber-100 bg-amber-50">
                       <div className="font-medium text-sm text-amber-800 mb-2">Monk — Martial Arts</div>
@@ -5143,7 +5919,7 @@ export default function Sheet() {
                     <p className="text-xs text-amber-700">When you hit with Flurry of Blows: DEX save or <strong>prone</strong>, STR save or <strong>pushed 15ft</strong>, or <strong>can't take reactions</strong> until end of their next turn (your choice).</p>
                     {cc.level >= 6 && <p className="text-xs text-amber-600 mt-1"><strong>Wholeness of Body</strong> (1/LR): heal yourself for 3× Monk level HP as an action.</p>}
                     {cc.level >= 11 && <p className="text-xs text-amber-600 mt-1"><strong>Tranquility</strong>: cast Sanctuary on yourself at end of each rest (lasts until you attack or cast a spell).</p>}
-                    {cc.level >= 17 && <p className="text-xs text-amber-600 mt-1"><strong>Quivering Palm</strong> (3 ki): on unarmed hit, set harmonic vibrations. As an action (any time), force CON save DC {8 + profBonus(char) + Math.max(0, abilityModFor(char, 'wis'))} or drop to 0 HP (half on success).</p>}
+                    {cc.level >= 17 && <p className="text-xs text-amber-600 mt-1"><strong>Quivering Palm</strong> (3 ki): on unarmed hit, set harmonic vibrations. As an action (any time), force CON save DC {8 + profBonus(char) + Math.max(0, abilityModFor(effectiveChar, 'wis'))} or drop to 0 HP (half on success).</p>}
                   </div>
                 ))()}
 
@@ -5254,7 +6030,7 @@ export default function Sheet() {
                     <div className="font-medium text-sm text-red-800 mb-1">Path of the Berserker</div>
                     <p className="text-xs text-red-700"><strong>Frenzy:</strong> when you enter rage, choose to Frenzy — make one melee weapon attack as a bonus action each turn. <em>Costs 1 exhaustion level when rage ends.</em></p>
                     {cc.level >= 6 && <p className="text-xs text-red-600 mt-1"><strong>Mindless Rage:</strong> immune to charmed and frightened while raging.</p>}
-                    {cc.level >= 10 && <p className="text-xs text-red-600 mt-1"><strong>Intimidating Presence:</strong> action — frighten one creature within 30ft (WIS save DC {8 + profBonus(char) + Math.max(0, abilityModFor(char, 'cha'))}).</p>}
+                    {cc.level >= 10 && <p className="text-xs text-red-600 mt-1"><strong>Intimidating Presence:</strong> action — frighten one creature within 30ft (WIS save DC {8 + profBonus(char) + Math.max(0, abilityModFor(effectiveChar, 'cha'))}).</p>}
                     {cc.level >= 14 && <p className="text-xs text-red-600 mt-1"><strong>Retaliation:</strong> reaction to melee attack a creature within 5ft that damages you.</p>}
                   </div>
                 ))()}
@@ -5333,7 +6109,7 @@ export default function Sheet() {
 
                 {/* Druid: Circle of Stars */}
                 {cc.classSlug === 'druid' && cc.subclassSlug === 'stars' && (() => {
-                  const wisStr = Math.max(0, abilityModFor(char, 'wis')) > 0 ? `+${Math.max(0, abilityModFor(char, 'wis'))}` : ''
+                  const wisStr = Math.max(0, abilityModFor(effectiveChar, 'wis')) > 0 ? `+${Math.max(0, abilityModFor(effectiveChar, 'wis'))}` : ''
                   return (
                     <div className="mb-3 p-3 rounded border border-indigo-100 bg-indigo-50">
                       <div className="font-medium text-sm text-indigo-800 mb-1">Circle of Stars</div>
@@ -5361,7 +6137,7 @@ export default function Sheet() {
 
                 {/* Druid: Circle of Dreams */}
                 {cc.classSlug === 'druid' && cc.subclassSlug === 'dreams' && (() => {
-                  const wisMod = Math.max(0, abilityModFor(char, 'wis'))
+                  const wisMod = Math.max(0, abilityModFor(effectiveChar, 'wis'))
                   return (
                     <div className="mb-3 p-3 rounded border border-purple-100 bg-purple-50">
                       <div className="font-medium text-sm text-purple-800 mb-1">Circle of Dreams</div>
@@ -5698,7 +6474,7 @@ export default function Sheet() {
                   <button
                     type="button"
                     className="text-xs bg-parchment-700 text-parchment-100 hover:bg-parchment-800 rounded px-2 py-1 font-semibold transition-colors"
-                    onClick={() => { setAddFeatOpen(true); setAddFeatSearch('') }}
+                    onClick={() => { setAddFeatOpen(true); setAddFeatSearch(''); setAddFeatPending(null) }}
                   >+ Add Feat</button>
                 </div>
                 {featChoices.length === 0 && (
@@ -5807,6 +6583,11 @@ export default function Sheet() {
                                     patch({
                                       featuresChosen: [...updated, fc],
                                       skillExpertise: [...new Set([...char.skillExpertise, s])],
+                                      // A class expertise pick is official, not a hand edit — record it in the baseline
+                                      skillBaseline: {
+                                        proficiencies: [...skillBaseProf],
+                                        expertise: [...new Set([...skillBaseExpert, s])],
+                                      },
                                     })
                                   }}
                                 >
@@ -5837,7 +6618,7 @@ export default function Sheet() {
                 </div>
                 {(bg.skillProficiencies.length > 0 || bg.toolProficiencies.length > 0 || bg.languages > 0) && (
                   <div className="mt-2 flex gap-4 text-xs text-parchment-500">
-                    {bg.skillProficiencies.length > 0 && <span>Skills: {bg.skillProficiencies.join(', ')}</span>}
+                    {bg.skillProficiencies.length > 0 && <span>Skills: {bg.skillProficiencies.map(s => SKILL_LABELS[toSkillKey(s) as keyof typeof SKILL_LABELS] ?? s).join(', ')}</span>}
                     {bg.toolProficiencies.length > 0 && <span>Tools: {bg.toolProficiencies.join(', ')}</span>}
                     {bg.languages > 0 && <span>Languages: +{bg.languages} of your choice</span>}
                   </div>
@@ -6419,9 +7200,13 @@ export default function Sheet() {
               <li>• HP restored to {maxHp}</li>
               <li>• All spell slots restored</li>
               <li>• All class resources restored</li>
+              {char.exhaustionLevel > 0 && <li>• Exhaustion {char.exhaustionLevel} → {char.exhaustionLevel - 1}</li>}
+              {char.activePotions.some(p => p.minutes <= 480) && (
+                <li>• Potion effects end: {char.activePotions.filter(p => p.minutes <= 480).map(p => p.name).join(', ')}</li>
+              )}
               {(() => {
                 const totalHd = char.classes.reduce((s, c) => s + c.level, 0)
-                const hdRecover = Math.max(1, Math.ceil(totalHd / 2))
+                const hdRecover = Math.max(1, Math.floor(totalHd / 2))  // half, rounded down, at least 1 (PHB p.186)
                 const totalUsed = char.classes.reduce((s, cc) => s + ((char.hitDiceUsed ?? {})[cc.classSlug] ?? 0), 0)
                 const actual = Math.min(totalUsed, hdRecover)
                 return actual > 0 ? <li>• {actual} hit {actual === 1 ? 'die' : 'dice'} recovered</li> : null
@@ -6447,7 +7232,8 @@ export default function Sheet() {
                     if (max > 0) freshSlots[lvl] = { max, used: 0 }
                   }
                   const totalHd = char.classes.reduce((s, c) => s + c.level, 0)
-                  const hdRecover = Math.max(1, Math.ceil(totalHd / 2))
+                  const hdRecover = Math.max(1, Math.floor(totalHd / 2))  // half, rounded down, at least 1 (PHB p.186)
+                  // Recover up to half your hit dice, class by class — every class keeps its entry
                   const newHitDiceUsed: Record<string, number> = {}
                   let toRecover = hdRecover
                   for (const cc of char.classes) {
@@ -6455,14 +7241,17 @@ export default function Sheet() {
                     const recover = Math.min(used, toRecover)
                     newHitDiceUsed[cc.classSlug] = used - recover
                     toRecover -= recover
-                    if (toRecover <= 0) break
                   }
                   patch({
-                    hp: { ...char.hp, current: maxHp },
+                    hp: { ...char.hp, current: maxHp, temp: 0 },  // temporary HP don't last through a long rest
                     classResources: { ...char.classResources, ...resets, 'cannon-free-used': 0, 'breath-weapon-used': 0 },
                     spellSlots: freshSlots,
                     hitDiceUsed: newHitDiceUsed,
                     freeSpellUses: {},
+                    // A long rest (with food and drink) removes one level of exhaustion
+                    exhaustionLevel: Math.max(0, char.exhaustionLevel - 1),
+                    // …and takes 8 hours: effects of 8 hours or less run out
+                    ...potionsAfterRest(480),
                     pactSlots: char.pactSlots ? { ...char.pactSlots, used: 0 } : undefined,
                     equipment: char.equipment.map(e =>
                       e.rechargesOnLongRest && e.chargesMax !== undefined ? { ...e, charges: e.chargesMax } : e
@@ -6490,7 +7279,7 @@ export default function Sheet() {
                 const used = (char.hitDiceUsed ?? {})[cc.classSlug] ?? 0
                 const remaining = cc.level - used
                 const spent = shortRestDice[cc.classSlug] ?? 0
-                const conMod = abilityModFor(char, 'con')
+                const conMod = abilityModFor(effectiveChar, 'con')
                 const rawRoll = parseInt(shortRestRolls[cc.classSlug] ?? '', 10)
                 const rollValid = !isNaN(rawRoll) && rawRoll >= spent && rawRoll <= hd * spent
                 const heal = rollValid ? rawRoll + conMod * spent : null
@@ -6544,7 +7333,7 @@ export default function Sheet() {
 
             {/* Total recovery */}
             {(() => {
-              const conMod = abilityModFor(char, 'con')
+              const conMod = abilityModFor(effectiveChar, 'con')
               const totalHeal = char.classes.reduce((sum, cc) => {
                 const spent = shortRestDice[cc.classSlug] ?? 0
                 if (spent === 0) return sum
@@ -6564,16 +7353,23 @@ export default function Sheet() {
             <div className="flex gap-2 justify-end">
               <button className="btn btn-secondary text-sm" onClick={() => { setShortRestOpen(false); setShortRestDice({}); setShortRestRolls({}) }}>Cancel</button>
               <button
-                className="btn btn-primary text-sm"
+                className="btn btn-primary text-sm disabled:opacity-50"
+                // Dice marked as spent need their roll entered, or they'd be used up for nothing
+                disabled={char.classes.some(cc => {
+                  const spent = shortRestDice[cc.classSlug] ?? 0
+                  const hd = CLASS_OPTIONS[cc.classSlug]?.hitDie ?? content.classes.find(c => c.slug === cc.classSlug)?.hitDie ?? 8
+                  const raw = parseInt(shortRestRolls[cc.classSlug] ?? '', 10)
+                  return spent > 0 && !(raw >= spent && raw <= hd * spent)
+                })}
                 onClick={() => {
-                  const conMod = abilityModFor(char, 'con')
-                  const totalHeal = char.classes.reduce((sum, cc) => {
+                  const conMod = abilityModFor(effectiveChar, 'con')
+                  const totalHeal = Math.max(0, char.classes.reduce((sum, cc) => {
                     const spent = shortRestDice[cc.classSlug] ?? 0
                     if (spent === 0) return sum
                     const raw = parseInt(shortRestRolls[cc.classSlug] ?? '', 10)
                     if (isNaN(raw)) return sum
                     return sum + raw + conMod * spent
-                  }, 0)
+                  }, 0))
                   const newHitDiceUsed: Record<string, number> = { ...(char.hitDiceUsed ?? {}) }
                   for (const [slug, spent] of Object.entries(shortRestDice)) {
                     if (spent > 0) newHitDiceUsed[slug] = (newHitDiceUsed[slug] ?? 0) + spent
@@ -6590,6 +7386,8 @@ export default function Sheet() {
                     hitDiceUsed: newHitDiceUsed,
                     classResources: { ...char.classResources, ...resets, 'breath-weapon-used': 0 },
                     ...(char.pactSlots ? { pactSlots: { ...char.pactSlots, used: 0 } } : {}),
+                    // A short rest takes an hour: effects of an hour or less run out
+                    ...potionsAfterRest(60),
                   })
                   setShortRestOpen(false)
                   setShortRestDice({})
@@ -6620,7 +7418,47 @@ export default function Sheet() {
                 onChange={e => setAddFeatSearch(e.target.value)}
               />
             </div>
-            <div className="overflow-y-auto flex-1 p-2">
+            {(() => {
+              // Half-feat or spell-granting feat chosen: its +1 and spell picks before adding it
+              const pending = content.feats.find(f => f.slug === addFeatPending)
+              if (!pending) return null
+              const pick = featAbilityPick(pending, addFeatAbility)
+              const confirmAdd = () => {
+                const key = `feat-manual-${Date.now()}`
+                const grantPatch = { spells: [...char.spells], freeSpellUses: { ...char.freeSpellUses } }
+                const resolved = addFeatClass ? withFeatClassChoice(pending, addFeatClass) : pending
+                for (const p of resolveFeatGrants(resolved, content.spells)) {
+                  const picks = addFeatGrants[p.storageKey] ?? []
+                  if (picks.length > 0) applyGrantPicks(grantPatch, p, picks, pending)
+                }
+                patch({
+                  featuresChosen: [...char.featuresChosen, { key, value: pending.slug }],
+                  ...grantPatch,
+                  ...(pending.abilityScoreIncrease && addFeatApplyAsi ? applyFeatAbilityIncrease(char, pending, addFeatAbility) : {}),
+                })
+                setAddFeatPending(null); setAddFeatAbility(''); setAddFeatOpen(false)
+              }
+              return (
+                <div className="p-3 bg-parchment-50 overflow-y-auto flex-1 min-h-0">
+                  {pending.abilityScoreIncrease && (
+                    <>
+                      <FeatAbilityPicker feat={pending} scores={char.abilityScores} value={addFeatAbility} onChange={setAddFeatAbility} />
+                      <label className="flex items-center gap-2 text-xs text-parchment-600 mt-2 cursor-pointer">
+                        <input type="checkbox" checked={addFeatApplyAsi} onChange={e => setAddFeatApplyAsi(e.target.checked)} />
+                        Apply the +1 now (untick if you already raised the score yourself)
+                      </label>
+                    </>
+                  )}
+                  <FeatGrantsBlock feat={pending} spells={content.spells} classChoice={addFeatClass} setClassChoice={setAddFeatClass}
+                    picks={addFeatGrants} setPicks={setAddFeatGrants} />
+                  <div className="flex justify-end gap-2 mt-3">
+                    <button type="button" className="btn-secondary text-sm" onClick={() => { setAddFeatPending(null); setAddFeatAbility('') }}>Back</button>
+                    <button type="button" className="btn-primary text-sm disabled:opacity-50" disabled={!!pending.abilityScoreIncrease && addFeatApplyAsi && !pick} onClick={confirmAdd}>Add {pending.name}</button>
+                  </div>
+                </div>
+              )
+            })()}
+            {!addFeatPending && <div className="overflow-y-auto flex-1 p-2">
               {content.feats
                 .filter(f => {
                   if (addFeatSearch && !f.name.toLowerCase().includes(addFeatSearch.toLowerCase())) return false
@@ -6644,6 +7482,11 @@ export default function Sheet() {
                       }`}
                       onClick={() => {
                         if (alreadyHas) return
+                        if (f.abilityScoreIncrease || f.grantsSpells) {
+                          setAddFeatPending(f.slug); setAddFeatAbility(''); setAddFeatApplyAsi(true)
+                          setAddFeatClass(''); setAddFeatGrants({})
+                          return
+                        }
                         const key = `feat-manual-${Date.now()}`
                         patch({ featuresChosen: [...char.featuresChosen, { key, value: f.slug }] })
                         setAddFeatOpen(false)
@@ -6662,7 +7505,7 @@ export default function Sheet() {
                     </button>
                   )
                 })}
-            </div>
+            </div>}
           </div>
         </div>
       )}

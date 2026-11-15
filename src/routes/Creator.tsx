@@ -1,21 +1,38 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useContent } from '../content/ContentProvider'
 import { newCharacter, touchUpdated } from '../character/create'
+import { applySubclassProficiencies } from '../character/levelUp'
 import { saveCharacterToDisk } from '../storage/charApi'
 import { Character, EquipmentItem, SKILLS, SKILL_LABELS, AbilityScores, ABILITIES } from '../character/model'
-import { abilityMod } from '../character/derive'
+import { abilityMod, hpMax } from '../character/derive'
+import { sumFeatBonuses } from '../character/featBonuses'
 import { v4 as uuidv4 } from 'uuid'
-import { DRACONIC_ANCESTRIES, applyRaceAbilityBonuses, RaceCategory } from '../data/raceData'
-import { CLASS_OPTIONS, INITIAL_SPELL_SLOTS } from '../data/classData'
+import { DRACONIC_ANCESTRIES, RaceCategory, LANGUAGES_STANDARD, LANGUAGES_EXOTIC, splitRaceLanguages } from '../data/raceData'
+import { CLASS_OPTIONS, INITIAL_SPELL_SLOTS, PACT_SLOT_TABLE, FAVORED_ENEMY_TYPES, FAVORED_TERRAINS } from '../data/classData'
 import { STRIXHAVEN_COLLEGES } from '../data/strixhavenSpells'
-import { CLASS_STARTING_GEAR } from '../data/startingGear'
+import { CLASS_STARTING_GEAR, gearPickOptions, type GearItem, type GearPick } from '../data/startingGear'
 import { FeatPicker } from '../components/FeatPicker'
 import { FeatGrantsBlock } from '../components/FeatGrantsBlock'
 import { InlinePicker } from '../components/InlinePicker'
-import { resolveFeatGrants, applyGrantPicks, withFeatClassChoice } from '../character/grants'
+import { resolveFeatGrants, applyGrantPicks, withFeatClassChoice, featAbilityPick } from '../character/grants'
+import { FeatAbilityPicker } from '../components/FeatAbilityPicker'
 
 const STEPS = ['Race', 'Class', 'Background', 'Abilities', 'Skills', 'Equipment', 'Details', 'Review']
+
+const STYLE_AT_LEVEL_1 = new Set(['fighter'])
+const CLASS_SECRET_LANGUAGE: Record<string, string> = { druid: 'Druidic', rogue: "Thieves' Cant" }
+
+/** The skills a race lets the player pick: from a set list (Kenku Training) or any skill (Half-Elf's Skill Versatility). */
+function raceSkillChoicesFor(race: { skillChoices?: { count: number; from: string[] }; bonusSkills?: number } | undefined) {
+  if (race?.skillChoices) return race.skillChoices
+  return race?.bonusSkills ? { count: race.bonusSkills, from: [...SKILLS] as string[] } : undefined
+}
+
+/** What a class calls the subclass it picks at level 1. */
+function level1SubclassLabel(classSlug: string): string {
+  return ({ cleric: 'Divine Domain', sorcerer: 'Sorcerous Origin', warlock: 'Otherworldly Patron' } as Record<string, string>)[classSlug] ?? 'subclass'
+}
 
 const BG_ITEM_SKIP = [
   'or ', 'and ', 'but ', 'you ', 'your ', 'will ', 'people ', 'to ', 'these ',
@@ -34,15 +51,15 @@ function parseBgItems(raw: string[]): string[] {
     .filter(s => !s.includes('\n'))
     .map(s => s.replace(/Value:\s*[\d.]+\s*(?:gp|sp|cp|pp|lb)?\s*(?:Weight:\s*[\d.]+\s*(?:lbs?)?)?/gi, '').trim())
     .map(s => s.replace(/\s{2,}/g, ' ').trim())
+    // Item names, not sentence fragments: drop the leading article and capitalise
+    .map(s => s.replace(/^(?:an?|the)\s+/i, ''))
+    .map(s => s.charAt(0).toUpperCase() + s.slice(1))
     .filter(s => {
       if (s.length < 4) return false
       const lower = s.toLowerCase()
       return !BG_ITEM_SKIP.some(p => lower.startsWith(p))
     })
 }
-
-const LANGUAGES_STANDARD = ['Common', 'Dwarvish', 'Elvish', 'Giant', 'Gnomish', 'Goblin', 'Halfling', 'Orc']
-const LANGUAGES_EXOTIC = ['Abyssal', 'Celestial', 'Draconic', 'Deep Speech', 'Infernal', 'Primordial', 'Sylvan', 'Undercommon']
 
 const MUSICAL_INSTRUMENTS = ['Bagpipes', 'Drum', 'Dulcimer', 'Flute', 'Lute', 'Lyre', 'Horn', 'Pan flute', 'Shawm', 'Viol']
 const ARTISAN_TOOLS = [
@@ -55,14 +72,28 @@ const GAMING_SETS = ['Dice set', 'Dragonchess set', 'Playing card set', 'Three-D
 
 function bgToolOptions(choiceLabel: string): string[] {
   const lower = choiceLabel.toLowerCase()
-  const wantsInstrument = lower.includes('musical instrument')
-  const wantsArtisan = lower.includes('artisan')
-  const wantsGaming = lower.includes('gaming set') || lower.includes('gaming')
-  if (wantsArtisan) return ARTISAN_TOOLS
-  if (wantsInstrument && wantsGaming) return [...MUSICAL_INSTRUMENTS, ...GAMING_SETS]
-  if (wantsInstrument) return MUSICAL_INSTRUMENTS
-  if (wantsGaming) return GAMING_SETS
-  return [...ARTISAN_TOOLS, ...MUSICAL_INSTRUMENTS, ...GAMING_SETS]
+  // Union of every category the label mentions ("artisan's tools or a musical instrument")
+  const options = [
+    ...(lower.includes('artisan') ? ARTISAN_TOOLS : []),
+    ...(lower.includes('musical instrument') ? MUSICAL_INSTRUMENTS : []),
+    ...(lower.includes('gaming') ? GAMING_SETS : []),
+  ]
+  return options.length ? options : [...ARTISAN_TOOLS, ...MUSICAL_INSTRUMENTS, ...GAMING_SETS]
+}
+
+const COUNT_WORDS: Record<string, number> = { one: 1, two: 2, three: 3 }
+
+/** Split a class's scraped tool list into fixed tools and a "choose N" entry, e.g.
+ *  ["Thieves' tools", "One type of artisan's tools"] or ["Three musical instruments"]. */
+function classToolSplit(tools: string[]): { fixed: string[]; choice: { count: number; label: string; options: string[] } | null } {
+  const fixed: string[] = []
+  let choice: { count: number; label: string; options: string[] } | null = null
+  for (const t of tools) {
+    const count = COUNT_WORDS[t.trim().split(/\s+/)[0].toLowerCase()]
+    if (count) choice = { count, label: t, options: bgToolOptions(t) }
+    else fixed.push(t)
+  }
+  return { fixed, choice }
 }
 
 const STANDARD_ARRAY = [15, 14, 13, 12, 10, 8]
@@ -73,7 +104,8 @@ const ABILITY_LABELS: Record<string, string> = {
 
 export default function Creator() {
   const navigate = useNavigate()
-  const { races, classes, backgrounds, feats, spells, loading } = useContent()
+  const content = useContent()
+  const { races, classes, backgrounds, feats, spells, items, loading } = content
   const [step, setStep] = useState(0)
   const [char, setChar] = useState<Character>(() => newCharacter({ id: uuidv4() }))
   const [abilityMethod, setAbilityMethod] = useState<'standard' | 'pointbuy' | 'manual'>('standard')
@@ -88,6 +120,7 @@ export default function Creator() {
   const [variantFeat, setVariantFeat] = useState('')
   const [variantFeatGrants, setVariantFeatGrants] = useState<Record<string, string[]>>({})
   const [variantFeatClass, setVariantFeatClass] = useState('')
+  const [variantFeatAbility, setVariantFeatAbility] = useState('')  // half-feat +1 target
   const [selectedSubrace, setSelectedSubrace] = useState('')
   const [halfElfAbilities, setHalfElfAbilities] = useState<string[]>([])
   const [flexAbility, setFlexAbility] = useState('')
@@ -104,6 +137,8 @@ export default function Creator() {
   const [raceSkillChoices, setRaceSkillChoices] = useState<string[]>([])
   // Starting equipment choices: choiceGroupIndex → selected option label ('a'|'b'|'c')
   const [gearChoices, setGearChoices] = useState<Record<number, string>>({})
+  // "(your choice)" items: pick key (see gearPickSlots) → chosen item name
+  const [gearPicks, setGearPicks] = useState<Record<string, string>>({})
 
   // Background tool-of-choice state
   const [bgToolChoiceLabel, setBgToolChoiceLabel] = useState('')
@@ -113,6 +148,68 @@ export default function Creator() {
   const [fightingStyle, setFightingStyle] = useState('')
   const [selectedCantrips, setSelectedCantrips] = useState<string[]>([])
   const [selectedL1Spells, setSelectedL1Spells] = useState<string[]>([])
+  const [classToolPicks, setClassToolPicks] = useState<string[]>([])
+  const [subclass, setSubclass] = useState('')  // only for classes that choose one at level 1
+  const [favoredEnemy, setFavoredEnemy] = useState('')      // Ranger level 1
+  const [favoredTerrain, setFavoredTerrain] = useState('')  // Ranger level 1
+
+  // Ability scores are kept as pre-racial base values (standard array / point buy / manual)
+  // and combined with every racial bonus in one place. char.abilityScores mirrors the result.
+  const [baseScores, setBaseScores] = useState<AbilityScores>(() => newCharacter().abilityScores)
+
+  const racialBonuses = useMemo(() => {
+    const race = races.find(r => r.slug === char.raceSlug)
+    const out: Record<string, number> = {}
+    const add = (ability: string, n: number) => { if (ability) out[ability] = (out[ability] ?? 0) + n }
+    if (!race) return out
+    const isVariantHuman = !!race.hasVariant && humanVariant
+    if (!isVariantHuman) for (const [k, v] of Object.entries(race.abilityBonuses ?? {})) add(k, v ?? 0)
+    const subrace = race.subraces?.find(s => s.slug === selectedSubrace)
+    for (const [k, v] of Object.entries(subrace?.abilityBonuses ?? {})) add(k, v ?? 0)
+    if (isVariantHuman) {
+      add(variantAbility1, 1)
+      if (variantAbility2 !== variantAbility1) add(variantAbility2, 1)
+    }
+    if (char.raceSlug === 'half-elf') {
+      halfElfAbilities.forEach(a => add(a, 1))
+    } else if (!race.hasVariant && race.chooseAbilityBonuses) {
+      if (race.chooseAbilityBonuses >= 2) {
+        add(flexAbility, 2)
+        if (flexAbility2 !== flexAbility) add(flexAbility2, 1)
+      } else {
+        add(flexAbility, 1)
+      }
+    }
+    return out
+  }, [races, char.raceSlug, selectedSubrace, humanVariant, variantAbility1, variantAbility2, halfElfAbilities, flexAbility, flexAbility2])
+
+  const scoresBeforeFeat = useMemo(() => {
+    const scores = { ...baseScores } as Record<string, number>
+    for (const a of ABILITIES) scores[a] = Math.min(20, baseScores[a] + (racialBonuses[a] ?? 0))
+    return scores as AbilityScores
+  }, [baseScores, racialBonuses])
+
+  // Variant Human's bonus feat may be a half-feat (+1 to an ability)
+  const variantFeatDef = humanVariant ? feats.find(f => f.slug === variantFeat) : undefined
+  const variantFeatPick = featAbilityPick(variantFeatDef, variantFeatAbility)
+
+  const finalScores = useMemo(() => {
+    if (!variantFeatPick) return scoresBeforeFeat
+    const max = variantFeatDef?.abilityScoreIncrease?.max ?? 20
+    const ability = variantFeatPick as keyof AbilityScores
+    return { ...scoresBeforeFeat, [ability]: Math.min(max, scoresBeforeFeat[ability] + 1) }
+  }, [scoresBeforeFeat, variantFeatPick, variantFeatDef])
+
+  useEffect(() => {
+    setChar(prev => ({ ...prev, abilityScores: finalScores }))
+  }, [finalScores])
+
+  function changeAbilityMethod(m: 'standard' | 'pointbuy' | 'manual') {
+    setAbilityMethod(m)
+    setStandardAssigned({})
+    if (m === 'pointbuy') setBaseScores({ str: 8, dex: 8, con: 8, int: 8, wis: 8, cha: 8 })
+    else if (m === 'standard') setBaseScores(newCharacter().abilityScores)
+  }
 
   function update(patch: Partial<Character>) {
     setChar(prev => ({ ...prev, ...patch }))
@@ -127,18 +224,69 @@ export default function Creator() {
       if (opts?.hasVariant && humanVariant) {
         if (!variantAbility1 || !variantAbility2) errs.push('Choose two ability scores for +1 (Variant Human).')
         if (!variantSkill) errs.push('Choose a bonus skill (Variant Human).')
+        if (variantFeatDef?.abilityScoreIncrease && !variantFeatPick) errs.push(`Choose which ability ${variantFeatDef.name} increases.`)
       }
       if (char.raceSlug === 'half-elf' && halfElfAbilities.length < 2) errs.push('Choose 2 ability scores for +1 (Half-Elf).')
       if (char.raceSlug === 'dragonborn' && !dragonAncestry) errs.push('Choose a Draconic Ancestry.')
-      const raceSkillDef = opts?.skillChoices
+      const raceSkillDef = raceSkillChoicesFor(opts)
       if (raceSkillDef && raceSkillChoices.length < raceSkillDef.count) {
         errs.push(`Choose ${raceSkillDef.count} skill${raceSkillDef.count > 1 ? 's' : ''} from your race trait.`)
       }
     }
     if (step === 1 && char.classes.length === 0) errs.push('Select a class.')
+    if (step === 1 && char.classes.length > 0) {
+      const slug = char.classes[0].classSlug
+      const opts = CLASS_OPTIONS[slug]
+      const toolChoice = classToolSplit(classes.find(c => c.slug === slug)?.toolProficiencies ?? []).choice
+      if (toolChoice && classToolPicks.length < toolChoice.count) {
+        errs.push(`Choose ${toolChoice.count} tool proficienc${toolChoice.count === 1 ? 'y' : 'ies'} (${toolChoice.label}).`)
+      }
+      if (opts?.subclasses[0]?.level === 1 && !subclass) errs.push(`Choose your ${level1SubclassLabel(slug)}.`)
+      if (STYLE_AT_LEVEL_1.has(slug) && opts?.fightingStyles?.length && !fightingStyle) errs.push('Choose a fighting style.')
+      if (slug === 'ranger' && !favoredEnemy) errs.push('Choose a favored enemy.')
+      if (slug === 'ranger' && !favoredTerrain) errs.push('Choose a favored terrain.')
+      const onList = (lvl: number) => spells.filter(sp => sp.level === lvl && (sp.classLists ?? []).includes(slug)).length
+      const cantripsNeeded = Math.min(opts?.cantripsKnown ?? 0, onList(0))
+      if (selectedCantrips.length < cantripsNeeded) errs.push(`Choose ${cantripsNeeded} cantrips (${selectedCantrips.length} chosen).`)
+      const spellsNeeded = Math.min(opts?.spellsKnownAtL1 ?? 0, onList(1))
+      if (selectedL1Spells.length < spellsNeeded) errs.push(`Choose ${spellsNeeded} level 1 spells (${selectedL1Spells.length} chosen).`)
+    }
     if (step === 2 && !char.backgroundSlug) errs.push('Select a background.')
+    if (step === 2 && char.backgroundSlug && bgToolChoiceLabel && !bgToolChoice) errs.push('Choose the tool your background gives you.')
+    if (step === 4) {
+      const cls = classes.find(c => c.slug === char.classes[0]?.classSlug)
+      const locked = lockedSkills()
+      const chosen = char.skillProficiencies.filter(sk => !locked.has(sk)).length
+      const open = (cls?.skillChoices ?? []).filter(sk => !locked.has(sk)).length
+      const needed = Math.min(cls?.numSkillChoices ?? 0, open)
+      if (chosen < needed) errs.push(`Choose ${needed} class skills (${chosen} chosen).`)
+    }
+    if (step === 3 && abilityMethod === 'standard' && Object.keys(standardAssigned).length < ABILITIES.length) {
+      errs.push('Assign all six Standard Array values.')
+    }
+    if (step === 5) {
+      const missing = gearPickSlots().filter(p => !gearPicks[p.key]).length
+      if (missing) errs.push(`Choose ${missing} starting item${missing > 1 ? 's' : ''} marked “your choice”.`)
+    }
     if (step === 6 && !char.name.trim()) errs.push('Enter a character name.')
     return errs
+  }
+
+  /** Every "(your choice)" unit in the chosen starting gear, one per item of quantity. */
+  function gearPickSlots(): { key: string; pick: GearPick; name: string }[] {
+    const gear = CLASS_STARTING_GEAR[char.classes[0]?.classSlug ?? '']
+    if (!gear) return []
+    const out: { key: string; pick: GearPick; name: string }[] = []
+    const add = (prefix: string, list: GearItem[]) => list.forEach((it, ii) => {
+      if (it.pick) for (let n = 0; n < (it.quantity ?? 1); n++) out.push({ key: `${prefix}:${ii}:${n}`, pick: it.pick, name: it.name })
+    })
+    add('f', gear.fixed)
+    gear.choices.forEach((g, gi) => {
+      const label = gearChoices[gi] ?? 'a'
+      const opt = g.options.find(o => o.label === label) ?? g.options[0]
+      if (opt) add(`${gi}${opt.label}`, opt.items)
+    })
+    return out
   }
 
   function next() {
@@ -146,6 +294,13 @@ export default function Creator() {
     if (errs.length) { setErrors(errs); return }
     setErrors([])
     setStep(s => s + 1)
+  }
+
+  /** Skills the character has from their background and race rather than their class picks. */
+  function lockedSkills(): Set<string> {
+    const bg = backgrounds.find(b => b.slug === char.backgroundSlug)
+    const race = races.find(r => r.slug === char.raceSlug)
+    return new Set([...(bg?.skillProficiencies ?? []), ...(race?.grantedSkills ?? []), ...raceSkillChoices])
   }
 
   function back() {
@@ -168,32 +323,27 @@ export default function Creator() {
     setRaceSkillChoices([])
 
     const opts = races.find(r => r.slug === slug)
-    const baseScores = newCharacter().abilityScores
-
-    let newScores = baseScores
-    if (slug !== 'human' || !humanVariant) {
-      newScores = applyRaceAbilityBonuses(baseScores, opts, undefined)
-    }
-
     const autoSkills = opts?.grantedSkills ?? []
-    const cleanLangs = opts?.grantedLanguages ?? opts?.languages ?? []
+    // Skills the previous race gave (granted or picked) go away, unless the background also gives them
+    const prevRace = races.find(r => r.slug === char.raceSlug)
+    const bgSkills = backgrounds.find(b => b.slug === char.backgroundSlug)?.skillProficiencies ?? []
+    const dropped = new Set([...(prevRace?.grantedSkills ?? []), ...raceSkillChoices].filter(sk => !bgSkills.includes(sk)))
+    // Only the fixed languages; "one language of your choice" is picked on the Details step
+    const { fixed: raceLangs } = splitRaceLanguages(opts?.grantedLanguages)
+    const classLang = CLASS_SECRET_LANGUAGE[char.classes[0]?.classSlug ?? '']
     update({
       raceSlug: slug,
       subraceSlug: undefined,
-      abilityScores: newScores,
-      languages: [...new Set(cleanLangs)],
-      skillProficiencies: [...new Set([...char.skillProficiencies, ...autoSkills])],
+      languages: [...new Set([...raceLangs, ...(classLang ? [classLang] : [])])],
+      skillProficiencies: [...new Set([...char.skillProficiencies.filter(sk => !dropped.has(sk)), ...autoSkills])],
     })
-    setStandardAssigned({})
   }
 
   function selectSubrace(subraceSlug: string) {
     setSelectedSubrace(subraceSlug)
     // Check for high elf cantrip
     if (subraceSlug !== 'high-elf') setHighElfCantrip('')
-    const baseScores = newCharacter().abilityScores
-    const newScores = applyRaceAbilityBonuses(baseScores, races.find(r => r.slug === char.raceSlug), subraceSlug)
-    update({ subraceSlug, abilityScores: newScores })
+    update({ subraceSlug })
   }
 
   function selectClass(slug: string) {
@@ -202,15 +352,28 @@ export default function Creator() {
     setFightingStyle('')
     setSelectedCantrips([])
     setSelectedL1Spells([])
+    setClassToolPicks([])
+    setSubclass('')
+    setFavoredEnemy('')
+    setFavoredTerrain('')
+    setGearChoices({})
+    setGearPicks({})
     const initialSlots = INITIAL_SPELL_SLOTS[slug] ?? {}
-    const secretLangs: string[] = slug === 'druid' ? ['Druidic'] : slug === 'rogue' ? ["Thieves' Cant"] : []
+    const prevSlug = char.classes[0]?.classSlug
+    const secretLang = CLASS_SECRET_LANGUAGE[slug]
+    const prevSecret = prevSlug ? CLASS_SECRET_LANGUAGE[prevSlug] : undefined
+    // A different class has a different skill list — keep only background and race skills
+    const locked = lockedSkills()
     update({
       classes: [{ classSlug: slug, level: 1, hitDieRolls: [cls.hitDie] }],
       saveProficiencies: cls.saveProficiencies,
       armorProficiencies: cls.armorProficiencies,
       weaponProficiencies: cls.weaponProficiencies,
       spellSlots: initialSlots,
-      languages: [...new Set([...char.languages, ...secretLangs])],
+      // Warlocks cast from Pact Magic slots instead
+      pactSlots: slug === 'warlock' ? { level: PACT_SLOT_TABLE[0][0], max: PACT_SLOT_TABLE[0][1], used: 0 } : undefined,
+      languages: [...new Set([...char.languages.filter(l => l !== prevSecret), ...(secretLang ? [secretLang] : [])])],
+      ...(prevSlug && prevSlug !== slug ? { skillProficiencies: char.skillProficiencies.filter(sk => locked.has(sk)) } : {}),
     })
   }
 
@@ -222,10 +385,15 @@ export default function Creator() {
     const choiceTool = bg.toolProficiencies.find(isChoiceTool) ?? ''
     setBgToolChoiceLabel(choiceTool)
     setBgToolChoice('')
+    // Skills and tools from a previously selected background go away (race skills stay)
+    const prev = backgrounds.find(b => b.slug === char.backgroundSlug)
+    const raceSkills = new Set([...(races.find(r => r.slug === char.raceSlug)?.grantedSkills ?? []), ...raceSkillChoices])
+    const prevSkills = new Set((prev?.skillProficiencies ?? []).filter(sk => !raceSkills.has(sk)))
+    const prevTools = new Set(prev?.toolProficiencies ?? [])
     update({
       backgroundSlug: slug,
-      skillProficiencies: [...new Set([...char.skillProficiencies, ...bg.skillProficiencies])],
-      toolProficiencies: [...new Set([...char.toolProficiencies, ...concreteTools])],
+      skillProficiencies: [...new Set([...char.skillProficiencies.filter(sk => !prevSkills.has(sk)), ...bg.skillProficiencies])],
+      toolProficiencies: [...new Set([...char.toolProficiencies.filter(t => !prevTools.has(t)), ...concreteTools])],
     })
   }
 
@@ -250,7 +418,7 @@ export default function Creator() {
   }
 
   async function finish() {
-    let finalChar = { ...char }
+    let finalChar = { ...char, abilityScores: finalScores }
 
     // Apply race skill choices (Orc Primal Intuition, Kenku Training, etc.)
     if (raceSkillChoices.length > 0) {
@@ -259,45 +427,49 @@ export default function Creator() {
       finalChar.skillProficiencies = [...skills]
     }
 
-    // Apply variant human choices
+    // Apply variant human choices (its +1/+1 is already in finalScores)
     if (char.raceSlug === 'human' && humanVariant) {
-      const scores = { ...newCharacter().abilityScores } as Record<string, number>
-      if (variantAbility1) scores[variantAbility1] = (scores[variantAbility1] ?? 10) + 1
-      if (variantAbility2 && variantAbility2 !== variantAbility1) scores[variantAbility2] = (scores[variantAbility2] ?? 10) + 1
-      finalChar.abilityScores = scores as AbilityScores
       const skills = new Set(finalChar.skillProficiencies)
       if (variantSkill) skills.add(variantSkill)
       finalChar.skillProficiencies = [...skills]
       if (variantFeat) {
         finalChar.featuresChosen = [...finalChar.featuresChosen, { key: 'feat-l1', value: variantFeat }]
       }
-    }
-
-    // Apply half-elf +1/+1 ability choices
-    if (char.raceSlug === 'half-elf' && halfElfAbilities.length > 0) {
-      const scores = { ...finalChar.abilityScores } as Record<string, number>
-      halfElfAbilities.forEach(a => { scores[a] = Math.min(20, (scores[a] ?? 10) + 1) })
-      finalChar.abilityScores = scores as AbilityScores
-    }
-
-    // Apply flex ability score choices (Changeling, Kobold = +1; Dhampir, Hexblood etc. = +2/+1)
-    const chooseBonus = races.find(r => r.slug === char.raceSlug)?.chooseAbilityBonuses ?? 0
-    if (chooseBonus >= 2 && flexAbility) {
-      const scores = { ...finalChar.abilityScores } as Record<string, number>
-      scores[flexAbility] = Math.min(20, (scores[flexAbility] ?? 10) + 2)
-      if (flexAbility2 && flexAbility2 !== flexAbility) {
-        scores[flexAbility2] = Math.min(20, (scores[flexAbility2] ?? 10) + 1)
+      // Half-feat +1 is already in finalScores; Resilient also grants that ability's save
+      if (variantFeatPick && variantFeatDef?.grantsProficiencies?.saves) {
+        finalChar.saveProficiencies = [...new Set([...finalChar.saveProficiencies, variantFeatPick])]
       }
-      finalChar.abilityScores = scores as AbilityScores
-    } else if (chooseBonus === 1 && flexAbility) {
-      const scores = { ...finalChar.abilityScores } as Record<string, number>
-      scores[flexAbility] = Math.min(20, (scores[flexAbility] ?? 10) + 1)
-      finalChar.abilityScores = scores as AbilityScores
     }
 
     // Record dragonborn ancestry
     if (dragonAncestry) {
       finalChar.featuresChosen = [...finalChar.featuresChosen, { key: 'dragonborn-ancestry', value: dragonAncestry }]
+    }
+
+    // Class tool proficiencies (fixed ones + the player's picks)
+    const classTools = classToolSplit(classes.find(c => c.slug === finalChar.classes[0]?.classSlug)?.toolProficiencies ?? [])
+    finalChar.toolProficiencies = [...new Set([...finalChar.toolProficiencies, ...classTools.fixed, ...classToolPicks])]
+
+    // Subclass chosen at level 1 (Cleric, Sorcerer, Warlock) and the proficiencies it grants
+    if (subclass && finalChar.classes[0]) {
+      finalChar.classes = [{ ...finalChar.classes[0], subclassSlug: subclass }]
+      finalChar = applySubclassProficiencies(finalChar, finalChar.classes[0].classSlug, subclass)
+    }
+
+    // Weapon, armor and tool training from the race and subrace (Dwarven Combat Training, …)
+    {
+      const race = races.find(r => r.slug === finalChar.raceSlug)
+      const sub = race?.subraces?.find(sr => sr.slug === finalChar.subraceSlug)
+      const add = (have: string[], more: string[]) => [...new Set([...have, ...more])]
+      finalChar.weaponProficiencies = add(finalChar.weaponProficiencies, [...(race?.grantedWeapons ?? []), ...(sub?.grantedWeapons ?? [])])
+      finalChar.armorProficiencies = add(finalChar.armorProficiencies, [...(race?.grantedArmor ?? []), ...(sub?.grantedArmor ?? [])])
+      finalChar.toolProficiencies = add(finalChar.toolProficiencies, [...(race?.grantedTools ?? []), ...(sub?.grantedTools ?? [])].filter(t => !/\bchoice\b/i.test(t)))
+    }
+
+    // Ranger level 1: Favored Enemy and Natural Explorer (same keys the Level Up wizard uses)
+    if (finalChar.classes[0]?.classSlug === 'ranger') {
+      if (favoredEnemy) finalChar.featuresChosen = [...finalChar.featuresChosen, { key: 'favored-enemy-1', value: favoredEnemy }]
+      if (favoredTerrain) finalChar.featuresChosen = [...finalChar.featuresChosen, { key: 'favored-terrain-1', value: favoredTerrain }]
     }
 
     // Record fighting style
@@ -319,7 +491,8 @@ export default function Creator() {
     // Add known L1 spells
     const l1Entries = selectedL1Spells.map(slug => {
       const def = spells.find(s => s.slug === slug)
-      return { spellSlug: slug, name: def?.name ?? slug, classSlug, prepared: false, isHomebrew: false }
+      // Known casters always have their spells ready; a wizard's start unprepared in the spellbook
+      return { spellSlug: slug, name: def?.name ?? slug, classSlug, prepared: !CLASS_OPTIONS[classSlug]?.preparedCaster, isHomebrew: false }
     })
 
     finalChar.spells = [...cantripEntries, ...l1Entries]
@@ -347,25 +520,29 @@ export default function Creator() {
         itemSlug: slug ?? `start-${name.toLowerCase().replace(/[^a-z0-9]/g, '-')}`,
         name, quantity: qty, equipped: false, attuned: false, isHomebrew: false, notes,
       })
-      for (const item of gear.fixed) {
-        toAdd.push(makeItem(item.name, item.slug, item.quantity ?? 1, item.notes ?? ''))
+      // A "(your choice)" item becomes what the player picked, one per unit of quantity
+      const addGear = (item: GearItem, key: string) => {
+        if (!item.pick) { toAdd.push(makeItem(item.name, item.slug, item.quantity ?? 1, item.notes ?? '')); return }
+        for (let n = 0; n < (item.quantity ?? 1); n++) {
+          const chosen = gearPickOptions(item.pick).find(o => o.name === gearPicks[`${key}:${n}`])
+          toAdd.push(chosen ? makeItem(chosen.name, chosen.slug, 1, '') : makeItem(item.name, item.slug, 1, item.notes ?? ''))
+        }
       }
+      gear.fixed.forEach((item, ii) => addGear(item, `f:${ii}`))
       for (let gi = 0; gi < gear.choices.length; gi++) {
         const label = gearChoices[gi] ?? 'a'
         const opt = gear.choices[gi].options.find(o => o.label === label) ?? gear.choices[gi].options[0]
-        if (opt) {
-          for (const item of opt.items) {
-            toAdd.push(makeItem(item.name, item.slug, item.quantity ?? 1, item.notes ?? ''))
-          }
-        }
+        if (opt) opt.items.forEach((item, ii) => addGear(item, `${gi}${opt.label}:${ii}`))
       }
+      // The same item twice (two shortswords) is one stack
       const existingNames = new Set(finalChar.equipment.map(e => e.name))
+      const merged: EquipmentItem[] = []
       for (const item of toAdd) {
-        if (!existingNames.has(item.name)) {
-          finalChar.equipment = [...finalChar.equipment, item]
-          existingNames.add(item.name)
-        }
+        const same = merged.find(m => m.name === item.name)
+        if (same) same.quantity += item.quantity
+        else if (!existingNames.has(item.name)) merged.push(item)
       }
+      finalChar.equipment = [...finalChar.equipment, ...merged]
     }
 
     // Apply background starting equipment and gold
@@ -388,16 +565,73 @@ export default function Creator() {
       // Apply tool-of-choice selection
       if (bgToolChoice) {
         finalChar.toolProficiencies = [...new Set([...finalChar.toolProficiencies, bgToolChoice])]
+        // "A set of artisan's tools (one of your choice)" is the tool just picked
+        const kind = ARTISAN_TOOLS.includes(bgToolChoice) ? /artisan/i
+          : MUSICAL_INSTRUMENTS.includes(bgToolChoice) ? /instrument/i
+          : GAMING_SETS.includes(bgToolChoice) ? /gaming set/i : null
+        const at = kind ? finalChar.equipment.findIndex(e => e.itemSlug.startsWith('bg-') && kind.test(e.name) && /your choice/i.test(e.name)) : -1
+        if (at >= 0) {
+          finalChar.equipment = finalChar.equipment.map((e, i) => i === at
+            ? { ...e, name: bgToolChoice, itemSlug: `bg-${bgToolChoice.toLowerCase().replace(/[^a-z0-9]/g, '-')}` }
+            : e)
+        }
       }
+    }
+
+    // Start wearing the best armor and shield the character can use, weapon in hand
+    {
+      const has = (kind: string) => finalChar.armorProficiencies.some(p => p.toLowerCase().startsWith(kind))
+      const canWear = (t: string) => t === 'shield' ? has('shield')
+        : has('all') || has('heavy') || (t !== 'heavy' && has('medium')) || (t === 'light' && has('light'))
+      const statsOf = (e: EquipmentItem) => items.find(i => i.slug === e.itemSlug)
+      const dex = abilityMod(finalChar.abilityScores.dex)
+      const acOf = (a: { acBase: number; type: string }) => a.acBase + (a.type === 'light' ? dex : a.type === 'medium' ? Math.min(dex, 2) : 0)
+      let armorAt = -1, armorAc = 0, shieldAt = -1, weaponAt = -1, weaponAvg = 0
+      finalChar.equipment.forEach((e, i) => {
+        const a = statsOf(e)?.armorStats
+        if (a && canWear(a.type)) {
+          if (a.type === 'shield') { if (shieldAt < 0) shieldAt = i }
+          else if (acOf(a) > armorAc) { armorAt = i; armorAc = acOf(a) }
+        }
+      })
+      // Best melee weapon that fits beside the shield (average damage die)
+      finalChar.equipment.forEach((e, i) => {
+        const w = statsOf(e)?.weaponStats
+        if (!w || w.ranged || (w.twoHanded && shieldAt >= 0)) return
+        const m = /^(\d+)d(\d+)$/.exec(w.damage)
+        const avg = m ? Number(m[1]) * (Number(m[2]) + 1) / 2 : 0
+        if (avg > weaponAvg) { weaponAt = i; weaponAvg = avg }
+      })
+      // Natural armor (Tortle, Lizardfolk) can beat the armor on offer
+      const natural = races.find(r => r.slug === finalChar.raceSlug)?.naturalArmor
+      const naturalBetter = !!natural && (natural.addDex ? natural.base + dex : natural.base) >= armorAc
+      finalChar.equipment = finalChar.equipment.map((e, i) => {
+        if (i === armorAt && !naturalBetter) return { ...e, equipped: true }
+        if (i === shieldAt) return { ...e, equipped: true, slot: 'off' as const }
+        if (i === weaponAt) return { ...e, equipped: true, slot: statsOf(e)?.weaponStats?.twoHanded ? 'both' as const : 'main' as const }
+        return e
+      })
     }
 
     // HP: first level always max hit die
     const cls = classes.find(c => c.slug === classSlug)
     if (cls && finalChar.classes.length > 0) {
-      finalChar.classes[0].hitDieRolls = [cls.hitDie]
-      const conMod = Math.floor((finalChar.abilityScores.con - 10) / 2)
-      finalChar.hp = { current: cls.hitDie + conMod, temp: 0 }
+      finalChar.classes = [{ ...finalChar.classes[0], hitDieRolls: [cls.hitDie] }]
+      // Start at full HP: hit die + CON, plus Hill Dwarf, Draconic Resilience and Tough
+      const featSlugs = finalChar.featuresChosen.filter(f => f.key.startsWith('feat-') && typeof f.value === 'string').map(f => f.value as string)
+      finalChar.hp = { current: hpMax(finalChar, content) + sumFeatBonuses(featSlugs, feats).hpBonusPerLevel, temp: 0 }
     }
+
+    // The same tool from two sources ("thieves' tools" + "Thieves' tools") is listed once
+    const seenTools = new Set<string>()
+    finalChar.toolProficiencies = finalChar.toolProficiencies.filter(t => {
+      const k = t.toLowerCase()
+      if (seenTools.has(k)) return false
+      seenTools.add(k)
+      return true
+    })
+
+    finalChar.skillBaseline = { proficiencies: [...finalChar.skillProficiencies], expertise: [...finalChar.skillExpertise] }
 
     const final = touchUpdated(finalChar)
     await saveCharacterToDisk(final)
@@ -407,6 +641,7 @@ export default function Creator() {
   if (loading) return <div className="text-center py-20 text-parchment-500">Loading content...</div>
 
   const raceOpts = races.find(r => r.slug === char.raceSlug)
+  const raceSkillDef = raceSkillChoicesFor(raceOpts)
   const currentClassSlug = char.classes[0]?.classSlug ?? ''
   const currentClass = classes.find(c => c.slug === currentClassSlug)
   const classOpts = CLASS_OPTIONS[currentClassSlug]
@@ -422,7 +657,7 @@ export default function Creator() {
       {/* Progress bar */}
       <div className="flex gap-1 mb-8">
         {STEPS.map((s, i) => (
-          <div key={s} className={`flex-1 h-1.5 rounded-full ${i <= step ? 'bg-parchment-600' : 'bg-parchment-200'}`} />
+          <div key={s} className={`flex-1 h-1.5 rounded-full ${i <= step ? 'bg-[rgb(var(--accent))]' : 'bg-parchment-200'}`} />
         ))}
       </div>
       <h1 className="text-2xl font-bold text-parchment-800 mb-1">{STEPS[step]}</h1>
@@ -571,6 +806,7 @@ export default function Creator() {
                             setVariantFeat(slug)
                             setVariantFeatGrants({})
                             setVariantFeatClass('')
+                            setVariantFeatAbility('')
                           }}
                           maxHeightClass="max-h-72"
                         />
@@ -578,14 +814,17 @@ export default function Creator() {
                           const featDef = feats.find(f => f.slug === variantFeat)
                           if (!featDef) return null
                           return (
-                            <FeatGrantsBlock
-                              feat={featDef}
-                              spells={spells}
-                              classChoice={variantFeatClass}
-                              setClassChoice={setVariantFeatClass}
-                              picks={variantFeatGrants}
-                              setPicks={setVariantFeatGrants}
-                            />
+                            <>
+                              <FeatAbilityPicker feat={featDef} scores={scoresBeforeFeat} value={variantFeatAbility} onChange={setVariantFeatAbility} />
+                              <FeatGrantsBlock
+                                feat={featDef}
+                                spells={spells}
+                                classChoice={variantFeatClass}
+                                setClassChoice={setVariantFeatClass}
+                                picks={variantFeatGrants}
+                                setPicks={setVariantFeatGrants}
+                              />
+                            </>
                           )
                         })()}
                       </div>
@@ -595,16 +834,16 @@ export default function Creator() {
               )}
 
               {/* Race skill choices (Kenku Training, Orc Primal Intuition, etc.) */}
-              {raceOpts?.skillChoices && (
+              {raceSkillDef && (
                 <div className="card border-parchment-400">
                   <h3 className="font-bold mb-1">
-                    Race Skill Proficiencies — Choose {raceOpts.skillChoices.count}
+                    Race Skill Proficiencies — Choose {raceSkillDef.count}
                   </h3>
-                  <p className="text-xs text-parchment-500 mb-3">{raceSkillChoices.length}/{raceOpts.skillChoices.count} selected</p>
+                  <p className="text-xs text-parchment-500 mb-3">{raceSkillChoices.length}/{raceSkillDef.count} selected</p>
                   <div className="grid grid-cols-2 gap-1">
-                    {raceOpts.skillChoices.from.map(s => {
+                    {raceSkillDef.from.map(s => {
                       const selected = raceSkillChoices.includes(s)
-                      const atMax = raceSkillChoices.length >= raceOpts.skillChoices!.count
+                      const atMax = raceSkillChoices.length >= raceSkillDef.count
                       return (
                         <label
                           key={s}
@@ -619,7 +858,7 @@ export default function Creator() {
                             onChange={() => {
                               const next = selected
                                 ? raceSkillChoices.filter(x => x !== s)
-                                : raceSkillChoices.length < raceOpts.skillChoices!.count
+                                : raceSkillChoices.length < raceSkillDef.count
                                   ? [...raceSkillChoices, s]
                                   : raceSkillChoices
                               setRaceSkillChoices(next)
@@ -852,8 +1091,79 @@ export default function Creator() {
                 </div>
               )}
 
-              {/* Fighting Style */}
-              {classOpts?.fightingStyles && (
+              {/* Tool proficiencies from the class */}
+              {(() => {
+                const { fixed, choice } = classToolSplit(currentClass?.toolProficiencies ?? [])
+                if (!fixed.length && !choice) return null
+                return (
+                  <div className="card border-parchment-400">
+                    <h3 className="font-bold mb-2">Tool Proficiencies</h3>
+                    {fixed.length > 0 && <p className="text-sm text-parchment-600 mb-2">You're proficient with: <strong>{fixed.join(', ')}</strong></p>}
+                    {choice && (
+                      <>
+                        <p className="text-sm text-parchment-500 mb-2">{choice.label}: choose {choice.count} ({classToolPicks.length}/{choice.count})</p>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                          {choice.options.map(tool => {
+                            const picked = classToolPicks.includes(tool)
+                            const full = classToolPicks.length >= choice.count
+                            return (
+                              <button key={tool} type="button" disabled={!picked && full}
+                                onClick={() => setClassToolPicks(prev => picked ? prev.filter(t => t !== tool) : [...prev, tool])}
+                                className={`text-left text-sm px-2 py-1 rounded border transition-colors disabled:opacity-40 ${picked ? 'border-parchment-600 bg-parchment-100 font-medium' : 'border-parchment-200 hover:border-parchment-400'}`}
+                              >{tool}</button>
+                            )
+                          })}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )
+              })()}
+
+              {/* Subclass chosen at level 1 (Divine Domain, Sorcerous Origin, Otherworldly Patron) */}
+              {classOpts?.subclasses[0]?.level === 1 && (
+                <div className="card border-parchment-400">
+                  <h3 className="font-bold mb-3">Choose your {level1SubclassLabel(currentClassSlug)}</h3>
+                  <div className="space-y-2">
+                    {classOpts.subclasses.map(sc => (
+                      <button
+                        key={sc.slug}
+                        onClick={() => setSubclass(sc.slug)}
+                        className={`w-full text-left p-3 rounded border transition-colors ${subclass === sc.slug ? 'border-parchment-600 bg-parchment-50' : 'border-parchment-200 hover:border-parchment-400'}`}
+                      >
+                        <div className="font-medium text-sm">{sc.name}</div>
+                        {sc.description && <div className="text-xs text-parchment-500">{sc.description}</div>}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Ranger level 1: Favored Enemy and Natural Explorer */}
+              {currentClassSlug === 'ranger' && (
+                <div className="card border-parchment-400">
+                  <h3 className="font-bold mb-3">Favored Enemy &amp; Natural Explorer</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="label">Favored enemy</label>
+                      <select className="input text-sm" value={favoredEnemy} onChange={e => setFavoredEnemy(e.target.value)}>
+                        <option value="">— choose a creature type —</option>
+                        {FAVORED_ENEMY_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="label">Favored terrain</label>
+                      <select className="input text-sm" value={favoredTerrain} onChange={e => setFavoredTerrain(e.target.value)}>
+                        <option value="">— choose a terrain —</option>
+                        {FAVORED_TERRAINS.map(t => <option key={t} value={t}>{t}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Fighting Style — Fighters pick at level 1; Paladins and Rangers pick at level 2 (Level Up) */}
+              {classOpts?.fightingStyles && STYLE_AT_LEVEL_1.has(currentClassSlug) && (
                 <div className="card border-parchment-400">
                   <h3 className="font-bold mb-3">Choose a Fighting Style</h3>
                   <div className="space-y-2">
@@ -926,7 +1236,7 @@ export default function Creator() {
               )}
 
               {/* Subclass preview */}
-              {classOpts?.subclasses && (
+              {classOpts?.subclasses && classOpts.subclasses[0]?.level !== 1 && (
                 <div className="card border-parchment-400">
                   <h3 className="font-bold mb-2">
                     Subclass at Level {classOpts.subclasses[0]?.level} — preview
@@ -988,7 +1298,7 @@ export default function Creator() {
               onChange={e => setBgToolChoice(e.target.value)}
             >
               <option value="">— choose a tool —</option>
-              {bgToolOptions(bgToolChoiceLabel).map(t => <option key={t} value={t}>{t}</option>)}
+              {bgToolOptions(bgToolChoiceLabel).filter(t => !classToolPicks.includes(t)).map(t => <option key={t} value={t}>{t}</option>)}
             </select>
           </div>
         ) : null
@@ -1045,7 +1355,7 @@ export default function Creator() {
             {(['standard', 'pointbuy', 'manual'] as const).map(m => (
               <button
                 key={m}
-                onClick={() => { setAbilityMethod(m); setStandardAssigned({}) }}
+                onClick={() => changeAbilityMethod(m)}
                 className={`btn ${abilityMethod === m ? 'btn-primary' : 'btn-secondary'} text-sm`}
               >
                 {m === 'standard' ? 'Standard Array' : m === 'pointbuy' ? 'Point Buy' : 'Manual'}
@@ -1053,24 +1363,11 @@ export default function Creator() {
             ))}
           </div>
 
-          {/* Race bonus preview */}
-          {char.raceSlug && (
-            <div className="mb-4 p-3 bg-parchment-50 rounded border border-parchment-200 text-sm text-parchment-600">
-              <strong>Race bonuses already applied:</strong>{' '}
-              {Object.entries(char.abilityScores).map(([k, v]) => {
-                const base = 10
-                const diff = v - base
-                return diff > 0 ? `+${diff} ${ABILITY_LABELS[k]}` : null
-              }).filter(Boolean).join(', ') || 'none yet'}
-            </div>
-          )}
-
           {abilityMethod === 'standard' && (
             <div>
               <p className="text-sm text-parchment-500 mb-4">Assign 15, 14, 13, 12, 10, 8 to each ability (before racial bonuses).</p>
               <div className="grid grid-cols-3 gap-3">
                 {ABILITIES.map(ability => {
-                  const used = Object.values(standardAssigned)
                   return (
                     <div key={ability}>
                       <label className="label">{ABILITY_LABELS[ability]}</label>
@@ -1079,12 +1376,11 @@ export default function Creator() {
                         value={standardAssigned[ability] ?? ''}
                         onChange={e => {
                           const val = parseInt(e.target.value, 10)
-                          const newAssigned = { ...standardAssigned, [ability]: val }
+                          const newAssigned = { ...standardAssigned }
+                          if (Number.isNaN(val)) delete newAssigned[ability]
+                          else newAssigned[ability] = val
                           setStandardAssigned(newAssigned)
-                          const raceBonus = raceOpts?.abilityBonuses?.[ability] ?? 0
-                          const subraceBonus = raceOpts?.subraces?.find(s => s.slug === selectedSubrace)?.abilityBonuses?.[ability] ?? 0
-                          const scores = { ...char.abilityScores, [ability]: val + raceBonus + subraceBonus }
-                          update({ abilityScores: scores as AbilityScores })
+                          setBaseScores(prev => ({ ...prev, [ability]: Number.isNaN(val) ? 10 : val }))
                         }}
                       >
                         <option value="">—</option>
@@ -1101,27 +1397,51 @@ export default function Creator() {
           )}
 
           {abilityMethod === 'manual' && (
-            <div className="grid grid-cols-3 gap-3">
-              {ABILITIES.map(ability => (
-                <div key={ability}>
-                  <label className="label">{ABILITY_LABELS[ability]}</label>
-                  <input
-                    type="number" min={1} max={30} className="input"
-                    value={char.abilityScores[ability]}
-                    onChange={e => {
-                      const scores = { ...char.abilityScores, [ability]: parseInt(e.target.value, 10) || 10 }
-                      update({ abilityScores: scores as AbilityScores })
-                    }}
-                  />
-                  <span className="text-xs text-parchment-400 ml-1">{abilityMod(char.abilityScores[ability]) >= 0 ? '+' : ''}{abilityMod(char.abilityScores[ability])}</span>
-                </div>
-              ))}
+            <div>
+              <p className="text-sm text-parchment-500 mb-4">Enter each score before racial bonuses (e.g. what you rolled).</p>
+              <div className="grid grid-cols-3 gap-3">
+                {ABILITIES.map(ability => (
+                  <div key={ability}>
+                    <label className="label">{ABILITY_LABELS[ability]}</label>
+                    <input
+                      type="number" min={1} max={30} className="input"
+                      value={baseScores[ability]}
+                      onChange={e => {
+                        const val = Math.max(1, Math.min(30, parseInt(e.target.value, 10) || 10))
+                        setBaseScores(prev => ({ ...prev, [ability]: val }))
+                      }}
+                    />
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
           {abilityMethod === 'pointbuy' && (
-            <PointBuyPanel scores={char.abilityScores} onChange={scores => update({ abilityScores: scores })} />
+            <PointBuyPanel scores={baseScores} onChange={setBaseScores} />
           )}
+
+          {/* Final scores: base + racial bonuses — exactly what the character will have */}
+          <div className="mt-6">
+            <div className="label">Final scores (with racial bonuses)</div>
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+              {ABILITIES.map(ability => {
+                const bonus = racialBonuses[ability] ?? 0
+                const final = finalScores[ability]
+                return (
+                  <div key={ability} className="stat-box">
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-parchment-500">{ability}</span>
+                    <span className="text-xl font-bold text-parchment-900">{final}</span>
+                    <span className="text-xs text-parchment-600">{abilityMod(final) >= 0 ? '+' : ''}{abilityMod(final)}</span>
+                    <span className="text-[10px] text-parchment-400 mt-0.5">
+                      {baseScores[ability]}{bonus ? ` ${bonus > 0 ? '+' : '−'} ${Math.abs(bonus)} race` : ''}{variantFeatPick === ability ? ' + 1 feat' : ''}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+            {!char.raceSlug && <p className="text-xs text-parchment-400 mt-2">Pick a race to see its bonuses applied.</p>}
+          </div>
         </div>
       )}
 
@@ -1150,7 +1470,7 @@ export default function Creator() {
             )}
             {classOpts?.expertiseAt?.includes(1) && (
               <div className="mb-4 p-3 bg-amber-50 border border-amber-300 rounded text-sm">
-                <strong>Expertise:</strong> As a {currentClass?.name}, you also gain Expertise in {classOpts.expertiseCount} proficient skills (double PB). Mark them on your character sheet after creation.
+                <strong>Expertise:</strong> As a {currentClass?.name}, you also gain Expertise in {classOpts.expertiseCount} proficient skills (double PB). Pick them on the sheet's Features tab after creation.
               </div>
             )}
             <div className="grid grid-cols-3 gap-2">
@@ -1159,7 +1479,7 @@ export default function Creator() {
                 const fromRace = raceGrants.has(skill) || raceChoicesSet.has(skill)
                 const isLocked = fromBg || fromRace
                 const inClassList = !currentClass || currentClass.skillChoices.includes(skill)
-                const checked = char.skillProficiencies.includes(skill)
+                const checked = char.skillProficiencies.includes(skill) || isLocked
                 const canToggleOn = inClassList && !isLocked && (!atLimit || checked)
                 const source = fromBg ? '🟦 BG' : fromRace ? '🟩 Race' : ''
                 return (
@@ -1253,6 +1573,28 @@ export default function Creator() {
                 </div>
               </div>
             ))}
+
+            {/* "(your choice)" items: which weapon or instrument */}
+            {gearPickSlots().length > 0 && (
+              <div className="mb-4 p-3 rounded border border-amber-200 bg-amber-50">
+                <div className="text-xs font-bold text-amber-800 uppercase tracking-wider mb-2">Your Choice</div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {gearPickSlots().map(slot => (
+                    <label key={slot.key} className="block">
+                      <span className="text-sm text-parchment-600">{slot.name.replace(' (your choice)', '')}</span>
+                      <select
+                        className="input text-sm"
+                        value={gearPicks[slot.key] ?? ''}
+                        onChange={e => setGearPicks(prev => ({ ...prev, [slot.key]: e.target.value }))}
+                      >
+                        <option value="">— choose —</option>
+                        {gearPickOptions(slot.pick).map(o => <option key={o.name} value={o.name}>{o.name}</option>)}
+                      </select>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )
       })()}
@@ -1300,10 +1642,18 @@ export default function Creator() {
             {(() => {
               const bgDef = backgrounds.find(b => b.slug === char.backgroundSlug)
               const bgLangCount = bgDef?.languages ?? 0
-              if (bgLangCount === 0) return null
+              const langRace = races.find(r => r.slug === char.raceSlug)
+              const raceLangCount = splitRaceLanguages(langRace?.grantedLanguages).choices
+                + (langRace?.subraces?.find(sr => sr.slug === char.subraceSlug)?.extraLanguages ?? 0)
+              const total = raceLangCount + bgLangCount
+              if (total === 0) return null
+              const sources = [
+                raceLangCount ? `${raceLangCount} from your race` : '',
+                bgLangCount ? `${bgLangCount} from your background` : '',
+              ].filter(Boolean).join(' and ')
               return (
                 <p className="text-xs text-parchment-500 mb-2 p-2 bg-parchment-50 rounded border border-parchment-200">
-                  Your background grants {bgLangCount} language choice{bgLangCount > 1 ? 's' : ''} — pick {bgLangCount > 1 ? 'them' : 'one'} below.
+                  Pick {total} language{total > 1 ? 's' : ''} of your choice below ({sources}).
                 </p>
               )
             })()}
@@ -1379,6 +1729,7 @@ export default function Creator() {
               {selectedSubrace ? ` (${raceOpts?.subraces?.find(s => s.slug === selectedSubrace)?.name})` : ''}
               {char.raceSlug === 'dragonborn' && dragonAncestry ? ` · ${DRACONIC_ANCESTRIES.find(a => a.slug === dragonAncestry)?.name} Dragon` : ''}
               {' · '}Level 1 {classes.find(c => c.slug === currentClassSlug)?.name ?? '—'}
+              {subclass ? ` (${classOpts?.subclasses.find(sc => sc.slug === subclass)?.name})` : ''}
               {' · '}{backgrounds.find(b => b.slug === char.backgroundSlug)?.name ?? '—'}
               {char.alignment ? ` · ${char.alignment}` : ''}
             </div>

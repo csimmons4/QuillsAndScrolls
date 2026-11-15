@@ -16,6 +16,33 @@ export interface SpellGrantPrompt {
   storageKey: string
 }
 
+/** The ability a half-feat's +1 goes to: the only option, or the player's pick if it's
+ *  valid. Undefined if the feat has no ASI or the player hasn't picked yet. (Every
+ *  half-feat in the data is `choose: 1`.) */
+export function featAbilityPick(feat: FeatDef | undefined, picked: string | undefined): string | undefined {
+  const asi = feat?.abilityScoreIncrease
+  if (!asi) return undefined
+  if (asi.from.length === 1) return asi.from[0]
+  return picked && (asi.from as string[]).includes(picked) ? picked : undefined
+}
+
+/** Apply a half-feat's +1 (capped at its max, usually 20). Feats that grant a save
+ *  proficiency alongside the ASI (Resilient) grant the save for the same ability. */
+export function applyFeatAbilityIncrease(
+  char: Pick<Character, 'abilityScores' | 'saveProficiencies'>,
+  feat: FeatDef | undefined,
+  picked: string | undefined,
+): Pick<Character, 'abilityScores' | 'saveProficiencies'> {
+  const ability = featAbilityPick(feat, picked)
+  if (!feat || !ability) return { abilityScores: char.abilityScores, saveProficiencies: char.saveProficiencies }
+  const scores = { ...char.abilityScores } as Record<string, number>
+  scores[ability] = Math.min(feat.abilityScoreIncrease?.max ?? 20, (scores[ability] ?? 10) + 1)
+  const saveProficiencies = feat.grantsProficiencies?.saves
+    ? [...new Set([...char.saveProficiencies, ability])]
+    : char.saveProficiencies
+  return { abilityScores: scores as Character['abilityScores'], saveProficiencies }
+}
+
 /** Resolve a `fromClassChoice` feat by collapsing it into a `fromList` feat once
  *  the player has picked a class. No-op for feats that don't use class choice. */
 export function withFeatClassChoice(feat: FeatDef, classSlug: string): FeatDef {

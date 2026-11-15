@@ -2,11 +2,17 @@
 // "fixed" items are always received.
 // "choices" is an array of choice groups — the player picks ONE option per group.
 
+import { ITEM_OVERLAY } from './itemOverlay'
+
+/** A "(your choice)" item — the Creator asks which one, once per unit of quantity. */
+export type GearPick = 'simple' | 'simple-melee' | 'martial' | 'martial-melee' | 'instrument'
+
 export interface GearItem {
   name: string
   quantity?: number
   slug?: string   // maps to WEAPON_STATS or ARMOR_STATS key in Sheet.tsx
   notes?: string  // e.g. "of your choice"
+  pick?: GearPick
 }
 
 export interface GearOption {
@@ -36,7 +42,7 @@ export const CLASS_STARTING_GEAR: Record<string, ClassStartingGear> = {
       {
         options: [
           { label: 'a', desc: 'Light Crossbow + 20 bolts', items: [{ name: 'Light Crossbow', slug: 'crossbow-light', quantity: 1 }, { name: 'Crossbow Bolts (20)', quantity: 20 }] },
-          { label: 'b', desc: 'Any simple weapon', items: [{ name: 'Simple Weapon (your choice)', notes: 'Choose any simple weapon', quantity: 1 }] },
+          { label: 'b', desc: 'Any simple weapon', items: [{ name: 'Simple Weapon (your choice)', pick: 'simple', notes: 'Choose any simple weapon', quantity: 1 }] },
         ],
       },
     ],
@@ -51,13 +57,13 @@ export const CLASS_STARTING_GEAR: Record<string, ClassStartingGear> = {
       {
         options: [
           { label: 'a', desc: 'Greataxe', items: [{ name: 'Greataxe', slug: 'greataxe', quantity: 1 }] },
-          { label: 'b', desc: 'Any martial melee weapon', items: [{ name: 'Martial Weapon (your choice)', notes: 'Choose any martial melee weapon', quantity: 1 }] },
+          { label: 'b', desc: 'Any martial melee weapon', items: [{ name: 'Martial Weapon (your choice)', pick: 'martial-melee', notes: 'Choose any martial melee weapon', quantity: 1 }] },
         ],
       },
       {
         options: [
           { label: 'a', desc: '2 Handaxes', items: [{ name: 'Handaxe', slug: 'handaxe', quantity: 2 }] },
-          { label: 'b', desc: 'Any simple weapon', items: [{ name: 'Simple Weapon (your choice)', notes: 'Choose any simple weapon', quantity: 1 }] },
+          { label: 'b', desc: 'Any simple weapon', items: [{ name: 'Simple Weapon (your choice)', pick: 'simple', notes: 'Choose any simple weapon', quantity: 1 }] },
         ],
       },
     ],
@@ -73,7 +79,7 @@ export const CLASS_STARTING_GEAR: Record<string, ClassStartingGear> = {
         options: [
           { label: 'a', desc: 'Rapier', items: [{ name: 'Rapier', slug: 'rapier', quantity: 1 }] },
           { label: 'b', desc: 'Longsword', items: [{ name: 'Longsword', slug: 'longsword', quantity: 1 }] },
-          { label: 'c', desc: 'Any simple weapon', items: [{ name: 'Simple Weapon (your choice)', notes: 'Choose any simple weapon', quantity: 1 }] },
+          { label: 'c', desc: 'Any simple weapon', items: [{ name: 'Simple Weapon (your choice)', pick: 'simple', notes: 'Choose any simple weapon', quantity: 1 }] },
         ],
       },
       {
@@ -85,7 +91,7 @@ export const CLASS_STARTING_GEAR: Record<string, ClassStartingGear> = {
       {
         options: [
           { label: 'a', desc: 'Lute', items: [{ name: 'Lute', quantity: 1 }] },
-          { label: 'b', desc: 'Musical instrument of your choice', items: [{ name: 'Musical Instrument (your choice)', notes: 'Choose any musical instrument', quantity: 1 }] },
+          { label: 'b', desc: 'Musical instrument of your choice', items: [{ name: 'Musical Instrument (your choice)', pick: 'instrument', notes: 'Choose any musical instrument', quantity: 1 }] },
         ],
       },
     ],
@@ -113,7 +119,7 @@ export const CLASS_STARTING_GEAR: Record<string, ClassStartingGear> = {
       {
         options: [
           { label: 'a', desc: 'Light Crossbow + 20 bolts', items: [{ name: 'Light Crossbow', slug: 'crossbow-light', quantity: 1 }, { name: 'Crossbow Bolts (20)', quantity: 20 }] },
-          { label: 'b', desc: 'Any simple weapon', items: [{ name: 'Simple Weapon (your choice)', notes: 'Choose any simple weapon', quantity: 1 }] },
+          { label: 'b', desc: 'Any simple weapon', items: [{ name: 'Simple Weapon (your choice)', pick: 'simple', notes: 'Choose any simple weapon', quantity: 1 }] },
         ],
       },
       {
@@ -135,13 +141,13 @@ export const CLASS_STARTING_GEAR: Record<string, ClassStartingGear> = {
       {
         options: [
           { label: 'a', desc: 'Wooden Shield', items: [{ name: 'Shield', slug: 'shield', quantity: 1 }] },
-          { label: 'b', desc: 'Any simple weapon', items: [{ name: 'Simple Weapon (your choice)', notes: 'Choose any simple weapon', quantity: 1 }] },
+          { label: 'b', desc: 'Any simple weapon', items: [{ name: 'Simple Weapon (your choice)', pick: 'simple', notes: 'Choose any simple weapon', quantity: 1 }] },
         ],
       },
       {
         options: [
           { label: 'a', desc: 'Scimitar', items: [{ name: 'Scimitar', slug: 'scimitar', quantity: 1 }] },
-          { label: 'b', desc: 'Any simple melee weapon', items: [{ name: 'Simple Melee Weapon (your choice)', notes: 'Choose any simple melee weapon', quantity: 1 }] },
+          { label: 'b', desc: 'Any simple melee weapon', items: [{ name: 'Simple Melee Weapon (your choice)', pick: 'simple-melee', notes: 'Choose any simple melee weapon', quantity: 1 }] },
         ],
       },
     ],
@@ -158,8 +164,8 @@ export const CLASS_STARTING_GEAR: Record<string, ClassStartingGear> = {
       },
       {
         options: [
-          { label: 'a', desc: 'Martial weapon + Shield', items: [{ name: 'Martial Weapon (your choice)', quantity: 1 }, { name: 'Shield', slug: 'shield', quantity: 1 }] },
-          { label: 'b', desc: '2 martial weapons', items: [{ name: 'Martial Weapon (your choice)', quantity: 2 }] },
+          { label: 'a', desc: 'Martial weapon + Shield', items: [{ name: 'Martial Weapon (your choice)', pick: 'martial', quantity: 1 }, { name: 'Shield', slug: 'shield', quantity: 1 }] },
+          { label: 'b', desc: '2 martial weapons', items: [{ name: 'Martial Weapon (your choice)', pick: 'martial', quantity: 2 }] },
         ],
       },
       {
@@ -185,7 +191,7 @@ export const CLASS_STARTING_GEAR: Record<string, ClassStartingGear> = {
       {
         options: [
           { label: 'a', desc: 'Shortsword', items: [{ name: 'Shortsword', slug: 'shortsword', quantity: 1 }] },
-          { label: 'b', desc: 'Any simple weapon', items: [{ name: 'Simple Weapon (your choice)', notes: 'Choose any simple weapon', quantity: 1 }] },
+          { label: 'b', desc: 'Any simple weapon', items: [{ name: 'Simple Weapon (your choice)', pick: 'simple', notes: 'Choose any simple weapon', quantity: 1 }] },
         ],
       },
       {
@@ -205,14 +211,14 @@ export const CLASS_STARTING_GEAR: Record<string, ClassStartingGear> = {
     choices: [
       {
         options: [
-          { label: 'a', desc: 'Martial weapon + Shield', items: [{ name: 'Martial Weapon (your choice)', quantity: 1 }, { name: 'Shield', slug: 'shield', quantity: 1 }] },
-          { label: 'b', desc: '2 martial weapons', items: [{ name: 'Martial Weapon (your choice)', quantity: 2 }] },
+          { label: 'a', desc: 'Martial weapon + Shield', items: [{ name: 'Martial Weapon (your choice)', pick: 'martial', quantity: 1 }, { name: 'Shield', slug: 'shield', quantity: 1 }] },
+          { label: 'b', desc: '2 martial weapons', items: [{ name: 'Martial Weapon (your choice)', pick: 'martial', quantity: 2 }] },
         ],
       },
       {
         options: [
           { label: 'a', desc: '5 Javelins', items: [{ name: 'Javelin', slug: 'javelin', quantity: 5 }] },
-          { label: 'b', desc: 'Any simple melee weapon', items: [{ name: 'Simple Melee Weapon (your choice)', notes: 'Choose any simple melee weapon', quantity: 1 }] },
+          { label: 'b', desc: 'Any simple melee weapon', items: [{ name: 'Simple Melee Weapon (your choice)', pick: 'simple-melee', notes: 'Choose any simple melee weapon', quantity: 1 }] },
         ],
       },
       {
@@ -239,7 +245,7 @@ export const CLASS_STARTING_GEAR: Record<string, ClassStartingGear> = {
       {
         options: [
           { label: 'a', desc: '2 Shortswords', items: [{ name: 'Shortsword', slug: 'shortsword', quantity: 2 }] },
-          { label: 'b', desc: '2 simple melee weapons', items: [{ name: 'Simple Melee Weapon (your choice)', quantity: 2 }] },
+          { label: 'b', desc: '2 simple melee weapons', items: [{ name: 'Simple Melee Weapon (your choice)', pick: 'simple-melee', quantity: 2 }] },
         ],
       },
       {
@@ -288,7 +294,7 @@ export const CLASS_STARTING_GEAR: Record<string, ClassStartingGear> = {
       {
         options: [
           { label: 'a', desc: 'Light crossbow + 20 bolts', items: [{ name: 'Light Crossbow', slug: 'crossbow-light', quantity: 1 }, { name: 'Crossbow Bolts (20)', quantity: 20 }] },
-          { label: 'b', desc: 'Any simple weapon', items: [{ name: 'Simple Weapon (your choice)', notes: 'Choose any simple weapon', quantity: 1 }] },
+          { label: 'b', desc: 'Any simple weapon', items: [{ name: 'Simple Weapon (your choice)', pick: 'simple', notes: 'Choose any simple weapon', quantity: 1 }] },
         ],
       },
       {
@@ -315,7 +321,7 @@ export const CLASS_STARTING_GEAR: Record<string, ClassStartingGear> = {
       {
         options: [
           { label: 'a', desc: 'Light crossbow + 20 bolts', items: [{ name: 'Light Crossbow', slug: 'crossbow-light', quantity: 1 }, { name: 'Crossbow Bolts (20)', quantity: 20 }] },
-          { label: 'b', desc: 'Any simple weapon', items: [{ name: 'Simple Weapon (your choice)', notes: 'Choose any simple weapon', quantity: 1 }] },
+          { label: 'b', desc: 'Any simple weapon', items: [{ name: 'Simple Weapon (your choice)', pick: 'simple', notes: 'Choose any simple weapon', quantity: 1 }] },
         ],
       },
       {
@@ -358,4 +364,21 @@ export const CLASS_STARTING_GEAR: Record<string, ClassStartingGear> = {
       },
     ],
   },
+}
+
+// PHB p.149 weapon table, by ITEM_OVERLAY slug
+const SIMPLE_MELEE = ['club', 'dagger', 'greatclub', 'handaxe', 'javelin', 'light-hammer', 'mace', 'quarterstaff', 'sickle', 'spear']
+const SIMPLE_RANGED = ['crossbow-light', 'dart', 'shortbow', 'sling']
+const MARTIAL_MELEE = ['battleaxe', 'flail', 'glaive', 'greataxe', 'greatsword', 'halberd', 'lance', 'longsword', 'maul', 'morningstar', 'pike', 'rapier', 'scimitar', 'shortsword', 'trident', 'war-pick', 'warhammer', 'whip']
+const MARTIAL_RANGED = ['crossbow-hand', 'crossbow-heavy', 'longbow', 'net']
+const INSTRUMENTS = ['Bagpipes', 'Drum', 'Dulcimer', 'Flute', 'Lute', 'Lyre', 'Horn', 'Pan flute', 'Shawm', 'Viol']
+
+/** The items a "(your choice)" starting item can become. */
+export function gearPickOptions(pick: GearPick): { slug?: string; name: string }[] {
+  if (pick === 'instrument') return INSTRUMENTS.map(name => ({ name }))
+  const slugs = pick === 'simple' ? [...SIMPLE_MELEE, ...SIMPLE_RANGED]
+    : pick === 'simple-melee' ? SIMPLE_MELEE
+    : pick === 'martial' ? [...MARTIAL_MELEE, ...MARTIAL_RANGED]
+    : MARTIAL_MELEE
+  return slugs.map(slug => ({ slug, name: ITEM_OVERLAY[slug]?.weaponStats?.label ?? slug }))
 }

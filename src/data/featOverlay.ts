@@ -221,10 +221,11 @@ export const FEAT_OVERLAY: Record<string, Partial<FeatDef>> = {
     ],
   },
 
+  // +1 to the chosen ability and proficiency in that ability's saving throw — the save
+  // follows the ASI pick (see applyFeatAbilityIncrease).
   'resilient': {
-    notes: [
-      "Grants proficiency in one saving throw of your choice (apply it in the Saving Throws section).",
-    ],
+    abilityScoreIncrease: { choose: 1, from: ['str', 'dex', 'con', 'int', 'wis', 'cha'], max: 20 },
+    grantsProficiencies: { saves: { count: 1 } },
   },
 
   'skilled': {

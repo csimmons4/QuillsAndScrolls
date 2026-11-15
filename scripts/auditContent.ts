@@ -15,7 +15,7 @@ import { BACKGROUND_OVERLAY } from '../src/data/backgroundOverlay'
 import { ITEM_OVERLAY } from '../src/data/itemOverlay'
 import { CLASS_OPTIONS } from '../src/data/classData'
 import { CLASS_STARTING_GEAR } from '../src/data/startingGear'
-import { enrichSpell } from '../src/content/spellDerivation'
+import { enrichSpell, SAVE_RE } from '../src/content/spellDerivation'
 import { SpellSchema, RaceSchema, BackgroundSchema, type SpellDef } from '../src/content/loaders'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -135,8 +135,9 @@ function auditSpells(): { total: number; gaps: Finding[] } {
       continue
     }
 
-    if (!spell.savingThrow && /(Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma)\s+saving throw/i.test(desc)) {
-      const m = desc.match(/(Strength|Dexterity|Constitution|Intelligence|Wisdom|Charisma)\s+saving throw/i)
+    // A save the target makes, not one it gains advantage on (matches spellDerivation.ts)
+    if (!spell.savingThrow && SAVE_RE.test(desc)) {
+      const m = desc.match(SAVE_RE)
       gaps.push({ slug: raw.slug, name: raw.name, trigger: `description mentions ${m?.[1]} save; add \`savingThrow\`` })
       continue
     }

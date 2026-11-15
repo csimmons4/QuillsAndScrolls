@@ -1,6 +1,6 @@
-import { Character, Ability, Skill, SKILL_ABILITY } from './model'
+import { Character, CharacterClass, Ability, Skill, SKILL_ABILITY } from './model'
 import type { ContentData } from '../content/ContentProvider'
-import { ELDRITCH_INVOCATIONS } from '../data/classData'
+import { ELDRITCH_INVOCATIONS, resolveCasterType } from '../data/classData'
 
 export function abilityMod(score: number): number {
   return Math.floor((score - 10) / 2)
@@ -31,8 +31,7 @@ export function skillMod(char: Character, skill: Skill): number {
   const pb = profBonus(char)
   if (char.skillExpertise.includes(skill)) return base + pb * 2
   if (char.skillProficiencies.includes(skill)) return base + pb
-  if (hasBardJackOfAllTrades(char)) return base + Math.floor(pb / 2)
-  return base
+  return base + halfProficiencyOn(char, SKILL_ABILITY[skill])
 }
 
 export function saveMod(char: Character, ability: Ability): number {
@@ -45,6 +44,8 @@ export function passivePerception(char: Character): number {
   return 10 + skillMod(char, 'perception')
 }
 
+/** Max HP from hit dice + CON, plus per-level race bonuses (Hill Dwarf) and Draconic
+ *  Resilience. Feat bonuses (Tough) are added by the caller from FeatBonuses. */
 export function hpMax(char: Character, content: ContentData | null): number {
   if (char.hp.maxOverride !== undefined) return char.hp.maxOverride
   const conMod = abilityModFor(char, 'con')
@@ -58,11 +59,29 @@ export function hpMax(char: Character, content: ContentData | null): number {
       total += roll + conMod
     }
   }
+  const race = content?.races.find(r => r.slug === char.raceSlug)
+  const subrace = race?.subraces?.find(s => s.slug === char.subraceSlug)
+  total += ((race?.hpBonusPerLevel ?? 0) + (subrace?.hpBonusPerLevel ?? 0)) * totalLevel(char)
+  const draconic = char.classes.find(c => c.classSlug === 'sorcerer' && c.subclassSlug === 'draconic')
+  if (draconic) total += draconic.level
   return Math.max(1, total)
 }
 
+/** Half proficiency on checks with `ability` that a character isn't proficient in — Jack of All
+ *  Trades (Bard 2: any ability, rounded down) or Remarkable Athlete (Champion 7: STR, DEX and
+ *  CON, rounded up). Initiative is a Dex check. */
+function halfProficiencyOn(char: Character, ability: Ability): number {
+  const pb = profBonus(char)
+  const jack = hasBardJackOfAllTrades(char) ? Math.floor(pb / 2) : 0
+  const athlete = ['str', 'dex', 'con'].includes(ability)
+    && char.classes.some(c => c.classSlug === 'fighter' && c.subclassSlug === 'champion' && c.level >= 7)
+    ? Math.ceil(pb / 2) : 0
+  return Math.max(jack, athlete)
+}
+
+/** Initiative from DEX and class features. Feat and item bonuses are added by the caller. */
 export function initiativeBonus(char: Character): number {
-  return abilityModFor(char, 'dex')
+  return abilityModFor(char, 'dex') + halfProficiencyOn(char, 'dex')
 }
 
 export function monkSpeedBonus(char: Character): number {
@@ -89,16 +108,27 @@ export function paladinAuraBonus(char: Character): number {
   return Math.max(1, abilityModFor(char, 'cha'))
 }
 
+/** A class entry's spellcasting ability, or undefined if it doesn't cast. Eldritch Knight
+ *  and Arcane Trickster cast with INT through their subclass (the scraped Fighter/Rogue have none). */
+export function spellcastingAbilityFor(cc: CharacterClass, content: ContentData | null): Ability | undefined {
+  const fromClass = content?.classes.find(c => c.slug === cc.classSlug)?.spellcastingAbility as Ability | undefined
+  if (fromClass) return fromClass
+  return resolveCasterType(cc) === 'third' ? 'int' : undefined
+}
+
+function spellAbilityForClassSlug(char: Character, classSlug: string, content: ContentData | null): Ability | undefined {
+  const cc = char.classes.find(c => c.classSlug === classSlug) ?? { classSlug, level: 1, hitDieRolls: [] }
+  return spellcastingAbilityFor(cc, content)
+}
+
 export function spellSaveDC(char: Character, classSlug: string, content: ContentData | null): number {
-  const classDef = content?.classes.find(c => c.slug === classSlug)
-  const spellAbility = classDef?.spellcastingAbility as Ability | undefined
+  const spellAbility = spellAbilityForClassSlug(char, classSlug, content)
   if (!spellAbility) return 0
   return 8 + profBonus(char) + abilityModFor(char, spellAbility)
 }
 
 export function spellAttackBonus(char: Character, classSlug: string, content: ContentData | null): number {
-  const classDef = content?.classes.find(c => c.slug === classSlug)
-  const spellAbility = classDef?.spellcastingAbility as Ability | undefined
+  const spellAbility = spellAbilityForClassSlug(char, classSlug, content)
   if (!spellAbility) return 0
   return profBonus(char) + abilityModFor(char, spellAbility)
 }
@@ -490,12 +520,15 @@ export function deriveClassResources(char: Character): ClassResource[] {
         break
       }
       case 'monk': {
-        resources.push({
-          key: 'ki-points', name: 'Ki Points', classSlug: slug,
-          current: get('ki-points', lvl),
-          max: lvl, recharge: 'short',
-          display: `DC ${8 + pb + abilityModFor(char, 'wis')} Stunning`,
-        })
+        // Ki starts at level 2 (PHB p.78)
+        if (lvl >= 2) {
+          resources.push({
+            key: 'ki-points', name: 'Ki Points', classSlug: slug,
+            current: get('ki-points', lvl),
+            max: lvl, recharge: 'short',
+            display: `Ki save DC ${8 + pb + abilityModFor(char, 'wis')}`,
+          })
+        }
         if (cc.subclassSlug === 'open-hand' && lvl >= 6) {
           resources.push({
             key: 'wholeness-of-body', name: 'Wholeness of Body', classSlug: slug,
@@ -613,13 +646,6 @@ export function deriveClassResources(char: Character): ClassResource[] {
             key: 'primeval-awareness', name: 'Primeval Awareness', classSlug: slug,
             current: 0, max: null, recharge: 'long',
             display: 'Spend spell slot · 1 min/slot level · sense creature types ≤1 mi',
-          })
-        }
-        if (lvl >= 14) {
-          resources.push({
-            key: 'vanish', name: 'Vanish', classSlug: slug,
-            current: get('vanish', 1), max: 1, recharge: 'short',
-            display: 'Hide as bonus action (unlimited once unlocked)',
           })
         }
         // ── Subclass resources ──
@@ -814,15 +840,7 @@ export function deriveClassResources(char: Character): ClassResource[] {
             }
           }
         }
-        if (lvl >= 11) {
-          const arcanaCount = lvl >= 17 ? 4 : lvl >= 15 ? 3 : lvl >= 13 ? 2 : 1
-          resources.push({
-            key: 'mystic-arcanum', name: 'Mystic Arcanum', classSlug: slug,
-            current: get('mystic-arcanum', arcanaCount),
-            max: arcanaCount, recharge: 'long',
-            display: `L${lvl >= 17 ? '6-9' : lvl >= 15 ? '6-8' : lvl >= 13 ? '6-7' : '6'} spells`,
-          })
-        }
+        // Mystic Arcanum uses are tracked on each arcanum spell (freeSpellUses), not here
         if (lvl >= 20) {
           resources.push({
             key: 'eldritch-master', name: 'Eldritch Master', classSlug: slug,
@@ -974,7 +992,7 @@ export function deriveClassResources(char: Character): ClassResource[] {
         if (lvl >= 20) {
           resources.push({
             key: 'signature-spells', name: 'Signature Spells', classSlug: slug,
-            current: get('signature-spells', 2), max: 2, recharge: 'long',
+            current: get('signature-spells', 2), max: 2, recharge: 'short',
             display: 'Cast 2 chosen L3 spells free (no slot)',
           })
         }

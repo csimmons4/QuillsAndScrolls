@@ -94,6 +94,8 @@ export const FeatSpellSchema = z.object({
   name: z.string(),
   level: z.number(),
   usesPerLongRest: z.number().optional(),
+  minLevel: z.number().optional(),   // character level the spell is gained at (racial "once you reach 3rd level")
+  castLevel: z.number().optional(),  // cast with a slot of this level (Tiefling: Hellish Rebuke as a 2nd-level spell)
 })
 export type FeatSpell = z.infer<typeof FeatSpellSchema>
 
@@ -207,6 +209,7 @@ export const ItemSchema = z.object({
 
   // Passive effect fields — applied when the item is equipped
   acBonus: z.number().optional(),               // flat AC bonus (stacks with armor)
+  requiresUnarmored: z.boolean().optional(),    // bonuses only apply with no armor or shield (Bracers of Defense)
   savingThrowBonus: z.number().optional(),       // bonus to all saving throws
   abilityCheckBonus: z.number().optional(),      // bonus to all ability checks (incl. skills)
   spellDCBonus: z.number().optional(),           // bonus to spell save DC
@@ -218,6 +221,65 @@ export const ItemSchema = z.object({
   grantedConditionImmunities: z.array(z.string()).optional(),
   grantedSkillProficiencies: z.array(z.string()).optional(),
   grantedSkillExpertise: z.array(z.string()).optional(),
+
+  // Potions & oils (overlay-supplied) — consumed with a Drink button instead of equipped.
+  // `effect` is the short badge on the inventory row; `healing` is a dice formula the
+  // player rolls physically and types in. Potions with a `duration` (label + length in
+  // minutes; the maximum for rolled durations) go into the sheet's Active Potions box.
+  potion: z.object({
+    effect: z.string(),
+    healing: z.string().optional(),
+    duration: z.object({ label: z.string(), minutes: z.number() }).optional(),
+    // What the potion lets you do while active (Fire Breath's exhale, Mind Control's Dominate…).
+    // DCs are the potion's own, not the drinker's.
+    action: z.object({
+      name: z.string(),
+      timing: z.string(),
+      range: z.string().optional(),
+      save: z.object({ ability: z.enum(ABILITY_VALUES), dc: z.number() }).optional(),
+      damage: z.string().optional(),
+      onSave: z.string().optional(),
+      text: z.string().optional(),
+    }).optional(),
+    uses: z.number().optional(),               // limited uses; the effect ends when they're spent
+    note: z.string().optional(),               // rules reminder shown while active
+    abilityOverride: z.record(z.number()).optional(), // sets the score while active, if higher
+    hpMaxMultiplier: z.number().optional(),    // Giant Size doubles max HP (and current HP when drunk)
+    tempHp: z.number().optional(),             // temporary HP gained when drunk (Heroism)
+    // Effects applied to the sheet while the potion is running (see potionEffects.ts)
+    acBonus: z.number().optional(),                       // Speed (Haste) +2
+    speedMultiplier: z.number().optional(),               // Speed (Haste) ×2
+    extraSpeeds: z.array(z.object({
+      mode: z.enum(['fly', 'swim', 'climb']),
+      feet: z.number().optional(),                        // omitted = equal to your walking speed
+      hover: z.boolean().optional(),
+    })).optional(),
+    saveAdvantage: z.array(z.enum(ABILITY_VALUES)).optional(),
+    saveDisadvantage: z.array(z.enum(ABILITY_VALUES)).optional(),
+    checkAdvantage: z.array(z.enum(ABILITY_VALUES)).optional(),     // ability checks (skills) using these
+    checkDisadvantage: z.array(z.enum(ABILITY_VALUES)).optional(),
+    rollBonusDice: z.string().optional(),                 // Bless: added to attack rolls and saves
+    weaponDamageDice: z.string().optional(),              // Enlarge '+1d4' / Reduce '−1d4'
+    resistances: z.array(z.string()).optional(),
+    conditionImmunities: z.array(z.string()).optional(),
+    advantages: z.array(z.string()).optional(),           // situational advantages, listed under Defenses
+    conditions: z.array(z.string()).optional(),           // conditions you have while it lasts (Invisible)
+    // A choice made when drinking: a damage type (Resistance) or which weapon to coat (Sharpness)
+    choice: z.object({ kind: z.enum(['damageType', 'weapon']), label: z.string(), options: z.array(z.string()).optional() }).optional(),
+    weaponBonus: z.number().optional(),                   // +N to hit and damage with the chosen weapon
+    onDrink: z.object({
+      removeConditions: z.array(z.string()).optional(),   // Elixir of Health, Vitality
+      clearExhaustion: z.boolean().optional(),            // Vitality
+      // Damage on drinking (Poison): rolled by the player; a failed save adds a condition and
+      // `ongoingDice` d-dice of damage each turn, shrinking by one per successful save.
+      damage: z.object({
+        dice: z.string(), type: z.string(),
+        save: z.object({ ability: z.enum(ABILITY_VALUES), dc: z.number() }),
+        failCondition: z.string().optional(),
+        ongoingDice: z.number().optional(),
+      }).optional(),
+    }).optional(),
+  }).optional(),
 })
 export type ItemDef = z.infer<typeof ItemSchema>
 
@@ -230,6 +292,12 @@ const SubraceSchema = z.object({
   abilityBonuses: z.record(z.number()).optional(),
   grantedCantrip: z.string().optional(),   // class slug (e.g. 'wizard' → pick one)
   grantedSpells: z.array(FeatSpellSchema).optional(),
+  hpBonusPerLevel: z.number().optional(),  // e.g. Hill Dwarf's Dwarven Toughness
+  speed: z.number().optional(),            // replaces the race's walking speed (Wood Elf's Fleet of Foot)
+  grantedWeapons: z.array(z.string()).optional(),
+  grantedArmor: z.array(z.string()).optional(),
+  grantedTools: z.array(z.string()).optional(),
+  extraLanguages: z.number().optional(),   // languages of the player's choice
 })
 
 export const RaceSchema = z.object({
@@ -254,6 +322,8 @@ export const RaceSchema = z.object({
   skillChoices: z.object({ count: z.number(), from: z.array(z.string()) }).optional(),
   grantedSkills: z.array(z.string()).optional(),
   grantedTools: z.array(z.string()).optional(),
+  grantedWeapons: z.array(z.string()).optional(),  // e.g. Dwarven Combat Training
+  grantedArmor: z.array(z.string()).optional(),
   grantedLanguages: z.array(z.string()).optional(),
   naturalArmor: z.object({ base: z.number(), addDex: z.boolean() }).optional(),
   resistances: z.array(z.string()).optional(),
@@ -261,6 +331,7 @@ export const RaceSchema = z.object({
   conditionImmunities: z.array(z.string()).optional(),
   advantages: z.array(z.string()).optional(),
   grantedSpells: z.array(FeatSpellSchema).optional(),
+  hpBonusPerLevel: z.number().optional(),
 })
 
 export type RaceDef = z.infer<typeof RaceSchema>

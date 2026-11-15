@@ -27,9 +27,13 @@ interface WeaponBlockProps {
   attackBonus: number
   damageMod: number
   magicBonus: number
+  // Active potion effects (already included in attackBonus/damageMod where numeric)
+  attackDice?: string    // e.g. " +1d4" from Bless (Heroism)
+  damageDice?: string    // e.g. " +1d4" from Enlarge (Growth)
+  potionBonus?: number   // Oil of Sharpness +3 on this weapon
 }
 
-export function WeaponStatBlock({ ws, attackBonus, damageMod, magicBonus }: WeaponBlockProps) {
+export function WeaponStatBlock({ ws, attackBonus, damageMod, magicBonus, attackDice = '', damageDice = '', potionBonus = 0 }: WeaponBlockProps) {
   const props: string[] = []
   if (ws.finesse)    props.push('Finesse')
   if (ws.light)      props.push('Light')
@@ -38,11 +42,13 @@ export function WeaponStatBlock({ ws, attackBonus, damageMod, magicBonus }: Weap
   if (ws.ranged)     props.push('Ranged')
 
   const rangeStr = ws.ranged && ws.label ? ws.label : null
-  const atkStr = `${attackBonus >= 0 ? '+' : ''}${attackBonus}`
-  const dmgStr = `${ws.damage}${damageMod !== 0 ? (damageMod > 0 ? `+${damageMod}` : `${damageMod}`) : ''} ${ws.damageType}`
+  const atkStr = `${attackBonus >= 0 ? '+' : ''}${attackBonus}${attackDice}`
+  const modStr = damageMod !== 0 ? (damageMod > 0 ? `+${damageMod}` : `${damageMod}`) : ''
+  const dmgStr = `${ws.damage}${modStr}${damageDice} ${ws.damageType}`
   const dmgVers = ws.versatile
-    ? `${ws.versatile}${damageMod !== 0 ? (damageMod > 0 ? `+${damageMod}` : `${damageMod}`) : ''} ${ws.damageType}`
+    ? `${ws.versatile}${modStr}${damageDice} ${ws.damageType}`
     : null
+  const potionActive = potionBonus > 0 || !!attackDice || !!damageDice
 
   return (
     <div className="rounded-md border border-parchment-200 bg-parchment-50 p-2.5 space-y-2">
@@ -52,9 +58,11 @@ export function WeaponStatBlock({ ws, attackBonus, damageMod, magicBonus }: Weap
         {dmgVers && <Field label="Versatile" value={dmgVers} />}
         {rangeStr && <Field label="Range" value={rangeStr} />}
       </div>
-      {(props.length > 0 || magicBonus > 0) && (
+      {(props.length > 0 || magicBonus > 0 || potionActive) && (
         <div className="flex flex-wrap gap-1">
           {magicBonus > 0 && <Badge label={`+${magicBonus} Magic`} cls="bg-violet-50 text-violet-700 border-violet-200" />}
+          {potionBonus > 0 && <Badge label={`+${potionBonus} Oil of Sharpness`} cls="bg-teal-50 text-teal-700 border-teal-200" />}
+          {(attackDice || damageDice) && <Badge label="Potion active" cls="bg-teal-50 text-teal-700 border-teal-200" />}
           {props.map(p => <Badge key={p} label={p} cls="bg-parchment-100 text-parchment-600 border-parchment-200" />)}
         </div>
       )}

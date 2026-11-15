@@ -16,6 +16,14 @@ export interface ItemBonuses {
   skillExpertise: string[]
 }
 
+/** Whether an item's magic is working: it must be worn/held (rings count as worn) and,
+ *  if it requires attunement, attuned. */
+export function itemIsActive(slot: EquipmentItem, def: ItemDef | undefined): boolean {
+  const worn = slot.equipped || def?.type === 'Ring'
+  if (!worn) return false
+  return !def?.attunement || slot.attuned
+}
+
 /** Aggregate passive mechanical bonuses from a character's equipped items. */
 export function sumItemBonuses(equipment: EquipmentItem[], items: ItemDef[]): ItemBonuses {
   const out: ItemBonuses = {
@@ -26,11 +34,11 @@ export function sumItemBonuses(equipment: EquipmentItem[], items: ItemDef[]): It
     skillProficiencies: [], skillExpertise: [],
   }
   const bySlug = new Map(items.map(i => [i.slug, i]))
+  const wearingArmorOrShield = equipment.some(e => e.equipped && !!bySlug.get(e.itemSlug)?.armorStats)
   for (const slot of equipment) {
     const def = bySlug.get(slot.itemSlug)
-    const alwaysWorn = def?.type === 'Ring'
-    if (!slot.equipped && !alwaysWorn) continue
-    if (!def) continue
+    if (!def || !itemIsActive(slot, def)) continue
+    if (def.requiresUnarmored && wearingArmorOrShield) continue
     out.acBonus            += def.acBonus            ?? 0
     out.savingThrowBonus   += def.savingThrowBonus   ?? 0
     out.abilityCheckBonus  += def.abilityCheckBonus  ?? 0
@@ -70,7 +78,9 @@ export function effectiveAbilityScores(
     if (val > (scores[ab] ?? 10)) scores[ab] = val
   }
   for (const [ab, bonus] of Object.entries(bonuses.abilityScoreBonuses)) {
-    scores[ab] = Math.min(20, (scores[ab] ?? 10) + bonus)
+    // Item bonuses cap at 20 but never lower a score that's already above it
+    const current = scores[ab] ?? 10
+    scores[ab] = Math.max(current, Math.min(20, current + bonus))
   }
   return scores
 }

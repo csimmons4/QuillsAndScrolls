@@ -13,12 +13,14 @@
   --p-100: 250 243 224;
   --p-200: 245 230 192;
   --p-300: 237 212 154;
-  --p-400: 226 188 110;
-  --p-500: 212 164 76;
-  --p-600: 184 136 58;
-  --p-700: 149 107 46;
-  --p-800: 116 82 40;
-  --p-900: 90 64 34;
+  /* 400–900 are text shades, set for readable contrast on the card surface (p-50):
+     400 ≈ 2.6:1 (hints), 500 ≈ 4.5:1, 600 ≈ 5.6:1, 700 ≈ 7:1, 800 ≈ 9:1, 900 ≈ 11:1 */
+  --p-400: 200 148 40;
+  --p-500: 148 109 36;
+  --p-600: 128 95 41;
+  --p-700: 112 80 35;
+  --p-800: 92 65 32;
+  --p-900: 75 53 28;
   --d-800: 30 27 24;
   --d-900: 20 18 16;
   --accent: 184 136 58;
@@ -72,6 +74,11 @@
 }
 
 @layer base {
+  /* Keep room for the scrollbar so switching between short and long pages doesn't shift the layout */
+  html {
+    scrollbar-gutter: stable;
+  }
+
   body {
     @apply bg-parchment-100 text-dungeon-900 font-serif;
     transition: background-color 0.25s ease, color 0.25s ease;
@@ -130,6 +137,17 @@
     color: rgb(var(--header-fg));
     font-weight: 700;
     border-bottom-color: rgb(var(--accent));
+  }
+  /* "← Character" shortcut back to the most recently opened sheet */
+  .nav-back {
+    @apply inline-flex items-center gap-1 text-xs font-semibold rounded-full px-3 py-1 border min-w-0;
+    color: rgb(var(--header-fg));
+    border-color: rgb(var(--header-fg) / 0.35);
+    transition: background-color 0.15s, border-color 0.15s;
+  }
+  .nav-back:hover {
+    background-color: rgb(var(--header-fg) / 0.12);
+    border-color: rgb(var(--accent));
   }
 
   .input {
@@ -209,6 +227,76 @@
     animation: conc-glow 2s ease-in-out infinite;
   }
 
+  /* Inspiration token — pops in when gained, then glows while held */
+  @keyframes inspire-pop {
+    0%   { transform: scale(0.7) rotate(-20deg); }
+    60%  { transform: scale(1.18) rotate(8deg); }
+    100% { transform: scale(1) rotate(0); }
+  }
+  @keyframes inspire-glow {
+    0%, 100% { box-shadow: 0 0 6px 1px rgba(245,158,11,0.35), inset 0 0 6px rgba(255,255,255,0.5); }
+    50%      { box-shadow: 0 0 18px 5px rgba(245,158,11,0.55), inset 0 0 8px rgba(255,255,255,0.7); }
+  }
+  @keyframes inspire-spin { to { transform: rotate(360deg); } }
+  .inspire-token-active {
+    animation: inspire-pop 0.5s cubic-bezier(0.16, 1, 0.3, 1), inspire-glow 2.4s ease-in-out 0.5s infinite;
+  }
+  .inspire-rays {
+    animation: inspire-spin 14s linear infinite;
+  }
+  /* ── Coin purse (merchant's ledger) ─────────────────────────────────────── */
+  /* Gold-leaf lettering; the gradient repeats every 1em so each odometer digit matches */
+  .gold-leaf {
+    background-image: linear-gradient(180deg, #fbe7a1 0%, #e3b64e 42%, #a8771f 68%, #f0cd6e 100%);
+    background-size: 100% 1em;
+    background-repeat: repeat-y;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    filter: drop-shadow(0 1px 0 rgb(0 0 0 / 0.18));
+  }
+  .odometer-strip {
+    transition: transform 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  /* Ruled ledger paper with a red margin line */
+  .ledger-lines {
+    background-image: repeating-linear-gradient(to bottom, transparent 0 21px, rgb(var(--p-200)) 21px 22px);
+    border-left: 2px solid rgb(220 38 38 / 0.25);
+  }
+  /* Wax-seal buttons: slightly irregular blobs of wax with an embossed ring */
+  .wax-seal {
+    border-radius: 47% 53% 50% 50% / 52% 48% 52% 48%;
+    box-shadow: inset 0 0 0 4px rgb(255 255 255 / 0.1), inset 0 -4px 7px rgb(0 0 0 / 0.35), 0 2px 5px rgb(0 0 0 / 0.3);
+    color: #f6e7c8;
+    text-shadow: 0 -1px 0 rgb(0 0 0 / 0.4), 0 1px 0 rgb(255 255 255 / 0.15);
+    transition: transform 0.15s ease, opacity 0.15s ease;
+  }
+  .wax-seal:hover:not(:disabled) { transform: rotate(-5deg) scale(1.05); }
+  .wax-seal:active:not(:disabled) { transform: scale(0.93); }
+  .wax-seal svg { filter: drop-shadow(0 -1px 0 rgb(0 0 0 / 0.45)) drop-shadow(0 1px 0 rgb(255 255 255 / 0.15)); }
+  /* Coin emblems look struck into the metal */
+  .coin-emblem { filter: drop-shadow(0 1px 0 rgb(255 255 255 / 0.45)); }
+  .wax-seal-green { background: radial-gradient(circle at 35% 30%, #5aa653, #26702c 58%, #154219); }
+  .wax-seal-red   { background: radial-gradient(circle at 35% 30%, #d9493c, #9c1d15 58%, #6a0f0a); }
+  /* "+25 gp" floats up from the balance */
+  @keyframes purse-float {
+    0%   { transform: translateY(6px); opacity: 0; }
+    15%  { opacity: 1; }
+    100% { transform: translateY(-34px); opacity: 0; }
+  }
+  .purse-float { animation: purse-float 1.3s ease-out forwards; }
+  /* Selected coin flips once */
+  @keyframes coin-flip {
+    from { transform: rotateY(0); }
+    to   { transform: rotateY(360deg); }
+  }
+  .coin-flip { animation: coin-flip 0.5s ease-out; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .inspire-token-active, .inspire-rays, .purse-float, .coin-flip { animation: none; }
+    .odometer-strip { transition: none; }
+  }
+
   @keyframes pip-pulse {
     0%, 100% {
       box-shadow: 0 0 4px 1px rgba(167, 139, 250, 0.45);
@@ -255,7 +343,7 @@
   }
 }
 
-/* ── Dark-mode accent overrides (generated; see _genaccents) ────────────────
+/* ── Dark-mode accent overrides (hand-maintained) ───────────────────────────
    Literal Tailwind accent utilities (bg/text/border-<hue>-*) don't follow the
    CSS-variable palette, so they stay bright on dark. Under the dark theme we tint
    light accent surfaces (50-300) down and lift dark accent text/borders to a light shade. */
@@ -487,6 +575,18 @@
 [data-theme='dark'] .border-stone-200,
 [data-theme='dark'] .border-stone-300,
 [data-theme='dark'] .border-stone-400{border-color:rgb(120 113 108 / 0.32)}
+[data-theme='dark'] .bg-gray-50{background-color:rgb(107 114 128 / 0.14)}
+[data-theme='dark'] .bg-gray-100{background-color:rgb(107 114 128 / 0.14)}
+[data-theme='dark'] .bg-gray-200{background-color:rgb(107 114 128 / 0.2)}
+[data-theme='dark'] .bg-gray-300{background-color:rgb(107 114 128 / 0.26)}
+[data-theme='dark'] .text-gray-600,
+[data-theme='dark'] .text-gray-700,
+[data-theme='dark'] .text-gray-800,
+[data-theme='dark'] .text-gray-900{color:#d1d5db}
+[data-theme='dark'] .border-gray-100,
+[data-theme='dark'] .border-gray-200,
+[data-theme='dark'] .border-gray-300,
+[data-theme='dark'] .border-gray-400{border-color:rgb(107 114 128 / 0.32)}
 [data-theme='dark'] .bg-violet-50\/50{background-color:rgb(139 92 246 / 0.14)}
 [data-theme='dark'] .bg-violet-50\/60{background-color:rgb(139 92 246 / 0.14)}
 [data-theme='dark'] .bg-indigo-50\/40{background-color:rgb(99 102 241 / 0.14)}

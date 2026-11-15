@@ -8,7 +8,8 @@ import { RITUAL_SLUGS } from '../data/spellMeta'
  */
 
 const SAVE_ABILITIES = ['Strength', 'Dexterity', 'Constitution', 'Intelligence', 'Wisdom', 'Charisma'] as const
-const SAVE_RE = new RegExp(`(${SAVE_ABILITIES.join('|')})\\s+saving throw`, 'i')
+// A save the target makes ("must make a Wisdom saving throw"), not one it gains advantage on (Haste, Beacon of Hope)
+export const SAVE_RE = new RegExp(`(?:make|succeed|attempt|repeat|fail)\\w*(?:\\s+on)?\\s+(?:an?|another|the|its|their)?\\s*(?:new\\s+)?(${SAVE_ABILITIES.join('|')})\\s+saving throw`, 'i')
 
 const DAMAGE_TYPES = [
   'acid', 'bludgeoning', 'cold', 'fire', 'force', 'lightning', 'necrotic',

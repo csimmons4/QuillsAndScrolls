@@ -1,6 +1,6 @@
 import { Character, CharacterClass, FeatureChoice } from './model'
 import { touchUpdated } from './create'
-import { CLASS_OPTIONS, MULTICLASS_PROF_GRANTS } from '../data/classData'
+import { MULTICLASS_PROF_GRANTS, subclassProficiencies } from '../data/classData'
 
 export interface LevelUpChoices {
   classSlug: string
@@ -11,7 +11,7 @@ export interface LevelUpChoices {
   fightingStyle?: string
   spellsKnown?: string[]
   featureChoices?: FeatureChoice[]
-  newSaveProficiencies?: string[]   // for multiclassing: the new class's save proficiencies
+  // (Multiclassing never grants saving throw proficiencies — PHB p.164.)
   multiclassSkill?: string          // for multiclassing: skill prof picked from limited list
   landTerrain?: string              // Druid Circle of the Land terrain choice
   runeChoices?: string[]            // Rune Knight: new rune slugs to add
@@ -30,6 +30,24 @@ const ASI_LEVELS: Record<string, number[]> = {
 
 export function asiLevelsForClass(classSlug: string): number[] {
   return ASI_LEVELS[classSlug] ?? ASI_LEVELS.default
+}
+
+/** Add the skills, tools, armor, weapons and languages a subclass grants outright. */
+export function applySubclassProficiencies(char: Character, classSlug: string, subclassSlug: string): Character {
+  const gp = subclassProficiencies(classSlug, subclassSlug)
+  // Case-insensitive, so "Smith's Tools" isn't added next to "Smith's tools"
+  const merge = (have: string[], add: string[] = []) => {
+    const seen = new Set(have.map(x => x.toLowerCase()))
+    return [...have, ...add.filter(x => !seen.has(x.toLowerCase()) && seen.add(x.toLowerCase()))]
+  }
+  return {
+    ...char,
+    skillProficiencies: merge(char.skillProficiencies, gp.skills),
+    toolProficiencies: merge(char.toolProficiencies, gp.tools),
+    armorProficiencies: merge(char.armorProficiencies, gp.armor),
+    weaponProficiencies: merge(char.weaponProficiencies, gp.weapons),
+    languages: merge(char.languages, gp.languages),
+  }
 }
 
 export function applyLevelUp(char: Character, choices: LevelUpChoices): Character {
@@ -62,13 +80,7 @@ export function applyLevelUp(char: Character, choices: LevelUpChoices): Characte
       ),
     }
     // Auto-apply fixed proficiencies the subclass grants on selection.
-    const gp = CLASS_OPTIONS[choices.classSlug]?.subclasses.find(s => s.slug === choices.subclassSlug)?.grantedProficiencies
-    if (gp?.skills?.length) {
-      next = { ...next, skillProficiencies: [...new Set([...next.skillProficiencies, ...gp.skills])] }
-    }
-    if (gp?.tools?.length) {
-      next = { ...next, toolProficiencies: [...new Set([...next.toolProficiencies, ...gp.tools])] }
-    }
+    next = applySubclassProficiencies(next, choices.classSlug, choices.subclassSlug)
   }
 
   if (choices.asiOrFeat) {
@@ -94,9 +106,10 @@ export function applyLevelUp(char: Character, choices: LevelUpChoices): Characte
     }
   }
 
-  if (choices.newSaveProficiencies?.length) {
-    const saves = new Set([...next.saveProficiencies, ...choices.newSaveProficiencies])
-    next = { ...next, saveProficiencies: [...saves] }
+  // Primal Champion (Barbarian 20): STR and CON +4, to a maximum of 24
+  if (choices.classSlug === 'barbarian' && next.classes.find(c => c.classSlug === 'barbarian')?.level === 20) {
+    const s = next.abilityScores
+    next = { ...next, abilityScores: { ...s, str: Math.min(24, s.str + 4), con: Math.min(24, s.con + 4) } }
   }
 
   // Apply multiclass limited proficiency grants (armor, weapons, tools)
@@ -124,7 +137,9 @@ export function applyLevelUp(char: Character, choices: LevelUpChoices): Characte
   // Fighting style (picked at Fighter L1, Paladin/Ranger L2 — also for multiclass entry)
   if (choices.fightingStyle) {
     const styleKey = `fighting-style-${choices.classSlug}`
-    const hasStyle = next.featuresChosen.some(f => f.key === 'fighting-style' || f.key === styleKey)
+    // The Creator's plain 'fighting-style' key belongs to the character's first class
+    const hasStyle = next.featuresChosen.some(f =>
+      f.key === styleKey || (f.key === 'fighting-style' && next.classes[0]?.classSlug === choices.classSlug))
     if (!hasStyle) {
       next = { ...next, featuresChosen: [...next.featuresChosen, { key: styleKey, value: choices.fightingStyle }] }
     }
@@ -196,10 +211,10 @@ export function applyLevelUp(char: Character, choices: LevelUpChoices): Characte
   }
 
   if (choices.featureChoices?.length) {
-    const REPLACEABLE = new Set(['invocations', 'metamagic'])
-    const toReplace = new Set(choices.featureChoices.filter(f => REPLACEABLE.has(f.key)).map(f => f.key))
-    const kept = toReplace.size > 0 ? next.featuresChosen.filter(f => !toReplace.has(f.key)) : next.featuresChosen
-    next = { ...next, featuresChosen: [...kept, ...choices.featureChoices] }
+    // Each key holds one value (the full list for invocations, infusions, maneuvers, …), so a
+    // new value replaces the old one rather than sitting beside it
+    const newKeys = new Set(choices.featureChoices.map(f => f.key))
+    next = { ...next, featuresChosen: [...next.featuresChosen.filter(f => !newKeys.has(f.key)), ...choices.featureChoices] }
   }
 
   return touchUpdated(next)

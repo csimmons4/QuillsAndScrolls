@@ -149,6 +149,15 @@ export const CharacterSchema = z.object({
 
   equipment: z.array(EquipmentItemSchema),
   currency: CurrencySchema,
+  // Coin purse history, newest first (kept to the last 30)
+  purseLog: z.array(z.object({
+    id: z.string(),
+    at: z.string(),                          // ISO timestamp
+    kind: z.enum(['gain', 'spend']),
+    coin: z.enum(['cp', 'sp', 'ep', 'gp', 'pp']),
+    amount: z.number().int().min(1),
+    note: z.string().optional(),
+  })).default([]),
 
   spells: z.array(SpellEntrySchema),
   spellSlots: SpellSlotsSchema,
@@ -221,7 +230,29 @@ export const CharacterSchema = z.object({
     max: z.number().int().min(1),
     recharge: z.enum(['short', 'long']),
   })).default([]),
+
+  // Potions currently in effect (added when a potion with a duration is drunk). `minutes`
+  // drives rest expiry; effects of 10 minutes or less also count down in rounds.
+  activePotions: z.array(z.object({
+    id: z.string(),
+    itemSlug: z.string().optional(),  // looks up the potion's action / stat changes
+    name: z.string(),
+    effect: z.string(),
+    duration: z.string(),
+    minutes: z.number(),
+    roundsLeft: z.number().int().min(0).optional(),
+    usesLeft: z.number().int().min(0).optional(),
+    choice: z.string().optional(),                     // damage type or weapon picked when drunk
+    addedConditions: z.array(z.string()).optional(),   // conditions this potion added (removed when it ends)
+  })).default([]),
+
+  // Skill proficiencies/expertise as set by character creation and level-ups. The sheet
+  // flags skills that differ (changed by hand) and can reset them back to this.
+  skillBaseline: z.object({
+    proficiencies: z.array(z.string()),
+    expertise: z.array(z.string()),
+  }).optional(),
 })
 
 export type Character = z.infer<typeof CharacterSchema>
-export const SCHEMA_VERSION = 3
+export const SCHEMA_VERSION = 5

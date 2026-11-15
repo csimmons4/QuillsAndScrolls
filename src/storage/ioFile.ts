@@ -1,4 +1,5 @@
-import { Character, CharacterSchema } from '../character/model'
+import { Character } from '../character/model'
+import { migrate } from './localStore'
 
 export function exportCharacter(char: Character): void {
   const blob = new Blob([JSON.stringify(char, null, 2)], { type: 'application/json' })
@@ -7,13 +8,14 @@ export function exportCharacter(char: Character): void {
   a.href = url
   a.download = `${char.name.replace(/[^a-z0-9]/gi, '_')}.json`
   a.click()
-  URL.revokeObjectURL(url)
+  // Some browsers start the download after click() returns
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
 
 export async function importCharacter(file: File): Promise<Character> {
   const text = await file.text()
   const raw = JSON.parse(text)
-  return CharacterSchema.parse(raw)
+  return migrate(raw)
 }
 
 export function exportHomebrew(data: unknown): void {
@@ -23,7 +25,7 @@ export function exportHomebrew(data: unknown): void {
   a.href = url
   a.download = 'quills-scrolls-homebrew.json'
   a.click()
-  URL.revokeObjectURL(url)
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
 
 export async function importHomebrew(file: File): Promise<unknown> {
@@ -48,5 +50,5 @@ export async function exportEverything(
   a.href = url
   a.download = `quills-scrolls-backup-${new Date().toISOString().slice(0, 10)}.zip`
   a.click()
-  URL.revokeObjectURL(url)
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
