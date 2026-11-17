@@ -6,7 +6,7 @@ import { shiftBaselines } from '../character/levelUp'
 import { exportCharacter } from '../storage/ioFile'
 import { applyFeatAbilityIncrease, featAbilityPick, resolveFeatGrants, applyGrantPicks, withFeatClassChoice } from '../character/grants'
 import { FeatGrantsBlock } from '../components/FeatGrantsBlock'
-import { HourglassIcon, MoonIcon, LevelUpIcon, SaveIcon, CheckIcon, ExportIcon, SearchIcon } from '../components/SheetIcons'
+import { HourglassIcon, MoonIcon, LevelUpIcon, SaveIcon, CheckIcon, ExportIcon, SearchIcon, PrinterIcon } from '../components/SheetIcons'
 import { PortraitPicker } from '../components/PortraitPicker'
 import { FeatAbilityPicker } from '../components/FeatAbilityPicker'
 import { Tab } from './sheet/helpers'
@@ -136,6 +136,10 @@ export default function Sheet() {
     quickAfterDamage,
     quickAfterHeal,
     applyDamage,
+    raging,
+    setRaging,
+    blessed,
+    setBlessed,
   } = model
 
   return (
@@ -196,6 +200,9 @@ export default function Sheet() {
             title="Export: download this character as a .json file" aria-label="Export character as JSON"
             className="inline-flex items-center justify-center w-9 h-9 rounded border border-parchment-300 text-parchment-600 hover:text-parchment-900 hover:border-parchment-500 hover:bg-parchment-100 transition-colors"
           ><ExportIcon className="w-5 h-5" /></button>
+          <Link to={`/c/${char.id}/print`} title="Printable sheet (print or save as PDF)" aria-label="Printable sheet"
+            className="inline-flex items-center justify-center w-9 h-9 rounded border border-parchment-300 text-parchment-600 hover:text-parchment-900 hover:border-parchment-500 hover:bg-parchment-100 transition-colors"
+          ><PrinterIcon className="w-5 h-5" /></Link>
         </div>
       </div>
 
@@ -650,6 +657,14 @@ export default function Sheet() {
               </span>
             )
           })()}
+          {raging && (
+            <button type="button" onClick={() => setRaging(false)} tabIndex={tabsPinned ? 0 : -1} title="Stop raging"
+              className="rounded-full bg-red-600 text-white text-xs font-semibold px-2 py-0.5 hover:bg-red-700">Raging ✕</button>
+          )}
+          {blessed && (
+            <button type="button" onClick={() => setBlessed(false)} tabIndex={tabsPinned ? 0 : -1} title="Bless has ended"
+              className="rounded-full bg-amber-400 text-white text-xs font-semibold px-2 py-0.5 hover:bg-amber-500">Blessed ✕</button>
+          )}
           {char.inspiration && (
             <span className="w-3 h-3 rotate-45 bg-amber-400 border border-amber-500" title="Inspired"
               style={{ boxShadow: '0 0 6px 2px rgba(251,191,36,0.55)' }} />
@@ -836,6 +851,7 @@ export default function Sheet() {
                 className="btn btn-primary text-sm"
                 onClick={() => {
                   offerUndo('Long rest taken')
+                  setRaging(false); setBlessed(false)
                   const resets: Record<string, number> = {}
                   longRestResourceKeys(classResources).forEach(k => {
                     const r = classResources.find(x => x.key === k)!
@@ -982,6 +998,7 @@ export default function Sheet() {
                 })}
                 onClick={() => {
                   offerUndo('Short rest taken')
+                  setRaging(false); setBlessed(false)
                   const conMod = abilityModFor(effectiveChar, 'con')
                   const totalHeal = Math.max(0, char.classes.reduce((sum, cc) => {
                     const spent = shortRestDice[cc.classSlug] ?? 0

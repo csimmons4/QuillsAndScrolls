@@ -903,3 +903,21 @@
 [data-theme='dark'] .bg-green-50\/50{background-color:rgb(34 197 94 / 0.14)}
 [data-theme='dark'] .bg-amber-50\/60{background-color:rgb(245 158 11 / 0.14)}
 [data-theme='dark'] .bg-amber-50\/40{background-color:rgb(245 158 11 / 0.14)}
+
+/* ── Printable character sheet (routes/PrintSheet): paper colours in every theme ── */
+.print-sheet { background: #fff; color: #1c1813; box-shadow: 0 2px 14px rgb(0 0 0 / 0.18); }
+.print-sheet .ps-muted { color: #6b6157; }
+.print-sheet .ps-rule { border-color: #cfc5b8; }
+.print-sheet .ps-box { border: 1px solid #9a8f82; }
+.print-sheet .ps-heading { border-bottom: 1px solid #9a8f82; }
+.print-sheet .ps-dot { width: 7px; height: 7px; border-radius: 9999px; border: 1px solid #6b6157; display: inline-block; flex-shrink: 0; }
+.print-sheet .ps-dot-on { background: #1c1813; border-color: #1c1813; }
+.print-sheet .ps-tick { width: 9px; height: 9px; border: 1px solid #6b6157; display: inline-block; }
+.print-sheet .ps-tag { font-size: 8px; font-weight: 700; border: 1px solid #9a8f82; border-radius: 3px; padding: 0 3px; margin-left: 4px; }
+.print-sheet .ps-page { break-before: page; margin-top: 2rem; }
+@media print {
+  @page { margin: 10mm; }
+  body { background: #fff !important; }
+  .print-sheet { box-shadow: none; max-width: none; padding: 0; }
+  .print-sheet .ps-page { margin-top: 0; }
+}

@@ -10,14 +10,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 npm install               # install dependencies (first time)
 npm run dev               # start both servers concurrently (see below)
 npm run build             # tsc + vite build
-npx tsc --noEmit          # type-check only — the closest thing to a test run
+npx tsc --noEmit          # type-check
+npm test                  # Vitest: the game-math tests (src/**/*.test.ts)
 npm run scrape            # scrape wikidot and output to public/data/wikidot/
 npm run scrape -- --force          # force re-download, ignore cache
 npm run scrape -- --only spells    # scrape a single category (comma-separate for several)
 npm run audit:content     # check overlays vs scraped data for gaps/mismatches
 ```
 
-No test suite exists.
+Tests live next to the code (`derive.test.ts`, `classData.test.ts`, `sheet/helpers.test.ts`, `currency.test.ts`, `localStore.test.ts`) and check the rules math against PHB values: modifiers, proficiency, HP, skills/saves/initiative, spell DC, class resources, multiclass and pact slots, AC, weapon attacks, the purse and save migrations. `src/test/fixtures.ts` builds the merged reference data from `public/data/wikidot` + overlays and a `makeChar()` helper. Add a test when you change a rule.
 
 **Launchers:** `Start (Mac).command` / `Start (Windows).bat` are the double-click entry point for non-technical users. On first run they download a private Node.js into `.runtime/` (gitignored) if none is installed, run `npm install`, kill anything on ports 5173/5174, then `npm run dev` and open the browser. Keep the two scripts and the README's Setup section in sync.
 
@@ -50,6 +51,8 @@ src/content/ContentProvider.tsx  ←  React context, exposes useContent() hook
         ↓
 Routes (Vault, Creator, Sheet, LevelUp, Lookup, Homebrew, Settings)
 ```
+
+Pages other than the Vault are `lazy()`-loaded in `App.tsx`; `vite.config.ts` splits React, zod and `src/data/` into their own chunks.
 
 All game reference data (spells, items, races, classes, backgrounds, feats) flows through `useContent()`. Routes never fetch content directly. Classes have **no overlay** — class mechanics the scraper can't capture live in `src/data/classData.ts` and are imported directly by consumers.
 
@@ -132,6 +135,7 @@ Literal Tailwind hues (amber, green, violet, red, …) are used widely for seman
 | `/` | `Vault` | Character cards (portrait, class and subclass, HP bar; Duplicate and Delete in the ⋯ menu), create/import; lists characters that failed to load. A dead character (0 HP and three failed death saves, `isFallen`, the same rule as the sheet's "You have died") gets a dark `.vault-fallen` card in a "Fallen" section at the bottom. At 0 HP but not fallen the card shows "Down" (or "Stable" after three successes) with the death-save pips |
 | `/new` | `Creator` | 8-step wizard: Race, Class, Background, Abilities, Skills, Equipment, Details, Review. The labelled progress bar jumps back to finished steps; forward is always Next (it validates) |
 | `/c/:id` | `Sheet` | Character sheet (tabs: Stats, Spells, Inventory, Features, Summons, Notes) |
+| `/c/:id/print` | `PrintSheet` | Printable two-page sheet from `useSheetModel()` (vitals, abilities, saves, skills, `attackRows`, limited uses with tick boxes, proficiencies, equipment; spells with slot boxes; features). `.print-sheet` styles at the end of `index.css` keep it black on white in every theme; the app header is `print:hidden` |
 | `/c/:id/level-up` | `LevelUp` | Level-up page (incl. multiclass prereqs). A pinned step bar lists every section card (read from the DOM: `:scope > .card` with an `h2.section-header`) with a red dot for `blockerList` and amber for `reminderList` items (each names its section's heading in `step`), plus an Apply button |
 | `/lookup` | `Lookup` | "Compendium": reference browser for all content. Each kind has a `…Parts()` function (title, tags, body); the list is on the left and the chosen entry reads in the pane on the right (opens in place on narrow screens). Spells filter by level, class and school |
 | `/homebrew` | `Homebrew` | CRUD for homebrew entries (spells, items, feats, races, classes, backgrounds) |
@@ -154,6 +158,7 @@ To give a tab something new: compute it at the top level of `useSheetModel()` an
 
 - Loading — fetches the full character list from disk and finds the one matching `:id`.
 - Layout above the tabs: header, then one vitals card (HP with Temp beside it and the Damage/Heal/Temp controls; AC, Initiative, Speed, Prof. Bonus and a shared Passive box), then the Resources strip (one pill per resource via `resourceTracker(r, true)`; descriptions longer than 14 characters go to the hover text). The tab bar is `sticky`; switch tabs with `selectTab()`, which scrolls back to the top of the tab when the bar is pinned. Once pinned (`tabsPinned`) it also shows a status strip: HP, AC, the concentration spell (with a drop button) and Inspiration. The Stats tab opens with Attacks; conditions live in the Status card as the active ones plus a "+ Add a condition" select.
+- **Fight effects:** `raging` / `blessed` are session state in the model (not saved; a rest or opening another character ends them). Starting a Rage (`startRage()`) spends a `rage-uses` and ends concentration. Both are folded into `potionFx` (advantage on STR checks/saves and resistances while raging, the Bear totem's all-but-psychic; Bless adds `1d4` to `rollBonusDice`), so saves, skills and resistances pick them up. `concRider` adds a concentration spell's extra damage (Hex, Hunter's Mark, Divine Favor, Spirit Shroud) to attack rows. `attackRows` (in the model) is the single list of attacks — Stats tab table and the printable sheet both draw from it.
 - **Undo:** call `offerUndo('Removed X')` just before a change the player might regret; a toast offers to restore the character as it was for 7 s (`undo.before`, put back with `save()`). Used for unpreparing/removing spells, removing/using/drinking items, rests, removing feats, dismissing summons and ending potions.
 - **Quick find:** ⌘K / Ctrl+K (or the magnifier in the header) opens a palette over the sheet listing spells, items, class/subclass features, feats and tabs; choosing one switches tab and opens it (rows carry `data-spell-key` / `data-item-idx` to scroll to; the Feats card is `#feats-card`).
 - Spells tab: one slim row per spell (`spellRow`: name · casting time · hit/DC · damage · C/R marks), grouped by level with each level's slot gems in its heading (`slotGems(lvl)`) and level buttons that jump to a section. Class spells (`entryRow`) and granted ones (`freeRow`, ★) share the `SpellRow` shape. The chosen spell (`selectedSpellKey`) opens in a sticky panel beside the list on wide screens, under its row on narrow ones (`spellDetails`: a card with a level seal coloured by school (`.spell-seal`, `--seal` from `schoolAccentHex`), the four facts with icons, its hit/DC and damage, Cast with a slot / free cast / Concentrate, the text with a drop cap, higher levels, Unprepare). The spell library sits inside the same card under the list, in the same rows (`libraryRow`, key `lib:<slug>`, a quick + to add, `learnSpell()`), so its cards open in the same panel. The header shows Save DC and spell attack as `.spell-stat` seals and Prepared/Known and Cantrips as fill bars (amber when over the limit). Pact Magic sits above the list.

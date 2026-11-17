@@ -54,6 +54,15 @@ export function StatsTab() {
     classResources,
     jackOfAllTrades,
     spellClassSlug,
+    raging,
+    setRaging,
+    blessed,
+    setBlessed,
+    barbarianLevel,
+    rageDamage,
+    concRider,
+    startRage,
+    attackRows,
   } = useSheet()
   return (
     <div className="space-y-5">
@@ -71,121 +80,43 @@ export function StatsTab() {
               </tr>
             </thead>
             <tbody className="divide-y divide-parchment-100">
-              {(() => {
-                const isMon = char.classes.some(c => c.classSlug === 'monk')
-                const monkLevel = char.classes.find(c => c.classSlug === 'monk')?.level ?? 0
-                const hasTB = featSlugs.includes('tavern-brawler')
-                const unarmedDie = isMon
-                  ? (monkLevel >= 17 ? '1d10' : monkLevel >= 11 ? '1d8' : monkLevel >= 5 ? '1d6' : '1d4')
-                  : hasTB ? '1d4' : '1'
-                const strMod = abilityModFor(effectiveChar, 'str')
-                const atkMod = isMon ? Math.max(strMod, abilityModFor(effectiveChar, 'dex')) : strMod
-                // A flat 1 + modifier is shown as its total (STR 8 → "0", not "1 -1")
-                const unarmedDamage = unarmedDie === '1'
-                  ? `${Math.max(0, 1 + atkMod)}`
-                  : `${unarmedDie}${atkMod !== 0 ? ` ${formatMod(atkMod)}` : ''}`
-                return (
-                  <tr>
-                    <td className="py-1.5 pr-4 font-medium">Unarmed Strike</td>
-                    <td className="py-1.5 pr-4 font-mono">{formatMod(atkMod + pb)}</td>
-                    <td className="py-1.5 pr-4">{unarmedDamage} bludgeoning</td>
-                    <td className="py-1.5 text-parchment-400 text-xs">{isMon ? `Monk d${monkLevel >= 17 ? 10 : monkLevel >= 11 ? 8 : monkLevel >= 5 ? 6 : 4}` : hasTB ? 'Tavern Brawler' : ''}</td>
-                  </tr>
-                )
-              })()}
-              {featSlugs.includes('dragon-hide') && (
-                <tr>
-                  <td className="py-1.5 pr-4 font-medium">Claws (Dragon Hide)</td>
-                  <td className="py-1.5 pr-4 font-mono">{formatMod(abilityModFor(effectiveChar, 'str') + pb)}</td>
-                  <td className="py-1.5 pr-4">1d4 {formatMod(abilityModFor(effectiveChar, 'str'))} slashing</td>
-                  <td className="py-1.5 text-parchment-400 text-xs">Natural weapon</td>
+              {attackRows.map(row => row.breath ? (
+                <tr key={row.key} className={row.breath.used ? 'opacity-50' : ''}>
+                  <td className="py-1.5 pr-4">
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-medium">{row.name}</span>
+                      {row.breath.used
+                        ? <span className="text-[10px] bg-parchment-100 text-parchment-400 rounded px-1.5 py-0.5">Used</span>
+                        : <span className="text-[10px] bg-green-100 text-green-700 rounded px-1.5 py-0.5">Ready</span>}
+                    </div>
+                  </td>
+                  <td className="py-1.5 pr-4 text-parchment-500 text-xs">{row.toHit}</td>
+                  <td className="py-1.5 pr-4">{row.damage}</td>
+                  <td className="py-1.5 text-xs">
+                    <div className="flex items-center gap-2">
+                      <span className="text-parchment-400">{row.notes}</span>
+                      <button type="button"
+                        className={`text-[10px] rounded px-1.5 py-0.5 border transition-colors ${row.breath.used ? 'border-green-300 text-green-600 hover:bg-green-50' : 'border-parchment-200 text-parchment-500 hover:border-parchment-400'}`}
+                        onClick={() => patch({ classResources: { ...char.classResources, 'breath-weapon-used': row.breath!.used ? 0 : 1 } })}>
+                        {row.breath.used ? 'Restore' : 'Mark Used'}
+                      </button>
+                    </div>
+                  </td>
                 </tr>
-              )}
-              {char.equipment.filter(e => e.equipped).map((item, idx) => {
-                const ws = resolveWeapon(item, content.items)
-                if (!ws) return null
-                const bonus = magicBonus(item, artificerLevel)
-                const proficient = isWeaponProficient(char, item)
-                const effectivePb = proficient ? pb : 0
-                const styles = fightingStyles(char)
-                // Dueling: a one-handed melee weapon and no other weapon held
-                const equippedWeaponCount = char.equipment.filter(e => e.equipped && resolveWeapon(e, content.items)).length
-                const dueling = styles.has('dueling') && !ws.ranged && !ws.twoHanded
-                  && item.slot !== 'both' && item.slot !== 'dual' && equippedWeaponCount === 1
-                const pw = potionWeaponMods(item.name)
-                const oilBonus = pw.bonus
-                const atk = weaponAttackBonus(effectiveChar, ws, effectivePb, bonus) + oilBonus
-                const dmgMod = weaponDamageMod(effectiveChar, ws, bonus) + (dueling ? 2 : 0) + oilBonus
-                const dmgStr = ws.damage === '—' ? '—'
-                  : `${ws.damage}${dmgMod !== 0 ? ` ${formatMod(dmgMod)}` : ''}${pw.damageDice} ${ws.damageType}`
-                const tags = [
-                  proficient ? '' : '⚠ Not proficient',
-                  ws.finesse ? 'Finesse' : '',
-                  isMonkWeapon(char, ws) ? 'Monk weapon' : '',
-                  ws.ranged ? 'Ranged' : '',
-                  ws.versatile ? `Versatile (${ws.versatile})` : '',
-                  bonus ? `Magic +${bonus}` : '',
-                  ws.ranged && styles.has('archery') ? 'Archery +2' : '',
-                  dueling ? 'Dueling +2 dmg' : '',
-                  oilBonus ? `Oil of Sharpness +${oilBonus}` : '',
-                  item.attuned ? '✦ Attuned' : '',
-                ].filter(Boolean).join(' · ')
-                return (
-                  <tr key={idx} className={item.attuned ? 'bg-indigo-50' : !proficient ? 'bg-red-50' : ''}>
-                    <td className="py-1.5 pr-4 font-medium">{item.name}</td>
-                    <td className="py-1.5 pr-4 font-mono">
-                      {formatMod(atk)}{pw.attackDice}
-                      {!proficient && <span className="text-red-500 ml-1 text-xs">(no prof)</span>}
-                    </td>
-                    <td className="py-1.5 pr-4">{dmgStr}</td>
-                    <td className="py-1.5 text-parchment-400 text-xs">{tags || '—'}</td>
-                  </tr>
-                )
-              })}
-              {spellClassSlug && (
-                <tr>
-                  <td className="py-1.5 pr-4 font-medium">Spell Attack</td>
-                  <td className="py-1.5 pr-4 font-mono">{formatMod(spellAttackBonus(effectiveChar, spellClassSlug, content) + itemBonuses.spellAttackBonus)}</td>
-                  <td className="py-1.5 pr-4 text-parchment-400">varies by spell</td>
-                  <td className="py-1.5 text-xs text-parchment-400">Save DC {spellSaveDC(effectiveChar, spellClassSlug, content) + itemBonuses.spellDCBonus}</td>
+              ) : (
+                <tr key={row.key} className={row.tone === 'attuned' ? 'bg-indigo-50' : row.tone === 'unproficient' ? 'bg-red-50' : ''}>
+                  <td className="py-1.5 pr-4 font-medium">{row.name}</td>
+                  <td className="py-1.5 pr-4 font-mono">
+                    {row.toHit}
+                    {row.tone === 'unproficient' && <span className="text-red-500 ml-1 text-xs">(no prof)</span>}
+                  </td>
+                  <td className={`py-1.5 pr-4 ${row.key === 'spell-attack' ? 'text-parchment-400' : ''}`}>
+                    {row.damage}
+                    {row.rider && <span className="text-violet-700 font-semibold" title={`${concRider?.label}: against its target`}> + {row.rider}</span>}
+                  </td>
+                  <td className="py-1.5 text-parchment-400 text-xs">{row.notes || '—'}</td>
                 </tr>
-              )}
-              {char.raceSlug === 'dragonborn' && (() => {
-                const dragonChoice = char.featuresChosen.find(fc => fc.key === 'dragonborn-ancestry')
-                const dragonSlug = typeof dragonChoice?.value === 'string' ? dragonChoice.value : null
-                const dragon = dragonSlug ? DRACONIC_ANCESTRIES.find(d => d.slug === dragonSlug) : null
-                if (!dragon) return null
-                const charLevel = totalLevel(char)
-                const damageDice = charLevel >= 16 ? '5d6' : charLevel >= 11 ? '4d6' : charLevel >= 6 ? '3d6' : '2d6'
-                const conMod = abilityModFor(effectiveChar, 'con')
-                const saveDC = 8 + conMod + pb
-                const used = (char.classResources['breath-weapon-used'] ?? 0) >= 1
-                return (
-                  <tr className={used ? 'opacity-50' : ''}>
-                    <td className="py-1.5 pr-4">
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-medium">Breath Weapon</span>
-                        {used
-                          ? <span className="text-[10px] bg-parchment-100 text-parchment-400 rounded px-1.5 py-0.5">Used</span>
-                          : <span className="text-[10px] bg-green-100 text-green-700 rounded px-1.5 py-0.5">Ready</span>
-                        }
-                      </div>
-                    </td>
-                    <td className="py-1.5 pr-4 text-parchment-500 text-xs">DC {saveDC} {dragon.saveType} save</td>
-                    <td className="py-1.5 pr-4">{damageDice} {dragon.damageType.toLowerCase()}</td>
-                    <td className="py-1.5 text-xs">
-                      <div className="flex items-center gap-2">
-                        <span className="text-parchment-400">{dragon.breathShape} · {dragon.name} dragon · 1/SR</span>
-                        <button type="button"
-                          className={`text-[10px] rounded px-1.5 py-0.5 border transition-colors ${used ? 'border-green-300 text-green-600 hover:bg-green-50' : 'border-parchment-200 text-parchment-500 hover:border-parchment-400'}`}
-                          onClick={() => patch({ classResources: { ...char.classResources, 'breath-weapon-used': used ? 0 : 1 } })}>
-                          {used ? 'Restore' : 'Mark Used'}
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })()}
+              ))}
             </tbody>
           </table>
         </div>
@@ -528,6 +459,34 @@ export function StatsTab() {
             <h2 className="section-header">Status</h2>
             {/* Inspiration: click to gain it; press and hold the glowing gem to spend it */}
             <InspirationToken held={char.inspiration} onChange={v => patch({ inspiration: v })} />
+            {/* In the fight: Rage (barbarians) and Bless from an ally. A minute each; a rest ends them. */}
+            {(() => {
+              const rage = classResources.find(r => r.key === 'rage-uses')
+              const rageLeft = rage ? (rage.max === null ? Infinity : rage.current) : 0
+              const bear = char.featuresChosen.some(fc => fc.key === 'totem-spirit' && fc.value === 'bear')
+              return (
+                <div className="mb-4">
+                  <div className="flex flex-wrap gap-1.5">
+                    {barbarianLevel > 0 && (
+                      <button type="button" onClick={raging ? () => setRaging(false) : startRage} disabled={!raging && rageLeft <= 0}
+                        title={raging ? 'Stop raging' : rageLeft <= 0 ? 'No rages left — a long rest restores them' : 'Start raging (uses one Rage)'}
+                        className={`px-3 py-1 rounded-full border text-xs font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${raging ? 'bg-red-600 border-red-600 text-white shadow-[0_0_10px_rgba(220,38,38,0.45)]' : 'border-red-300 text-red-700 hover:bg-red-50'}`}
+                      >{raging ? 'Raging · end' : `Rage${rage?.max !== null ? ` (${rageLeft} left)` : ''}`}</button>
+                    )}
+                    <button type="button" onClick={() => setBlessed(b => !b)}
+                      title={blessed ? 'Bless has ended' : 'An ally cast Bless on you: +1d4 to attack rolls and saving throws'}
+                      className={`px-3 py-1 rounded-full border text-xs font-semibold transition-colors ${blessed ? 'bg-amber-400 border-amber-400 text-white' : 'border-amber-300 text-amber-700 hover:bg-amber-50'}`}
+                    >{blessed ? 'Blessed · end' : 'Blessed'}</button>
+                  </div>
+                  {raging && (
+                    <p className="text-[11px] text-red-700 mt-1.5 leading-snug">
+                      +{rageDamage} melee damage with Strength · advantage on Strength checks and saves · resistance to {bear ? 'all damage but psychic' : 'bludgeoning, piercing and slashing'} · no spells or concentration
+                    </p>
+                  )}
+                  {blessed && <p className="text-[11px] text-amber-700 mt-1.5 leading-snug">+1d4 to attack rolls and saving throws</p>}
+                </div>
+              )
+            })()}
             <div className="text-xs font-semibold text-parchment-600 uppercase tracking-wide mb-1.5">Exhaustion</div>
             <div className="flex gap-1 mb-1">
               {[1,2,3,4,5,6].map(lvl => (

@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom'
 import { Character, ABILITIES } from '../../character/model'
 import { listCharactersFromDisk, saveCharacterToDisk } from '../../storage/charApi'
 import { useContent } from '../../content/ContentProvider'
-import { profBonus, skillMod, hpMax, totalLevel, passivePerception, spellAttackBonus, deriveClassResources, featureKey, resourceMatchesFeature, hasBardJackOfAllTrades, monkSpeedBonus, sneakAttackDice, paladinAuraBonus, initiativeBonus, spellcastingAbilityFor, type ClassResource } from '../../character/derive'
+import { profBonus, skillMod, hpMax, totalLevel, passivePerception, spellAttackBonus, spellSaveDC, abilityModFor, formatMod, deriveClassResources, featureKey, resourceMatchesFeature, hasBardJackOfAllTrades, monkSpeedBonus, sneakAttackDice, paladinAuraBonus, initiativeBonus, spellcastingAbilityFor, type ClassResource } from '../../character/derive'
 import { touchUpdated } from '../../character/create'
 import { CLASS_OPTIONS, infusionBonus, LAND_CIRCLE_SPELLS, isMulticlassSpellcaster, multiclassSpellSlotsMax } from '../../data/classData'
 import { sumFeatBonuses } from '../../character/featBonuses'
@@ -14,7 +14,8 @@ import { useConfirm } from '../../components/ConfirmDialog'
 import { featArmorKinds } from '../../character/proficiencies'
 import { runningPotions, sumPotionEffects } from '../../character/potionEffects'
 import type { ArmorStats } from '../../content/loaders'
-import { ABILITY_LABELS, Tab, artificerLevelOf, computeFullAC, deriveResistances, deriveSkillSources, missingProficiencies, resolveArmor, toSkillKey } from './helpers'
+import { ABILITY_LABELS, Tab, artificerLevelOf, computeFullAC, deriveResistances, deriveSkillSources, missingProficiencies, resolveArmor, toSkillKey, resolveWeapon, magicBonus, isWeaponProficient, fightingStyles, weaponAttackBonus, weaponDamageMod, isMonkWeapon } from './helpers'
+import { DRACONIC_ANCESTRIES } from '../../data/raceData'
 
 /** Everything the character sheet works from: its state, what follows from the character (AC,
  *  resources, spells…) and the actions that change it. The tabs read it through `useSheet()`. */
@@ -238,6 +239,12 @@ export function useSheetModel() {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
+  // Fight effects that last a minute: raging (barbarian) and being Blessed by an ally. They aren't
+  // saved with the character, and end on a rest or when another character is opened.
+  const [raging, setRaging] = useState(false)
+  const [blessed, setBlessed] = useState(false)
+  useEffect(() => { setRaging(false); setBlessed(false) }, [id])
+
   // Whether the tab bar is pinned to the top of the window (scrolled past its place); the status strip shows then
   const [tabsPinned, setTabsPinned] = useState(false)
   useEffect(() => {
@@ -292,7 +299,32 @@ export function useSheetModel() {
 
   // Active potions still running (not out of rounds or uses), and everything they change
   const running = runningPotions(char, content.items)
-  const potionFx = sumPotionEffects(running)
+  // Rage and Bless feed the same effects as potions: advantage, resistances and extra dice
+  const barbarianLevel = char.classes.find(c => c.classSlug === 'barbarian')?.level ?? 0
+  const rageDamage = barbarianLevel >= 16 ? 4 : barbarianLevel >= 9 ? 3 : 2
+  const potionFx = (() => {
+    const fx = sumPotionEffects(running)
+    if (raging && barbarianLevel > 0) {
+      fx.saveAdvantage.add('str')
+      fx.checkAdvantage.add('str')
+      // Totem Warrior (Bear): resistance to every damage type but psychic
+      const bear = char.featuresChosen.some(fc => fc.key === 'totem-spirit' && fc.value === 'bear')
+      const resist = bear
+        ? ['acid', 'bludgeoning', 'cold', 'fire', 'force', 'lightning', 'necrotic', 'piercing', 'poison', 'radiant', 'slashing', 'thunder']
+        : ['bludgeoning', 'piercing', 'slashing']
+      for (const r of resist) if (!fx.resistances.includes(r)) fx.resistances.push(r)
+    }
+    if (blessed && !fx.rollBonusDice.includes('1d4')) fx.rollBonusDice.push('1d4')
+    return fx
+  })()
+  // Concentration spells that add damage to your hits while they last (against the target they name)
+  const CONCENTRATION_RIDERS: Record<string, { dice: string; label: string; weaponOnly?: boolean }> = {
+    'hex': { dice: '1d6 necrotic', label: 'Hex' },
+    'hunters-mark': { dice: '1d6', label: "Hunter's Mark", weaponOnly: true },
+    'divine-favor': { dice: '1d4 radiant', label: 'Divine Favor', weaponOnly: true },
+    'spirit-shroud': { dice: '1d8', label: 'Spirit Shroud' },
+  }
+  const concRider = char.concentratingOn ? CONCENTRATION_RIDERS[char.concentratingOn] : undefined
   const potionScoreOverrides = potionFx.abilityOverrides
   // Potion effects on a weapon's numbers, shared by the attacks table and the inventory cards:
   // Oil of Sharpness (+N to hit and damage on the coated weapon), Bless dice on attack rolls,
@@ -691,8 +723,128 @@ export function useSheetModel() {
     patch(update)
   }
 
+  /** Every attack the character can make right now, worked out once for the Stats tab and the
+   *  printed sheet: to hit, damage (with Rage, potions, fighting styles) and what modifies it */
+  type AttackRow = {
+    key: string
+    name: string
+    toHit: string
+    damage: string
+    rider?: string                  // a concentration spell's extra damage against its target
+    notes: string
+    tone?: 'attuned' | 'unproficient'
+    breath?: { used: boolean }      // Dragonborn Breath Weapon: once per short rest
+  }
+  const attackRows: AttackRow[] = (() => {
+    const rows: AttackRow[] = []
+    const rollDice = potionFx.rollBonusDice.map(d => ` ${d}`).join('')
+    const strMod = abilityModFor(effectiveChar, 'str'), dexMod = abilityModFor(effectiveChar, 'dex')
+    // Unarmed strike: monk Martial Arts die or Tavern Brawler's d4, otherwise a flat 1
+    const monkLevel = char.classes.find(c => c.classSlug === 'monk')?.level ?? 0
+    const tavernBrawler = featSlugs.includes('tavern-brawler')
+    const unarmedDie = monkLevel ? (monkLevel >= 17 ? '1d10' : monkLevel >= 11 ? '1d8' : monkLevel >= 5 ? '1d6' : '1d4') : tavernBrawler ? '1d4' : '1'
+    const atkMod = monkLevel ? Math.max(strMod, dexMod) : strMod
+    const rageUnarmed = raging && barbarianLevel > 0 && strMod >= atkMod ? rageDamage : 0
+    rows.push({
+      key: 'unarmed', name: 'Unarmed Strike', toHit: formatMod(atkMod + pb) + rollDice,
+      // A flat 1 + modifier is shown as its total (STR 8 → "0", not "1 -1")
+      damage: (unarmedDie === '1' ? `${Math.max(0, 1 + atkMod + rageUnarmed)}` : `${unarmedDie}${atkMod + rageUnarmed !== 0 ? ` ${formatMod(atkMod + rageUnarmed)}` : ''}`) + ' bludgeoning',
+      notes: [monkLevel ? `Monk ${unarmedDie.slice(1)}` : tavernBrawler ? 'Tavern Brawler' : '', rageUnarmed ? `Rage +${rageUnarmed}` : ''].filter(Boolean).join(' · '),
+    })
+    if (featSlugs.includes('dragon-hide')) {
+      rows.push({ key: 'dragon-hide', name: 'Claws (Dragon Hide)', toHit: formatMod(strMod + pb) + rollDice, damage: `1d4 ${formatMod(strMod)} slashing`, notes: 'Natural weapon' })
+    }
+    const styles = fightingStyles(char)
+    const equippedWeaponCount = char.equipment.filter(e => e.equipped && resolveWeapon(e, content.items)).length
+    char.equipment.forEach((item, idx) => {
+      if (!item.equipped) return
+      const ws = resolveWeapon(item, content.items)
+      if (!ws) return
+      const bonus = magicBonus(item, artificerLevel)
+      const proficient = isWeaponProficient(char, item)
+      // Dueling: a one-handed melee weapon and no other weapon held
+      const dueling = styles.has('dueling') && !ws.ranged && !ws.twoHanded && item.slot !== 'both' && item.slot !== 'dual' && equippedWeaponCount === 1
+      const pw = potionWeaponMods(item.name)
+      // Rage adds to melee attacks made with Strength
+      const usesStr = !ws.ranged && (!(ws.finesse || isMonkWeapon(char, ws)) || strMod >= dexMod)
+      const rageBonus = raging && barbarianLevel > 0 && usesStr ? rageDamage : 0
+      const atk = weaponAttackBonus(effectiveChar, ws, proficient ? pb : 0, bonus) + pw.bonus
+      const dmgMod = weaponDamageMod(effectiveChar, ws, bonus) + (dueling ? 2 : 0) + pw.bonus + rageBonus
+      rows.push({
+        key: `weapon-${idx}`, name: item.name,
+        toHit: formatMod(atk) + pw.attackDice,
+        damage: ws.damage === '—' ? '—' : `${ws.damage}${dmgMod !== 0 ? ` ${formatMod(dmgMod)}` : ''}${pw.damageDice} ${ws.damageType}`,
+        rider: concRider && ws.damage !== '—' ? concRider.dice : undefined,
+        notes: [
+          proficient ? '' : '⚠ Not proficient',
+          ws.finesse ? 'Finesse' : '',
+          isMonkWeapon(char, ws) ? 'Monk weapon' : '',
+          ws.ranged ? 'Ranged' : '',
+          ws.versatile ? `Versatile (${ws.versatile})` : '',
+          bonus ? `Magic +${bonus}` : '',
+          ws.ranged && styles.has('archery') ? 'Archery +2' : '',
+          dueling ? 'Dueling +2 dmg' : '',
+          rageBonus ? `Rage +${rageBonus}` : '',
+          styles.has('great-weapon') && !ws.ranged && (ws.twoHanded || ws.versatile) ? `Great Weapon Fighting: reroll 1s and 2s${ws.twoHanded ? '' : ' when two-handed'}` : '',
+          pw.bonus ? `Oil of Sharpness +${pw.bonus}` : '',
+          item.attuned ? '✦ Attuned' : '',
+          concRider ? `${concRider.label} target` : '',
+        ].filter(Boolean).join(' · '),
+        tone: item.attuned ? 'attuned' : !proficient ? 'unproficient' : undefined,
+      })
+    })
+    if (spellClassSlug) {
+      rows.push({
+        key: 'spell-attack', name: 'Spell Attack',
+        toHit: formatMod(spellAttackBonus(effectiveChar, spellClassSlug, content) + itemBonuses.spellAttackBonus) + rollDice,
+        damage: 'varies by spell',
+        rider: concRider && !concRider.weaponOnly ? concRider.dice : undefined,
+        notes: `Save DC ${spellSaveDC(effectiveChar, spellClassSlug, content) + itemBonuses.spellDCBonus}`,
+      })
+    }
+    if (char.raceSlug === 'dragonborn') {
+      const choice = char.featuresChosen.find(fc => fc.key === 'dragonborn-ancestry')
+      const dragon = typeof choice?.value === 'string' ? DRACONIC_ANCESTRIES.find(d => d.slug === choice.value) : undefined
+      if (dragon) {
+        const charLevel = totalLevel(char)
+        rows.push({
+          key: 'breath', name: 'Breath Weapon',
+          toHit: `DC ${8 + abilityModFor(effectiveChar, 'con') + pb} ${dragon.saveType} save`,
+          damage: `${charLevel >= 16 ? '5d6' : charLevel >= 11 ? '4d6' : charLevel >= 6 ? '3d6' : '2d6'} ${dragon.damageType.toLowerCase()}`,
+          notes: `${dragon.breathShape} · ${dragon.name} dragon · 1/SR`,
+          breath: { used: (char.classResources['breath-weapon-used'] ?? 0) >= 1 },
+        })
+      }
+    }
+    return rows
+  })()
+
+  /** Start raging: spends a Rage, and ends concentration (a raging barbarian can't concentrate or cast) */
+  const startRage = async () => {
+    const rage = classResources.find(r => r.key === 'rage-uses')
+    if (!rage || (rage.max !== null && rage.current <= 0)) return
+    if (char.concentratingOn) {
+      const conc = content.spells.find(s => s.slug === char.concentratingOn)?.name ?? char.concentratingOn
+      if (!(await askConfirm({ title: 'Start Raging?', message: `Raging ends your concentration on ${conc}.`, confirmLabel: 'Rage' }))) return
+    }
+    patch({
+      ...(rage.max !== null ? { classResources: { ...char.classResources, 'rage-uses': rage.current - 1 } } : {}),
+      concentratingOn: undefined,
+    })
+    setRaging(true)
+  }
+
   return {
     ready: true as const,
+    raging,
+    setRaging,
+    blessed,
+    setBlessed,
+    barbarianLevel,
+    rageDamage,
+    concRider,
+    startRage,
+    attackRows,
     id,
     content,
     char,

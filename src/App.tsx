@@ -2,13 +2,17 @@ import { BrowserRouter, Routes, Route, NavLink, Link, useLocation } from 'react-
 import { ContentProvider } from './content/ContentProvider'
 import { ThemeProvider } from './theme/theme'
 import { RecentCharacterProvider, useRecentCharacter } from './storage/recentCharacter'
+import { lazy, Suspense } from 'react'
 import Vault from './routes/Vault'
-import Creator from './routes/Creator'
-import Sheet from './routes/Sheet'
-import LevelUp from './routes/LevelUp'
-import Homebrew from './routes/Homebrew'
-import Lookup from './routes/Lookup'
-import Settings from './routes/Settings'
+
+// The other pages load when first opened, so the Vault comes up quickly
+const Creator = lazy(() => import('./routes/Creator'))
+const Sheet = lazy(() => import('./routes/Sheet'))
+const PrintSheet = lazy(() => import('./routes/PrintSheet'))
+const LevelUp = lazy(() => import('./routes/LevelUp'))
+const Homebrew = lazy(() => import('./routes/Homebrew'))
+const Lookup = lazy(() => import('./routes/Lookup'))
+const Settings = lazy(() => import('./routes/Settings'))
 
 function NavBar() {
   const linkClass = ({ isActive }: { isActive: boolean }) =>
@@ -18,7 +22,7 @@ function NavBar() {
   const onRecentSheet = !!recent && pathname.startsWith(`/c/${recent.id}`)
 
   return (
-    <header className="app-header shadow-lg">
+    <header className="app-header shadow-lg print:hidden">
       <div className="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center gap-x-6 gap-y-2">
         <Link to="/" className="nav-brand text-xl font-bold tracking-wide whitespace-nowrap">
           Quills &amp; Scrolls
@@ -48,16 +52,19 @@ export default function App() {
       <ContentProvider>
         <div className="min-h-screen flex flex-col">
           <NavBar />
-          <main className="flex-1 max-w-7xl w-full mx-auto px-4 py-6">
+          <main className="flex-1 max-w-7xl w-full mx-auto px-4 py-6 print:p-0 print:max-w-none">
+            <Suspense fallback={<div className="text-center py-20 text-parchment-400">Loading…</div>}>
             <Routes>
               <Route path="/" element={<Vault />} />
               <Route path="/new" element={<Creator />} />
               <Route path="/c/:id" element={<Sheet />} />
+              <Route path="/c/:id/print" element={<PrintSheet />} />
               <Route path="/c/:id/level-up" element={<LevelUp />} />
               <Route path="/lookup" element={<Lookup />} />
               <Route path="/homebrew" element={<Homebrew />} />
               <Route path="/settings" element={<Settings />} />
             </Routes>
+            </Suspense>
           </main>
         </div>
       </ContentProvider>

@@ -736,13 +736,7 @@ export function deriveClassResources(char: Character): ClassResource[] {
         break
       }
       case 'ranger': {
-        if (lvl >= 3) {
-          resources.push({
-            key: 'primeval-awareness', name: 'Primeval Awareness', classSlug: slug,
-            current: 0, max: null, recharge: 'long',
-            display: 'Spend spell slot · 1 min/slot level · sense creature types ≤1 mi',
-          })
-        }
+        // Primeval Awareness (3) spends a spell slot each time, so it has no uses to track
         // ── Subclass resources ──
         if (cc.subclassSlug === 'horizon-walker' && lvl >= 7) {
           resources.push({

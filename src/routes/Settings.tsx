@@ -6,6 +6,7 @@ import { CLASS_OPTIONS } from '../data/classData'
 import { deriveClassResources } from '../character/derive'
 import type { Character } from '../character/model'
 import { useTheme, THEMES } from '../theme/theme'
+import { PaletteIcon, BookIcon, ExportIcon, ScalesIcon, ChecklistIcon } from '../components/SheetIcons'
 
 const CLASS_SLUGS = Object.keys(CLASS_OPTIONS).sort()
 
@@ -46,8 +47,8 @@ function ClassCoverage() {
   }
 
   return (
-    <div className="card mb-6">
-      <h2 className="section-header">Class Coverage</h2>
+    <details className="card mb-6">
+      <summary className="section-header flex items-center gap-2 cursor-pointer select-none"><ChecklistIcon className="w-5 h-5 text-[rgb(var(--accent))] shrink-0" /> Class Coverage <span className="ml-auto text-xs font-normal normal-case tracking-normal text-parchment-400">for checking the app ▾</span></summary>
       <p className="text-sm text-parchment-500 mb-4">
         Shows what resources are tracked for a given class, level, and subclass. Gaps here mean a feature isn't implemented yet.
       </p>
@@ -124,17 +125,17 @@ function ClassCoverage() {
       <p className="text-xs text-parchment-400 mt-3">
         All ability scores assumed 16 (+3). Warlock invocation uses won't show without a real character's saved choices.
       </p>
-    </div>
+    </details>
   )
 }
 
 const CATEGORY_META = [
-  { key: 'spells', label: 'Spells', icon: '✨' },
-  { key: 'items', label: 'Items', icon: '⚔️' },
-  { key: 'feats', label: 'Feats', icon: '🎖️' },
-  { key: 'races', label: 'Races', icon: '🧝' },
-  { key: 'backgrounds', label: 'Backgrounds', icon: '📖' },
-  { key: 'classes', label: 'Classes', icon: '🛡️' },
+  { key: 'spells', label: 'Spells' },
+  { key: 'items', label: 'Items' },
+  { key: 'feats', label: 'Feats' },
+  { key: 'races', label: 'Races' },
+  { key: 'backgrounds', label: 'Backgrounds' },
+  { key: 'classes', label: 'Classes' },
 ] as const
 
 function timeAgo(iso: string): string {
@@ -180,7 +181,7 @@ export default function Settings() {
 
       {/* Appearance */}
       <div className="card mb-6">
-        <h2 className="section-header flex items-center gap-2"><span aria-hidden>🎨</span> Appearance</h2>
+        <h2 className="section-header flex items-center gap-2"><PaletteIcon className="w-5 h-5 text-[rgb(var(--accent))] shrink-0" /> Appearance</h2>
         <p className="text-sm text-parchment-500 mb-4">Choose a display theme. Saved to this browser.</p>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {THEMES.map(t => {
@@ -211,9 +212,20 @@ export default function Settings() {
         </div>
       </div>
 
+      {/* Backup */}
+      <div className="card mb-6">
+        <h2 className="section-header flex items-center gap-2"><ExportIcon className="w-5 h-5 text-[rgb(var(--accent))] shrink-0" /> Backup &amp; Export</h2>
+        <p className="text-sm text-parchment-500 mb-4">
+          Download all your characters and homebrew as a single ZIP. Re-import individual characters with the Vault's “Import .json” button.
+        </p>
+        <button className="btn-primary" onClick={handleBackup}>
+          <ExportIcon className="w-4 h-4 mr-1.5" /> Download Backup (.zip)
+        </button>
+      </div>
+
       {/* Reference data */}
       <div className="card mb-6">
-        <h2 className="section-header flex items-center gap-2"><span aria-hidden>📜</span> Reference Data</h2>
+        <h2 className="section-header flex items-center gap-2"><BookIcon className="w-5 h-5 text-[rgb(var(--accent))] shrink-0" /> Reference Data</h2>
 
         {content.loading ? (
           <p className="text-parchment-400 text-sm">Loading…</p>
@@ -222,7 +234,6 @@ export default function Settings() {
             <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 mb-4">
               {CATEGORY_META.map(c => (
                 <div key={c.key} className="stat-box">
-                  <span className="text-base leading-none mb-1" aria-hidden>{c.icon}</span>
                   <span className="text-xl font-bold text-parchment-800 tabular-nums">{counts[c.key].toLocaleString()}</span>
                   <span className="text-[10px] uppercase tracking-wide text-parchment-500 text-center leading-tight">{c.label}</span>
                 </div>
@@ -265,23 +276,12 @@ export default function Settings() {
         )}
       </div>
 
-      {/* Backup */}
-      <div className="card mb-6">
-        <h2 className="section-header flex items-center gap-2"><span aria-hidden>💾</span> Backup &amp; Export</h2>
-        <p className="text-sm text-parchment-500 mb-4">
-          Download all your characters and homebrew as a single ZIP. Re-import individual characters with the Vault's “Import .json” button.
-        </p>
-        <button className="btn-primary" onClick={handleBackup}>
-          <span className="mr-1.5" aria-hidden>⬇</span> Download Backup (.zip)
-        </button>
-      </div>
-
       {/* Class coverage */}
       <ClassCoverage />
 
       {/* Attribution */}
       <div className="card">
-        <h2 className="section-header flex items-center gap-2"><span aria-hidden>⚖️</span> Attribution</h2>
+        <h2 className="section-header flex items-center gap-2"><ScalesIcon className="w-5 h-5 text-[rgb(var(--accent))] shrink-0" /> Attribution</h2>
         <p className="text-sm text-parchment-600">
           Game reference content sourced from{' '}
           <a href="https://dnd5e.wikidot.com" target="_blank" rel="noreferrer" className="text-parchment-700 underline hover:text-parchment-900">
