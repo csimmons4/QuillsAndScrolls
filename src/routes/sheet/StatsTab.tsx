@@ -1,0 +1,779 @@
+import { Character, SKILLS, SKILL_LABELS, SKILL_ABILITY, ABILITIES } from '../../character/model'
+import { abilityModFor, skillMod, saveMod, totalLevel, formatMod, spellSaveDC, spellAttackBonus } from '../../character/derive'
+import { DRACONIC_ANCESTRIES, LANGUAGES_STANDARD, LANGUAGES_EXOTIC, languageChoiceCount, languageChoicePlaceholder } from '../../data/raceData'
+import { InspirationToken } from '../../components/InspirationToken'
+import { ARMOR_KINDS, ARTISAN_TOOLS, MUSICAL_INSTRUMENTS, GAMING_SETS, OTHER_TOOLS, armorKindsOf, profKey, isToolItem, proficiencySources, type ArmorKind } from '../../character/proficiencies'
+import { describePotionEffects } from '../../character/potionEffects'
+import { ABILITY_FULL, ABILITY_LABELS, CONDITIONS, SIMPLE_WEAPON_SLUGS, SkillSourceTag, fightingStyles, isArmorProficient, isMonkWeapon, isWeaponProficient, magicBonus, resolveArmor, resolveWeapon, weaponAttackBonus, weaponDamageMod } from './helpers'
+import { useSheet } from './SheetContext'
+
+/** The Stats tab: attacks, ability scores, saves, skills, status and proficiencies */
+export function StatsTab() {
+  const {
+    id,
+    content,
+    char,
+    profEditing,
+    setProfEditing,
+    newToolText,
+    setNewToolText,
+    newLangText,
+    setNewLangText,
+    save,
+    offerUndo,
+    patch,
+    level,
+    pb,
+    featSlugs,
+    featBonuses,
+    featArmor,
+    artificerLevel,
+    itemBonuses,
+    potionFx,
+    potionScoreOverrides,
+    potionWeaponMods,
+    effectiveChar,
+    effectiveCharSkills,
+    endPotion,
+    walkSpeed,
+    paladinAura,
+    attuned,
+    skillInfo,
+    skillBaseProf,
+    skillBaseExpert,
+    skillChanged,
+    resetSkill,
+    resetAllSkills,
+    abilityBase,
+    abilitiesChanged,
+    resetAllAbilities,
+    saveBase,
+    savesChanged,
+    resetSave,
+    resetAllSaves,
+    classResources,
+    jackOfAllTrades,
+    spellClassSlug,
+  } = useSheet()
+  return (
+    <div className="space-y-5">
+      {/* Attacks — full width, first: they're what you look at most in a fight */}
+      <div className="card">
+        <h2 className="section-header">Attacks</h2>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-xs uppercase text-parchment-500 border-b border-parchment-200">
+                <th className="pb-1 pr-4 font-medium">Name</th>
+                <th className="pb-1 pr-4 font-medium">Attack Bonus</th>
+                <th className="pb-1 pr-4 font-medium">Damage / Type</th>
+                <th className="pb-1 font-medium">Notes</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-parchment-100">
+              {(() => {
+                const isMon = char.classes.some(c => c.classSlug === 'monk')
+                const monkLevel = char.classes.find(c => c.classSlug === 'monk')?.level ?? 0
+                const hasTB = featSlugs.includes('tavern-brawler')
+                const unarmedDie = isMon
+                  ? (monkLevel >= 17 ? '1d10' : monkLevel >= 11 ? '1d8' : monkLevel >= 5 ? '1d6' : '1d4')
+                  : hasTB ? '1d4' : '1'
+                const strMod = abilityModFor(effectiveChar, 'str')
+                const atkMod = isMon ? Math.max(strMod, abilityModFor(effectiveChar, 'dex')) : strMod
+                // A flat 1 + modifier is shown as its total (STR 8 → "0", not "1 -1")
+                const unarmedDamage = unarmedDie === '1'
+                  ? `${Math.max(0, 1 + atkMod)}`
+                  : `${unarmedDie}${atkMod !== 0 ? ` ${formatMod(atkMod)}` : ''}`
+                return (
+                  <tr>
+                    <td className="py-1.5 pr-4 font-medium">Unarmed Strike</td>
+                    <td className="py-1.5 pr-4 font-mono">{formatMod(atkMod + pb)}</td>
+                    <td className="py-1.5 pr-4">{unarmedDamage} bludgeoning</td>
+                    <td className="py-1.5 text-parchment-400 text-xs">{isMon ? `Monk d${monkLevel >= 17 ? 10 : monkLevel >= 11 ? 8 : monkLevel >= 5 ? 6 : 4}` : hasTB ? 'Tavern Brawler' : ''}</td>
+                  </tr>
+                )
+              })()}
+              {featSlugs.includes('dragon-hide') && (
+                <tr>
+                  <td className="py-1.5 pr-4 font-medium">Claws (Dragon Hide)</td>
+                  <td className="py-1.5 pr-4 font-mono">{formatMod(abilityModFor(effectiveChar, 'str') + pb)}</td>
+                  <td className="py-1.5 pr-4">1d4 {formatMod(abilityModFor(effectiveChar, 'str'))} slashing</td>
+                  <td className="py-1.5 text-parchment-400 text-xs">Natural weapon</td>
+                </tr>
+              )}
+              {char.equipment.filter(e => e.equipped).map((item, idx) => {
+                const ws = resolveWeapon(item, content.items)
+                if (!ws) return null
+                const bonus = magicBonus(item, artificerLevel)
+                const proficient = isWeaponProficient(char, item)
+                const effectivePb = proficient ? pb : 0
+                const styles = fightingStyles(char)
+                // Dueling: a one-handed melee weapon and no other weapon held
+                const equippedWeaponCount = char.equipment.filter(e => e.equipped && resolveWeapon(e, content.items)).length
+                const dueling = styles.has('dueling') && !ws.ranged && !ws.twoHanded
+                  && item.slot !== 'both' && item.slot !== 'dual' && equippedWeaponCount === 1
+                const pw = potionWeaponMods(item.name)
+                const oilBonus = pw.bonus
+                const atk = weaponAttackBonus(effectiveChar, ws, effectivePb, bonus) + oilBonus
+                const dmgMod = weaponDamageMod(effectiveChar, ws, bonus) + (dueling ? 2 : 0) + oilBonus
+                const dmgStr = ws.damage === '—' ? '—'
+                  : `${ws.damage}${dmgMod !== 0 ? ` ${formatMod(dmgMod)}` : ''}${pw.damageDice} ${ws.damageType}`
+                const tags = [
+                  proficient ? '' : '⚠ Not proficient',
+                  ws.finesse ? 'Finesse' : '',
+                  isMonkWeapon(char, ws) ? 'Monk weapon' : '',
+                  ws.ranged ? 'Ranged' : '',
+                  ws.versatile ? `Versatile (${ws.versatile})` : '',
+                  bonus ? `Magic +${bonus}` : '',
+                  ws.ranged && styles.has('archery') ? 'Archery +2' : '',
+                  dueling ? 'Dueling +2 dmg' : '',
+                  oilBonus ? `Oil of Sharpness +${oilBonus}` : '',
+                  item.attuned ? '✦ Attuned' : '',
+                ].filter(Boolean).join(' · ')
+                return (
+                  <tr key={idx} className={item.attuned ? 'bg-indigo-50' : !proficient ? 'bg-red-50' : ''}>
+                    <td className="py-1.5 pr-4 font-medium">{item.name}</td>
+                    <td className="py-1.5 pr-4 font-mono">
+                      {formatMod(atk)}{pw.attackDice}
+                      {!proficient && <span className="text-red-500 ml-1 text-xs">(no prof)</span>}
+                    </td>
+                    <td className="py-1.5 pr-4">{dmgStr}</td>
+                    <td className="py-1.5 text-parchment-400 text-xs">{tags || '—'}</td>
+                  </tr>
+                )
+              })}
+              {spellClassSlug && (
+                <tr>
+                  <td className="py-1.5 pr-4 font-medium">Spell Attack</td>
+                  <td className="py-1.5 pr-4 font-mono">{formatMod(spellAttackBonus(effectiveChar, spellClassSlug, content) + itemBonuses.spellAttackBonus)}</td>
+                  <td className="py-1.5 pr-4 text-parchment-400">varies by spell</td>
+                  <td className="py-1.5 text-xs text-parchment-400">Save DC {spellSaveDC(effectiveChar, spellClassSlug, content) + itemBonuses.spellDCBonus}</td>
+                </tr>
+              )}
+              {char.raceSlug === 'dragonborn' && (() => {
+                const dragonChoice = char.featuresChosen.find(fc => fc.key === 'dragonborn-ancestry')
+                const dragonSlug = typeof dragonChoice?.value === 'string' ? dragonChoice.value : null
+                const dragon = dragonSlug ? DRACONIC_ANCESTRIES.find(d => d.slug === dragonSlug) : null
+                if (!dragon) return null
+                const charLevel = totalLevel(char)
+                const damageDice = charLevel >= 16 ? '5d6' : charLevel >= 11 ? '4d6' : charLevel >= 6 ? '3d6' : '2d6'
+                const conMod = abilityModFor(effectiveChar, 'con')
+                const saveDC = 8 + conMod + pb
+                const used = (char.classResources['breath-weapon-used'] ?? 0) >= 1
+                return (
+                  <tr className={used ? 'opacity-50' : ''}>
+                    <td className="py-1.5 pr-4">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-medium">Breath Weapon</span>
+                        {used
+                          ? <span className="text-[10px] bg-parchment-100 text-parchment-400 rounded px-1.5 py-0.5">Used</span>
+                          : <span className="text-[10px] bg-green-100 text-green-700 rounded px-1.5 py-0.5">Ready</span>
+                        }
+                      </div>
+                    </td>
+                    <td className="py-1.5 pr-4 text-parchment-500 text-xs">DC {saveDC} {dragon.saveType} save</td>
+                    <td className="py-1.5 pr-4">{damageDice} {dragon.damageType.toLowerCase()}</td>
+                    <td className="py-1.5 text-xs">
+                      <div className="flex items-center gap-2">
+                        <span className="text-parchment-400">{dragon.breathShape} · {dragon.name} dragon · 1/SR</span>
+                        <button type="button"
+                          className={`text-[10px] rounded px-1.5 py-0.5 border transition-colors ${used ? 'border-green-300 text-green-600 hover:bg-green-50' : 'border-parchment-200 text-parchment-500 hover:border-parchment-400'}`}
+                          onClick={() => patch({ classResources: { ...char.classResources, 'breath-weapon-used': used ? 0 : 1 } })}>
+                          {used ? 'Restore' : 'Mark Used'}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })()}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+
+        {/* Col 1: Ability Scores + Saving Throws */}
+        <div className="space-y-4">
+          <div className="card p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <h2 className="section-header mb-0 flex-1">Ability Scores</h2>
+              {abilitiesChanged.length > 0 && (
+                <button type="button" onClick={resetAllAbilities}
+                  title={`Changed by hand: ${abilitiesChanged.map(a => ABILITY_LABELS[a]).join(', ')}. Click to restore them.`}
+                  className="text-xs rounded-full px-2.5 py-0.5 border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors shrink-0"
+                >↺ Reset {abilitiesChanged.length} changed</button>
+              )}
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {ABILITIES.map(a => (
+                <div key={a} className="stat-box relative">
+                  <div className="text-xs text-parchment-500 uppercase">{ABILITY_LABELS[a]}</div>
+                  <input
+                    type="number"
+                    min={1}
+                    max={30}
+                    className="text-2xl font-bold w-12 text-center bg-transparent border-none outline-none focus:bg-parchment-50 rounded"
+                    value={char.abilityScores[a]}
+                    onChange={e => {
+                      const scores = { ...char.abilityScores, [a]: parseInt(e.target.value, 10) || 10 }
+                      patch({ abilityScores: scores as Character['abilityScores'] })
+                    }}
+                  />
+                  <div className="text-sm font-semibold text-parchment-600">
+                    {formatMod(abilityModFor(effectiveChar, a))}
+                    {effectiveChar.abilityScores[a] !== char.abilityScores[a] && (
+                      <span className="text-xs text-indigo-500 ml-0.5"
+                        title={`Currently ${effectiveChar.abilityScores[a]} from ${potionScoreOverrides[a] === effectiveChar.abilityScores[a] ? 'an active potion' : 'an equipped item'}`}
+                      >★{effectiveChar.abilityScores[a]}</span>
+                    )}
+                  </div>
+                  {/* In the corner, so a changed box keeps the same layout as the others */}
+                  {abilitiesChanged.includes(a) && (
+                    <button type="button" onClick={() => patch({ abilityScores: { ...char.abilityScores, [a]: abilityBase[a] } })}
+                      title={`Changed by hand (was ${abilityBase[a]}). Click to reset.`}
+                      className="absolute top-1 right-1.5 text-[11px] font-semibold text-amber-700 hover:text-amber-900"
+                    >↺ {abilityBase[a]}</button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="card p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <h2 className="section-header mb-0 flex-1">Saving Throws</h2>
+              {savesChanged.length > 0 && (
+                <button type="button" onClick={resetAllSaves}
+                  title={`Changed by hand: ${savesChanged.map(a => ABILITY_FULL[a]).join(', ')}. Click to restore them.`}
+                  className="text-xs rounded-full px-2.5 py-0.5 border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors shrink-0"
+                >↺ Reset {savesChanged.length} changed</button>
+              )}
+            </div>
+            <div className="space-y-1.5">
+              {ABILITIES.map(a => (
+                <div key={a} className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={char.saveProficiencies.includes(a)}
+                    onChange={e => {
+                      const s = new Set(char.saveProficiencies)
+                      e.target.checked ? s.add(a) : s.delete(a)
+                      patch({ saveProficiencies: [...s] })
+                    }}
+                  />
+                  <span className="w-10 font-mono text-right text-parchment-700">{formatMod(saveMod(effectiveChar, a) + itemBonuses.savingThrowBonus + paladinAura)}</span>
+                  <span className="flex-1">{ABILITY_FULL[a]}</span>
+                  {savesChanged.includes(a) && (
+                    <button type="button" onClick={() => resetSave(a)}
+                      title={`Changed by hand. Originally ${saveBase.has(a) ? 'proficient' : 'not proficient'}. Click to reset.`}
+                      className="text-[11px] font-semibold text-amber-700 hover:text-amber-900 shrink-0"
+                    >↺ reset</button>
+                  )}
+                  {paladinAura > 0 && <span className="text-xs bg-yellow-100 text-yellow-700 rounded px-1.5 py-0.5">+{paladinAura} Aura</span>}
+                  {a === 'con' && featBonuses.concentrationAdvantage && (
+                    <span className="text-xs bg-amber-100 text-amber-700 rounded px-1.5 py-0.5">War Caster</span>
+                  )}
+                  {/* Active potions: advantage/disadvantage (they cancel out) and Bless dice */}
+                  {potionFx.saveAdvantage.has(a) && !potionFx.saveDisadvantage.has(a) && (
+                    <span className="text-xs bg-teal-100 text-teal-700 rounded px-1.5 py-0.5" title="From an active potion">Adv</span>
+                  )}
+                  {potionFx.saveDisadvantage.has(a) && !potionFx.saveAdvantage.has(a) && (
+                    <span className="text-xs bg-red-100 text-red-700 rounded px-1.5 py-0.5" title="From an active potion">Disadv</span>
+                  )}
+                  {potionFx.rollBonusDice.map(d => (
+                    <span key={d} className="text-xs bg-teal-100 text-teal-700 rounded px-1.5 py-0.5" title="From an active potion">{d}</span>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Active Potions — added by Drink; minute-long effects count down in rounds */}
+          {char.activePotions.length > 0 && (
+            <div className="card p-4">
+              <h2 className="section-header">Active Potions</h2>
+              <div className="space-y-2">
+                {char.activePotions.map(p => {
+                  const def = content.items.find(i => i.slug === p.itemSlug)?.potion
+                  const outOfUses = p.usesLeft === 0
+                  const ended = p.roundsLeft === 0 || outOfUses
+                  const update = (changes: Partial<typeof p>) =>
+                    patch({ activePotions: char.activePotions.map(x => x.id === p.id ? { ...x, ...changes } : x) })
+                  const action = def?.action
+                  const applied = describePotionEffects(def, p.choice, walkSpeed)
+                  // Potion of Poison after a failed save: usesLeft counts the damage dice still to come
+                  const poisonFx = def?.onDrink?.damage
+                  const isPoison = !!poisonFx?.ongoingDice && !def?.uses
+                  return (
+                    <div key={p.id} className={`rounded-lg border px-3 py-2 ${ended ? 'border-parchment-200 bg-parchment-50 opacity-70' : 'border-teal-200 bg-teal-50'}`}>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="text-sm font-semibold text-parchment-900 truncate">{p.name}</div>
+                          <span className="inline-block mt-0.5 text-[11px] font-semibold rounded px-1.5 py-0.5 bg-teal-100 text-teal-700">{p.effect}</span>
+                        </div>
+                        <button type="button" onClick={() => { offerUndo(`Ended ${p.name}`); endPotion(p.id) }}
+                          title="End this effect"
+                          className="shrink-0 text-xs rounded border border-parchment-300 px-2 py-0.5 text-parchment-600 hover:border-red-400 hover:text-red-600 transition-colors"
+                        >End</button>
+                      </div>
+                      {/* What the potion lets you do — its own DC, not yours */}
+                      {action && !ended && (
+                        <div className="mt-1.5 rounded border border-teal-200 bg-parchment-50 px-2 py-1.5 text-xs space-y-0.5">
+                          <div className="font-semibold text-parchment-800">
+                            {action.name}
+                            <span className="font-normal text-parchment-500"> · {action.timing}{action.range ? ` · ${action.range}` : ''}</span>
+                          </div>
+                          {(action.save || action.damage) && (
+                            <div className="text-parchment-700">
+                              {action.save && <>DC {action.save.dc} {ABILITY_FULL[action.save.ability]} save</>}
+                              {action.save && action.damage && ' · '}
+                              {action.damage && <span className="font-semibold">{action.damage}</span>}
+                              {action.onSave === 'half' && ' (half on a success)'}
+                            </div>
+                          )}
+                          {action.text && <div className="text-parchment-500">{action.text}</div>}
+                        </div>
+                      )}
+                      {/* Poison: damage each turn until saves wear it down */}
+                      {isPoison && p.usesLeft! > 0 && (
+                        <div className="mt-1.5 rounded border border-red-200 bg-red-50 px-2 py-1.5 text-xs space-y-1">
+                          <div className="text-red-800">
+                            Start of your turn: take <strong>{p.usesLeft}{poisonFx!.dice.replace(/^\d+/, '')} {poisonFx!.type}</strong>.
+                            End of your turn: DC {poisonFx!.save.dc} {ABILITY_FULL[poisonFx!.save.ability]} save; a success removes one die.
+                          </div>
+                          <button type="button"
+                            onClick={() => p.usesLeft === 1 ? endPotion(p.id) : update({ usesLeft: p.usesLeft! - 1 })}
+                            className="text-[11px] font-semibold rounded border border-red-300 bg-parchment-50 px-2 py-0.5 text-red-700 hover:bg-red-100 transition-colors"
+                          >Saved (−1 die){p.usesLeft === 1 ? ': poison ends' : ''}</button>
+                        </div>
+                      )}
+                      {/* Limited uses (Fire Breath ×3, Fragments of Possibility ×2…) */}
+                      {p.usesLeft !== undefined && !isPoison && (
+                        <div className="flex items-center gap-1.5 mt-1.5">
+                          {Array.from({ length: def?.uses ?? p.usesLeft }).map((_, i) => (
+                            <span key={i} className={`w-3 h-3 rounded-full border-2 ${i < p.usesLeft! ? 'bg-teal-500 border-teal-500' : 'border-teal-300'}`} />
+                          ))}
+                          <span className={`text-xs font-semibold ml-1 ${outOfUses ? 'text-red-600' : 'text-teal-800'}`}>
+                            {outOfUses ? 'All used' : `${p.usesLeft} left`}
+                          </span>
+                          {!outOfUses && (
+                            <button type="button" onClick={() => update({ usesLeft: p.usesLeft! - 1 })}
+                              className="ml-auto text-[11px] font-semibold rounded border border-teal-400 bg-teal-100 px-2 py-0.5 text-teal-800 hover:bg-teal-200 transition-colors"
+                            >Use</button>
+                          )}
+                        </div>
+                      )}
+                      {/* What it's doing to your sheet right now */}
+                      {applied.length > 0 && !ended && (
+                        <ul className="mt-1.5 text-xs font-semibold text-indigo-600 space-y-0.5">
+                          {applied.map(line => <li key={line}>✓ {line}</li>)}
+                        </ul>
+                      )}
+                      {def?.note && !ended && <div className="text-[11px] text-parchment-600 mt-1">{def.note}</div>}
+                      {outOfUses || isPoison ? null : p.roundsLeft !== undefined ? (
+                        <div className="flex items-center gap-2 mt-1.5">
+                          <span className={`text-xs font-semibold ${ended ? 'text-red-600' : 'text-teal-800'}`}>
+                            {ended ? 'Duration over' : `${p.roundsLeft} round${p.roundsLeft === 1 ? '' : 's'} left`}
+                          </span>
+                          <span className="text-[11px] text-parchment-400">({p.duration})</span>
+                          {!ended && (
+                            <button type="button" onClick={() => update({ roundsLeft: Math.max(0, p.roundsLeft! - 1) })}
+                              className="ml-auto text-[11px] rounded border border-teal-300 px-1.5 py-0.5 text-teal-700 hover:bg-teal-100 transition-colors"
+                            >−1 round</button>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="text-xs text-teal-800 mt-1.5">Lasts {p.duration}</div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+              <p className="text-[11px] text-parchment-400 mt-2">Short rests end effects of up to 1 hour; long rests up to 8 hours.</p>
+            </div>
+          )}
+        </div>
+
+        {/* Col 2: Skills */}
+        <div className="card p-4 self-start">
+          {(() => {
+            const changed = SKILLS.filter(s => skillChanged(s))
+            return (
+              <div className="flex items-center gap-2 mb-2">
+                <h2 className="section-header mb-0 flex-1">Skills</h2>
+                {changed.length > 0 && (
+                  <button type="button" onClick={resetAllSkills}
+                    title={`Changed by hand: ${changed.map(s => SKILL_LABELS[s]).join(', ')}. Click to restore them.`}
+                    className="text-xs rounded-full px-2.5 py-0.5 border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors shrink-0"
+                  >↺ Reset {changed.length} changed</button>
+                )}
+              </div>
+            )
+          })()}
+          <div className="space-y-0.5">
+            {SKILLS.map(skill => {
+              const profTags = skillInfo.profTags.get(skill) ?? []
+              const expertTags = skillInfo.expertTags.get(skill) ?? []
+              const isAutoProf = skillInfo.autoProfs.has(skill)
+              const isAutoExpert = skillInfo.autoExpert.has(skill)
+              const isManualProf = char.skillProficiencies.includes(skill)
+              const isManualExpert = char.skillExpertise.includes(skill)
+              const effectiveProf = isManualProf || isAutoProf
+              const effectiveExpert = isManualExpert || isAutoExpert
+              const hasTags = profTags.length > 0 || expertTags.length > 0
+
+              // Sources show as small coloured dots (legend under the card); hover one to name it
+              const tagDot = (kind: SkillSourceTag['kind']) => {
+                if (kind === 'bg')     return 'bg-blue-400'
+                if (kind === 'race')   return 'bg-green-500'
+                if (kind === 'class')  return 'bg-purple-400'
+                if (kind === 'feat')   return 'bg-amber-400'
+                if (kind === 'item')   return 'bg-indigo-400'
+                return 'bg-parchment-300'
+              }
+              const tagStar = (kind: SkillSourceTag['kind']) => {
+                if (kind === 'bg')     return 'text-blue-500'
+                if (kind === 'race')   return 'text-green-600'
+                if (kind === 'class')  return 'text-purple-500'
+                if (kind === 'feat')   return 'text-amber-500'
+                if (kind === 'item')   return 'text-indigo-500'
+                return 'text-parchment-400'
+              }
+              const tagTitle = (tag: SkillSourceTag) =>
+                tag.kind === 'bg' ? 'Background' : tag.kind === 'item' ? `Item: ${tag.label}` : tag.kind === 'feat' ? `Feat: ${tag.label}`
+                  : tag.kind === 'class' ? `Class: ${tag.label.charAt(0).toUpperCase()}${tag.label.slice(1)}` : tag.kind === 'race' ? `Race: ${tag.label}` : tag.label
+
+              const isModified = skillChanged(skill)
+
+              return (
+                <div key={skill}>
+                  <div className={`flex items-center gap-1.5 text-sm px-1 py-[3px] rounded ${isModified ? 'bg-amber-50' : 'hover:bg-parchment-50'}`}>
+                    {/* Prof checkbox — manual only; auto profs show as locked */}
+                    <input
+                      type="checkbox"
+                      checked={effectiveProf}
+                      disabled={isAutoProf && !isManualProf}
+                      title={isAutoProf && !isManualProf ? `Granted by: ${profTags.map(t => t.label).join(', ')}` : 'Proficient'}
+                      onChange={e => {
+                        const s = new Set(char.skillProficiencies)
+                        e.target.checked ? s.add(skill) : s.delete(skill)
+                        patch({ skillProficiencies: [...s] })
+                      }}
+                    />
+                    {/* Expert checkbox */}
+                    <input
+                      type="checkbox"
+                      checked={effectiveExpert}
+                      disabled={isAutoExpert && !isManualExpert}
+                      title={isAutoExpert && !isManualExpert ? `Expertise granted by: ${expertTags.map(t => t.label).join(', ')}` : 'Expertise (double proficiency)'}
+                      onChange={e => {
+                        const s = new Set(char.skillExpertise)
+                        e.target.checked ? s.add(skill) : s.delete(skill)
+                        patch({ skillExpertise: [...s] })
+                      }}
+                    />
+                    <span className="w-8 font-mono text-right text-xs text-parchment-700 shrink-0">{formatMod(skillMod(effectiveCharSkills, skill) + itemBonuses.abilityCheckBonus)}</span>
+                    <span className={`flex-1 min-w-0 ${effectiveExpert ? 'font-semibold' : ''}`}>{SKILL_LABELS[skill]}</span>
+                    {(() => {
+                      // Active potions giving advantage/disadvantage on this skill's ability checks
+                      const ab = SKILL_ABILITY[skill]
+                      const adv = potionFx.checkAdvantage.has(ab), dis = potionFx.checkDisadvantage.has(ab)
+                      if (adv === dis) return null
+                      return adv
+                        ? <span className="text-[10px] font-semibold rounded px-1.5 py-0.5 bg-teal-100 text-teal-700 shrink-0" title="From an active potion">Adv</span>
+                        : <span className="text-[10px] font-semibold rounded px-1.5 py-0.5 bg-red-100 text-red-700 shrink-0" title="From an active potion">Disadv</span>
+                    })()}
+                    {isModified && (
+                      <button type="button" onClick={() => resetSkill(skill)}
+                        title={`Changed by hand. Originally ${skillBaseProf.has(skill) ? (skillBaseExpert.has(skill) ? 'expertise' : 'proficient') : 'not proficient'}. Click to reset.`}
+                        className="text-[11px] font-semibold text-amber-700 hover:text-amber-900 shrink-0"
+                      >↺ reset</button>
+                    )}
+                    {/* Where it comes from: a dot per source, a star for expertise */}
+                    <div className="flex items-center gap-1 shrink-0">
+                      {profTags.map((tag, i) => (
+                        <span key={i} className={`w-2 h-2 rounded-full ${tagDot(tag.kind)}`} title={tagTitle(tag)} />
+                      ))}
+                      {expertTags.map((tag, i) => (
+                        <span key={`e${i}`} className={`text-[11px] leading-none ${tagStar(tag.kind)}`} title={`Expertise from ${tagTitle(tag)}`}>★</span>
+                      ))}
+                      {isManualProf && profTags.filter(t => t.kind !== 'manual').length === 0 && !hasTags && (
+                        <span className="w-2 h-2 rounded-full border border-parchment-400" title="Added by hand" />
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+          <p className="text-xs text-parchment-400 mt-2">☐ prof · ☐ expertise{jackOfAllTrades ? ' · Bard: ½ PB on non-prof' : ''}</p>
+          <p className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] text-parchment-500 mt-1">
+            <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-purple-400" />class</span>
+            <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-400" />background</span>
+            <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500" />race</span>
+            <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-400" />feat</span>
+            <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-indigo-400" />item</span>
+            <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full border border-parchment-400" />by hand</span>
+            <span>★ expertise</span>
+          </p>
+          {char.classes.some(c => c.classSlug === 'rogue' && c.level >= 11) && (
+            <p className="text-xs text-amber-600 mt-1">Reliable Talent: treat proficient roll ≤ 9 as 10.</p>
+          )}
+        </div>
+
+        {/* Col 3: Status (Inspiration, Exhaustion, Conditions) */}
+        <div className="space-y-4">
+          <div className="card p-4">
+            <h2 className="section-header">Status</h2>
+            {/* Inspiration: click to gain it; press and hold the glowing gem to spend it */}
+            <InspirationToken held={char.inspiration} onChange={v => patch({ inspiration: v })} />
+            <div className="text-xs font-semibold text-parchment-600 uppercase tracking-wide mb-1.5">Exhaustion</div>
+            <div className="flex gap-1 mb-1">
+              {[1,2,3,4,5,6].map(lvl => (
+                <button
+                  key={lvl}
+                  title={(['Disadv. on ability checks','Speed halved','Disadv. on attacks & saves','HP max halved','Speed = 0','Death'])[lvl-1]}
+                  onClick={() => patch({ exhaustionLevel: char.exhaustionLevel === lvl ? lvl - 1 : lvl })}
+                  className={`w-7 h-7 rounded text-xs font-bold border-2 transition-colors ${
+                    char.exhaustionLevel >= lvl
+                      ? lvl === 6 ? 'bg-red-700 border-red-700 text-white' : 'bg-red-500 border-red-500 text-white'
+                      : 'border-parchment-300 text-parchment-400 hover:border-red-300'
+                  }`}
+                >{lvl}</button>
+              ))}
+            </div>
+            {char.exhaustionLevel > 0 && (
+              <ul className="text-xs text-red-600 mt-1 space-y-0.5">
+                {(['Disadv. on ability checks','Speed halved','Disadv. on attacks & saves','HP max halved','Speed = 0','Dead'] as const)
+                  .slice(0, char.exhaustionLevel)
+                  .map((effect, i) => <li key={i}>· {effect}</li>)}
+              </ul>
+            )}
+
+            {/* Conditions: only the ones you have, each with its effect; add more from the list */}
+            <div className="text-xs font-semibold text-parchment-600 uppercase tracking-wide mt-4 mb-1.5">Conditions</div>
+            {char.conditions.length === 0 && <p className="text-xs text-parchment-400 mb-2">None</p>}
+            {char.conditions.length > 0 && (
+              <ul className="space-y-1.5 mb-2">
+                {char.conditions.map(name => (
+                  <li key={name} className="rounded border border-red-200 bg-red-50 px-2.5 py-1.5">
+                    <div className="flex items-center gap-2">
+                      <span className="flex-1 text-sm font-semibold text-red-700">{name}</span>
+                      <button type="button" onClick={() => patch({ conditions: char.conditions.filter(c => c !== name) })}
+                        title={`Remove ${name}`} aria-label={`Remove ${name}`}
+                        className="text-xs text-red-400 hover:text-red-700 transition-colors">✕</button>
+                    </div>
+                    {CONDITIONS.find(c => c.name === name) && (
+                      <p className="text-xs text-parchment-600 leading-snug mt-0.5">{CONDITIONS.find(c => c.name === name)!.effect}</p>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+            {CONDITIONS.some(c => !char.conditions.includes(c.name)) && (
+              <select className="input text-xs py-1" value="" aria-label="Add a condition"
+                onChange={e => { if (e.target.value) patch({ conditions: [...char.conditions, e.target.value] }) }}>
+                <option value="">+ Add a condition…</option>
+                {CONDITIONS.filter(c => !char.conditions.includes(c.name)).map(c => (
+                  <option key={c.name} value={c.name}>{c.name}</option>
+                ))}
+              </select>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Proficiencies — full width. Each shows where it comes from; Edit adds and removes them, and
+          "Your gear" shows whether you're proficient with what you carry. */}
+      {(() => {
+        const sources = proficiencySources(char, content, featSlugs)
+        // A free pick ("one language of your choice") isn't recorded against its source, so unlisted ones may be either
+        const fromText = (from: string[] | undefined) => from?.length ? `From ${from.join(', ')}` : 'Chosen or added by hand'
+        const chip = (label: string, title: string, tone: string, onRemove?: () => void) => (
+          <span key={label} title={title} className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs capitalize ${tone}`}>
+            {label}
+            {profEditing && onRemove && (
+              <button type="button" onClick={onRemove} aria-label={`Remove ${label}`} className="opacity-50 hover:opacity-100 hover:text-red-600 leading-none">✕</button>
+            )}
+          </span>
+        )
+
+        // Armor: four kinds. Feat armor is always on (remove the feat to lose it).
+        const storedArmor = armorKindsOf(char.armorProficiencies)
+        const toggleArmor = (k: ArmorKind) => {
+          const next = new Set(storedArmor)
+          if (next.has(k)) next.delete(k); else next.add(k)
+          patch({ armorProficiencies: ARMOR_KINDS.filter(a => next.has(a.key)).map(a => a.key) })
+        }
+        // Weapons: Simple / Martial, plus named weapons stored by name ("Longsword", "Pistol")
+        const weaponKeys = new Set(char.weaponProficiencies.map(profKey))
+        const addWeapon = (name: string) => {
+          if (!weaponKeys.has(profKey(name))) patch({ weaponProficiencies: [...char.weaponProficiencies, name] })
+        }
+        const toggleCategory = (cat: 'simple' | 'martial') => weaponKeys.has(cat)
+          ? patch({ weaponProficiencies: char.weaponProficiencies.filter(w => profKey(w) !== cat) })
+          : addWeapon(cat)
+        const namedWeapons = char.weaponProficiencies.filter(w => !['simple', 'martial'].includes(profKey(w)))
+        const weaponOptions = [...new Map(content.items
+          .filter(i => i.weaponStats && i.weaponStats.damage !== '—' && (!i.rarity || i.rarity.toLowerCase() === 'common'))
+          .map(i => [profKey(i.weaponStats!.label ?? i.name ?? i.slug), { name: i.weaponStats!.label ?? i.name ?? i.slug, simple: SIMPLE_WEAPON_SLUGS.has(i.slug) }])).values()]
+          .filter(w => !weaponKeys.has(profKey(w.name)))
+          .sort((a, b) => a.name.localeCompare(b.name))
+        // Tools and languages
+        const toolKeys = new Set(char.toolProficiencies.map(profKey))
+        const addTool = (name: string) => { if (name && !toolKeys.has(profKey(name))) patch({ toolProficiencies: [...char.toolProficiencies, name] }) }
+        const langKeys = new Set(char.languages.map(profKey))
+        const addLanguage = (name: string) => { if (name && !langKeys.has(profKey(name))) patch({ languages: [...char.languages, name] }) }
+
+        // Your gear: is the character proficient with what it carries?
+        const gearWeapons = char.equipment.flatMap(e => {
+          const ws = resolveWeapon(e, content.items)
+          return ws ? [{ e, base: ws.label ?? e.name, ok: isWeaponProficient(char, e) }] : []
+        })
+        const gearArmor = char.equipment.flatMap(e => {
+          const as_ = resolveArmor(e, content.items)
+          return as_ ? [{ e, kind: (as_.type === 'shield' ? 'shields' : as_.type) as ArmorKind, ok: isArmorProficient(char, as_, featArmor) }] : []
+        })
+        const gearTools = char.equipment.filter(e => isToolItem(e.name)).map(e => ({ e, ok: toolKeys.has(profKey(e.name)) }))
+        const gear = [
+          ...gearWeapons.map(g => ({ key: `w${g.e.name}`, name: g.e.name, ok: g.ok, add: () => addWeapon(g.base), what: `${g.base} proficiency` })),
+          ...gearArmor.map(g => ({ key: `a${g.e.name}`, name: g.e.name, ok: g.ok, add: () => toggleArmor(g.kind), what: `${g.kind === 'shields' ? 'shield' : g.kind + ' armor'} proficiency` })),
+          ...gearTools.map(g => ({ key: `t${g.e.name}`, name: g.e.name, ok: g.ok, add: () => addTool(g.e.name), what: `${g.e.name} proficiency` })),
+        ]
+
+        return (
+          <div className="card">
+            <div className="flex items-center gap-2 mb-3">
+              <h2 className="section-header mb-0 flex-1">All Proficiencies</h2>
+              <button type="button" onClick={() => setProfEditing(v => !v)}
+                className={`text-xs rounded-full px-2.5 py-0.5 border transition-colors ${profEditing ? 'bg-parchment-700 text-white border-parchment-700' : 'border-parchment-200 text-parchment-500 hover:border-parchment-500 hover:text-parchment-800'}`}
+              >{profEditing ? 'Done' : '✎ Edit'}</button>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+              <div>
+                <div className="font-semibold text-parchment-700 mb-1">Armor</div>
+                <div className="flex flex-wrap gap-1">
+                  {profEditing
+                    ? ARMOR_KINDS.map(a => {
+                        const viaFeat = featArmor.get(a.key)
+                        const on = storedArmor.has(a.key) || !!viaFeat
+                        return (
+                          <button key={a.key} type="button" aria-pressed={on} disabled={!!viaFeat}
+                            onClick={() => toggleArmor(a.key)} title={viaFeat ? `From ${viaFeat}` : fromText(sources.armor.get(a.key))}
+                            className={`rounded px-2 py-0.5 text-xs border transition-colors ${on ? 'bg-blue-100 text-blue-700 border-blue-200 font-semibold' : 'border-dashed border-parchment-300 text-parchment-400 hover:border-blue-300 hover:text-blue-700'} disabled:cursor-not-allowed`}
+                          >{a.label}{viaFeat ? ' 🔒' : ''}</button>
+                        )
+                      })
+                    : ARMOR_KINDS.filter(a => storedArmor.has(a.key) || featArmor.has(a.key)).map(a =>
+                        chip(a.label, featArmor.get(a.key) ? `From ${featArmor.get(a.key)}` : fromText(sources.armor.get(a.key)), 'bg-blue-100 text-blue-700'))}
+                  {!profEditing && storedArmor.size === 0 && featArmor.size === 0 && <span className="text-parchment-400 text-xs">None</span>}
+                </div>
+              </div>
+              <div>
+                <div className="font-semibold text-parchment-700 mb-1">Weapons</div>
+                <div className="flex flex-wrap gap-1">
+                  {profEditing
+                    ? (['simple', 'martial'] as const).map(cat => (
+                        <button key={cat} type="button" aria-pressed={weaponKeys.has(cat)} onClick={() => toggleCategory(cat)} title={fromText(sources.weapons.get(cat))}
+                          className={`rounded px-2 py-0.5 text-xs border capitalize transition-colors ${weaponKeys.has(cat) ? 'bg-green-100 text-green-700 border-green-200 font-semibold' : 'border-dashed border-parchment-300 text-parchment-400 hover:border-green-300 hover:text-green-700'}`}
+                        >{cat}</button>
+                      ))
+                    : (['simple', 'martial'] as const).filter(cat => weaponKeys.has(cat)).map(cat => chip(cat, fromText(sources.weapons.get(cat)), 'bg-green-100 text-green-700'))}
+                  {namedWeapons.map(w => chip(w, fromText(sources.weapons.get(profKey(w))), 'bg-green-100 text-green-700',
+                    () => patch({ weaponProficiencies: char.weaponProficiencies.filter(x => x !== w) })))}
+                  {!profEditing && char.weaponProficiencies.length === 0 && <span className="text-parchment-400 text-xs">None</span>}
+                </div>
+                {profEditing && (
+                  <select className="input text-xs py-1 mt-1.5" value="" aria-label="Add a weapon proficiency"
+                    onChange={e => { if (e.target.value) addWeapon(e.target.value) }}>
+                    <option value="">+ Add a weapon…</option>
+                    <optgroup label="Simple">{weaponOptions.filter(w => w.simple).map(w => <option key={w.name} value={w.name}>{w.name}</option>)}</optgroup>
+                    <optgroup label="Martial & other">{weaponOptions.filter(w => !w.simple).map(w => <option key={w.name} value={w.name}>{w.name}</option>)}</optgroup>
+                  </select>
+                )}
+              </div>
+              <div>
+                <div className="font-semibold text-parchment-700 mb-1">Tools</div>
+                <div className="flex flex-wrap gap-1">
+                  {char.toolProficiencies.map(t => chip(t, fromText(sources.tools.get(profKey(t))), 'bg-parchment-100 text-parchment-700',
+                    () => patch({ toolProficiencies: char.toolProficiencies.filter(x => x !== t) })))}
+                  {!profEditing && char.toolProficiencies.length === 0 && <span className="text-parchment-400 text-xs">None recorded</span>}
+                </div>
+                {profEditing && (
+                  <div className="mt-1.5 space-y-1">
+                    <select className="input text-xs py-1" value="" aria-label="Add a tool proficiency" onChange={e => addTool(e.target.value)}>
+                      <option value="">+ Add a tool…</option>
+                      {([["Artisan's tools", ARTISAN_TOOLS], ['Instruments', MUSICAL_INSTRUMENTS], ['Gaming sets', GAMING_SETS], ['Other tools', OTHER_TOOLS]] as const).map(([group, list]) => (
+                        <optgroup key={group} label={group}>
+                          {list.filter(t => !toolKeys.has(profKey(t))).map(t => <option key={t} value={t}>{t}</option>)}
+                        </optgroup>
+                      ))}
+                    </select>
+                    <input className="input text-xs py-1" placeholder="Other… (press Enter)" value={newToolText}
+                      onChange={e => setNewToolText(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') { addTool(newToolText.trim()); setNewToolText('') } }} />
+                  </div>
+                )}
+              </div>
+              <div>
+                <div className="font-semibold text-parchment-700 mb-1">Languages</div>
+                {char.languages.length > 0
+                  ? <div className="flex flex-wrap gap-1">{char.languages.map(l => {
+                  const picks = languageChoiceCount(l)
+                  if (!picks) return chip(l, fromText(sources.languages.get(profKey(l))), 'bg-parchment-100 text-parchment-700',
+                    () => patch({ languages: char.languages.filter(x => x !== l) }))
+                  // "one language of your choice" left over from creation — ask for it here
+                  const known = new Set(char.languages)
+                  return (
+                    <select key={l} value="" aria-label="Choose a language"
+                      className="rounded px-1.5 py-0.5 text-xs border border-amber-300 bg-amber-50 text-amber-800"
+                      onChange={e => {
+                        const rest = languageChoicePlaceholder(picks - 1)
+                        patch({ languages: char.languages.flatMap(x => x === l ? [e.target.value, ...(rest ? [rest] : [])] : [x]) })
+                      }}>
+                      <option value="">Choose {picks > 1 ? `${picks} languages` : 'a language'}…</option>
+                      <optgroup label="Standard">{LANGUAGES_STANDARD.filter(x => !known.has(x)).map(x => <option key={x}>{x}</option>)}</optgroup>
+                      <optgroup label="Exotic">{LANGUAGES_EXOTIC.filter(x => !known.has(x)).map(x => <option key={x}>{x}</option>)}</optgroup>
+                    </select>
+                  )
+                })}</div>
+                  : <span className="text-parchment-400 text-xs">None recorded</span>}
+                {profEditing && (
+                  <div className="mt-1.5 space-y-1">
+                    <select className="input text-xs py-1" value="" aria-label="Add a language" onChange={e => addLanguage(e.target.value)}>
+                      <option value="">+ Add a language…</option>
+                      <optgroup label="Standard">{LANGUAGES_STANDARD.filter(x => !langKeys.has(profKey(x))).map(x => <option key={x}>{x}</option>)}</optgroup>
+                      <optgroup label="Exotic">{LANGUAGES_EXOTIC.filter(x => !langKeys.has(profKey(x))).map(x => <option key={x}>{x}</option>)}</optgroup>
+                    </select>
+                    <input className="input text-xs py-1" placeholder="Other… (press Enter)" value={newLangText}
+                      onChange={e => setNewLangText(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') { addLanguage(newLangText.trim()); setNewLangText('') } }} />
+                  </div>
+                )}
+              </div>
+            </div>
+            {gear.length > 0 && (
+              <div className="mt-4 pt-3 border-t border-parchment-100">
+                <div className="font-semibold text-parchment-700 mb-2 text-sm">Your gear</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {gear.map(g => (
+                    <span key={g.key}
+                      className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs border ${g.ok ? 'bg-green-50 text-green-700 border-green-200' : 'bg-amber-50 text-amber-800 border-amber-300'}`}
+                      title={g.ok ? 'Proficient' : 'Not proficient: no proficiency bonus with this'}>
+                      {g.ok ? '✓' : '⚠'} {g.name}
+                      {!g.ok && (
+                        <button type="button" onClick={g.add} title={`Add ${g.what}`} aria-label={`Add ${g.what}`}
+                          className="ml-0.5 font-bold hover:text-green-700">+</button>
+                      )}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )
+      })()}
+    </div>
+  )
+}

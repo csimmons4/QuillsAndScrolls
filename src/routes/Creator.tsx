@@ -1291,7 +1291,7 @@ export default function Creator() {
             </div>
             <div className="text-xs text-parchment-400 mt-1">{bg.feature.name}</div>
             {STRIXHAVEN_COLLEGES[bg.slug] && (
-              <div className="text-xs text-violet-600 mt-1">🔮 Strixhaven Initiate — grants {STRIXHAVEN_COLLEGES[bg.slug].college} cantrip + 1st-level spell</div>
+              <div className="text-xs text-violet-600 mt-1">Strixhaven Initiate: grants {STRIXHAVEN_COLLEGES[bg.slug].college} cantrip + 1st-level spell</div>
             )}
           </button>
         )
@@ -1472,9 +1472,9 @@ export default function Creator() {
             {currentClass && (
               <div className="mb-4 p-3 bg-parchment-50 border border-parchment-200 rounded text-sm space-y-1">
                 <p>Choose <strong>{limit}</strong> skills from your {currentClass.name} list. ({chosenByPlayer.length}/{limit} chosen)</p>
-                {bgSkills.size > 0 && <p className="text-parchment-500">🟦 Background: {[...bgSkills].map(s => SKILL_LABELS[s as keyof typeof SKILL_LABELS] ?? s).join(', ')}</p>}
-                {raceGrants.size > 0 && <p className="text-parchment-500">🟩 Race (auto): {[...raceGrants].map(s => SKILL_LABELS[s as keyof typeof SKILL_LABELS] ?? s).join(', ')}</p>}
-                {raceChoicesSet.size > 0 && <p className="text-parchment-500">🟩 Race (chosen): {[...raceChoicesSet].map(s => SKILL_LABELS[s as keyof typeof SKILL_LABELS] ?? s).join(', ')}</p>}
+                {bgSkills.size > 0 && <p className="text-parchment-500 flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-blue-400" aria-hidden />Background: {[...bgSkills].map(s => SKILL_LABELS[s as keyof typeof SKILL_LABELS] ?? s).join(', ')}</p>}
+                {raceGrants.size > 0 && <p className="text-parchment-500 flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-green-500" aria-hidden />Race (auto): {[...raceGrants].map(s => SKILL_LABELS[s as keyof typeof SKILL_LABELS] ?? s).join(', ')}</p>}
+                {raceChoicesSet.size > 0 && <p className="text-parchment-500 flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-green-500" aria-hidden />Race (chosen): {[...raceChoicesSet].map(s => SKILL_LABELS[s as keyof typeof SKILL_LABELS] ?? s).join(', ')}</p>}
               </div>
             )}
             {classOpts?.expertiseAt?.includes(1) && (
@@ -1490,7 +1490,7 @@ export default function Creator() {
                 const inClassList = !currentClass || currentClass.skillChoices.includes(skill)
                 const checked = char.skillProficiencies.includes(skill) || isLocked
                 const canToggleOn = inClassList && !isLocked && (!atLimit || checked)
-                const source = fromBg ? '🟦 BG' : fromRace ? '🟩 Race' : ''
+                const source = fromBg ? 'BG' : fromRace ? 'Race' : ''
                 return (
                   <label
                     key={skill}

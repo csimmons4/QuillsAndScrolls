@@ -36,7 +36,7 @@ export function FeatEffectBadges({ slug }: { slug: string }) {
       ))}
       {granted.map(s => (
         <span key={s.slug} className="text-xs bg-indigo-100 text-indigo-700 rounded px-1.5 py-0.5">
-          🔮 {s.name}{s.usesPerLongRest ? ` (${s.usesPerLongRest}/LR)` : s.level === 0 ? '' : ' (at will)'}
+          {s.name}{s.usesPerLongRest ? ` (${s.usesPerLongRest}/LR)` : s.level === 0 ? '' : ' (at will)'}
         </span>
       ))}
     </div>

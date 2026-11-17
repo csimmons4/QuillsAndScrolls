@@ -57,6 +57,22 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
   )
 }
 
+/** The entry's ID ("slug"): made from the name, shown small, editable on request */
+function SlugField({ value, name, onChange }: { value: string; name: string; onChange: (v: string) => void }) {
+  const [editing, setEditing] = useState(false)
+  if (editing) return (
+    <Field label="ID" hint="Matches this entry to characters and the reference data. Homebrew with the same ID as official content replaces it.">
+      <input className="input font-mono text-sm" value={value} onChange={e => onChange(e.target.value)} autoFocus />
+    </Field>
+  )
+  return (
+    <p className="text-[11px] text-parchment-500 -mt-2">
+      ID <code className="font-mono text-parchment-600">{value || autoSlug(name) || '—'}</code>{' '}
+      <button type="button" className="underline hover:text-parchment-800" onClick={() => setEditing(true)}>change</button>
+    </p>
+  )
+}
+
 function Section({ title, open, onToggle, children }: { title: string; open: boolean; onToggle: () => void; children: React.ReactNode }) {
   return (
     <div className="border border-parchment-200 rounded-lg overflow-hidden">
@@ -249,9 +265,7 @@ function ItemForm({ initial, onSave, onCancel }: { initial?: Record<string, unkn
           setF(prev => ({ ...prev, name, slug: prev.slug || autoSlug(name) }))
         }} />
       </Field>
-      <Field label="Slug" hint="Auto-generated from name — edit to override">
-        <input className="input font-mono text-sm" value={f.slug} onChange={e => up('slug', e.target.value)} />
-      </Field>
+      <SlugField value={f.slug} name={f.name} onChange={v => up('slug', v)} />
       <div className="grid grid-cols-2 gap-3">
         <Field label="Type">
           <select className="input" value={f.type} onChange={e => up('type', e.target.value)}>
@@ -278,7 +292,7 @@ function ItemForm({ initial, onSave, onCancel }: { initial?: Record<string, unkn
       </Field>
 
       {/* Weapon Stats */}
-      <Section title="⚔️ Weapon Stats" open={sections.weapon} onToggle={() => sec('weapon')}>
+      <Section title="Weapon Stats" open={sections.weapon} onToggle={() => sec('weapon')}>
         <Toggle checked={f.showWeaponStats} onChange={v => up('showWeaponStats', v)} label="This item has weapon stats" />
         {f.showWeaponStats && (
           <>
@@ -306,7 +320,7 @@ function ItemForm({ initial, onSave, onCancel }: { initial?: Record<string, unkn
       </Section>
 
       {/* Armor Stats */}
-      <Section title="🛡️ Armor Stats" open={sections.armor} onToggle={() => sec('armor')}>
+      <Section title="Armor Stats" open={sections.armor} onToggle={() => sec('armor')}>
         <Toggle checked={f.showArmorStats} onChange={v => up('showArmorStats', v)} label="This item has armor stats" />
         {f.showArmorStats && (
           <>
@@ -332,7 +346,7 @@ function ItemForm({ initial, onSave, onCancel }: { initial?: Record<string, unkn
       </Section>
 
       {/* Passive Bonuses */}
-      <Section title="✨ Passive Bonuses (while equipped)" open={sections.bonuses} onToggle={() => sec('bonuses')}>
+      <Section title="Passive Bonuses (while equipped)" open={sections.bonuses} onToggle={() => sec('bonuses')}>
         <div className="grid grid-cols-2 gap-3">
           <Field label="AC Bonus"><NumInput value={f.acBonus} onChange={v => up('acBonus', v)} /></Field>
           <Field label="All Saving Throws"><NumInput value={f.savingThrowBonus} onChange={v => up('savingThrowBonus', v)} /></Field>
@@ -367,7 +381,7 @@ function ItemForm({ initial, onSave, onCancel }: { initial?: Record<string, unkn
       </Section>
 
       {/* Granted Abilities */}
-      <Section title="🎯 Granted Abilities (while equipped)" open={sections.granted} onToggle={() => sec('granted')}>
+      <Section title="Granted Abilities (while equipped)" open={sections.granted} onToggle={() => sec('granted')}>
         <SkillPicker label="Skill Proficiencies" selected={f.grantedSkillProficiencies}
           onChange={v => up('grantedSkillProficiencies', v)} />
         <SkillPicker label="Skill Expertise (double proficiency)"
@@ -482,9 +496,7 @@ function SpellForm({ initial, onSave, onCancel }: { initial?: Record<string, unk
           setF(prev => ({ ...prev, name, slug: prev.slug || autoSlug(name) }))
         }} />
       </Field>
-      <Field label="Slug">
-        <input className="input font-mono text-sm" value={f.slug} onChange={e => up('slug', e.target.value)} />
-      </Field>
+      <SlugField value={f.slug} name={f.name} onChange={v => up('slug', v)} />
       <div className="grid grid-cols-2 gap-3">
         <Field label="Level">
           <select className="input" value={f.level} onChange={e => up('level', e.target.value)}>
@@ -616,9 +628,7 @@ function FeatForm({ initial, onSave, onCancel }: { initial?: Record<string, unkn
           setF(prev => ({ ...prev, name, slug: prev.slug || autoSlug(name) }))
         }} />
       </Field>
-      <Field label="Slug">
-        <input className="input font-mono text-sm" value={f.slug} onChange={e => up('slug', e.target.value)} />
-      </Field>
+      <SlugField value={f.slug} name={f.name} onChange={v => up('slug', v)} />
       <Field label="Prerequisite (optional)">
         <input className="input" value={f.prerequisite} onChange={e => up('prerequisite', e.target.value)} placeholder="e.g. Strength 13 or higher" />
       </Field>
@@ -638,7 +648,7 @@ function FeatForm({ initial, onSave, onCancel }: { initial?: Record<string, unkn
       <Field label="Description">
         <textarea className="input min-h-[100px]" value={f.description} onChange={e => up('description', e.target.value)} />
       </Field>
-      <Section title="🎯 Granted Skill Proficiencies" open={sections.skills} onToggle={() => setSections(s => ({ ...s, skills: !s.skills }))}>
+      <Section title="Granted Skill Proficiencies" open={sections.skills} onToggle={() => setSections(s => ({ ...s, skills: !s.skills }))}>
         <SkillPicker label="Proficiencies" selected={f.grantedSkillProficiencies} onChange={v => up('grantedSkillProficiencies', v)} />
         <SkillPicker label="Expertise" selected={f.grantedSkillExpertise} onChange={v => up('grantedSkillExpertise', v)} />
       </Section>
@@ -709,9 +719,7 @@ function RaceForm({ initial, onSave, onCancel }: { initial?: Record<string, unkn
           setF(prev => ({ ...prev, name, slug: prev.slug || autoSlug(name) }))
         }} />
       </Field>
-      <Field label="Slug">
-        <input className="input font-mono text-sm" value={f.slug} onChange={e => up('slug', e.target.value)} />
-      </Field>
+      <SlugField value={f.slug} name={f.name} onChange={v => up('slug', v)} />
       <div className="grid grid-cols-2 gap-3">
         <Field label="Size">
           <select className="input" value={f.size} onChange={e => up('size', e.target.value)}>
@@ -809,9 +817,7 @@ function ClassForm({ initial, onSave, onCancel }: { initial?: Record<string, unk
           setF(prev => ({ ...prev, name, slug: prev.slug || autoSlug(name) }))
         }} />
       </Field>
-      <Field label="Slug">
-        <input className="input font-mono text-sm" value={f.slug} onChange={e => up('slug', e.target.value)} />
-      </Field>
+      <SlugField value={f.slug} name={f.name} onChange={v => up('slug', v)} />
       <div className="grid grid-cols-2 gap-3">
         <Field label="Hit Die">
           <select className="input" value={f.hitDie} onChange={e => up('hitDie', e.target.value)}>
@@ -920,9 +926,7 @@ function BackgroundForm({ initial, onSave, onCancel }: { initial?: Record<string
           setF(prev => ({ ...prev, name, slug: prev.slug || autoSlug(name) }))
         }} />
       </Field>
-      <Field label="Slug">
-        <input className="input font-mono text-sm" value={f.slug} onChange={e => up('slug', e.target.value)} />
-      </Field>
+      <SlugField value={f.slug} name={f.name} onChange={v => up('slug', v)} />
       <SkillPicker label="Skill Proficiencies (pick 2)" selected={f.skillProficiencies} onChange={v => up('skillProficiencies', v)} />
       <Field label="Tool Proficiencies" hint="Comma-separated (e.g. Thieves' tools, One musical instrument)">
         <input className="input" value={f.toolProficiencies} onChange={e => up('toolProficiencies', e.target.value)} placeholder="e.g. Disguise kit, Forgery kit" />
@@ -958,14 +962,19 @@ function BackgroundForm({ initial, onSave, onCancel }: { initial?: Record<string
 
 // ─── Entry List ───────────────────────────────────────────────────────────
 
-function EntryList({ category, entries, onEdit, onDelete }: {
+function EntryList({ category, entries, editIdx, onEdit, onDelete }: {
   category: Category
   entries: Record<string, unknown>[]
+  editIdx: number | null
   onEdit: (idx: number) => void
   onDelete: (idx: number) => void
 }) {
   // ✕ asks first: deleting removes the entry's file from disk
   const [confirmIdx, setConfirmIdx] = useState<number | null>(null)
+  const [query, setQuery] = useState('')
+  const RARITY_EDGE: Record<string, string> = {
+    uncommon: 'border-l-green-400', rare: 'border-l-blue-400', 'very rare': 'border-l-violet-500', legendary: 'border-l-amber-500', artifact: 'border-l-orange-500',
+  }
   const rarityColor = (r: string) => {
     const rl = String(r ?? '').toLowerCase()
     if (rl === 'uncommon') return 'text-green-600'
@@ -975,13 +984,27 @@ function EntryList({ category, entries, onEdit, onDelete }: {
     if (rl === 'artifact') return 'text-orange-600'
     return 'text-parchment-400'
   }
-  if (entries.length === 0) return <p className="text-parchment-400 text-sm italic">None yet.</p>
+  if (entries.length === 0) return <p className="text-parchment-400 text-sm italic">None yet. Fill in the form to make one.</p>
+  const q = query.trim().toLowerCase()
   return (
     <div className="space-y-2">
-      {entries.map((entry, idx) => (
-        <div key={idx} className="flex items-center gap-2 p-3 rounded-lg border border-parchment-200 hover:bg-parchment-50">
+      {entries.length > 6 && (
+        <input className="input text-sm py-1.5" placeholder={`Search ${CATEGORY_LABELS[category].toLowerCase()}…`} aria-label="Search"
+          value={query} onChange={e => setQuery(e.target.value)} />
+      )}
+      {entries.map((entry, idx) => {
+        if (q && !String(entry.name ?? '').toLowerCase().includes(q)) return null
+        const editing = idx === editIdx
+        const desc = String(entry.description ?? (entry.feature as { description?: string } | undefined)?.description ?? '').replace(/\s+/g, ' ').trim()
+        return (
+        <div key={idx} className={`flex items-center gap-2 p-3 rounded-lg border border-l-4 transition-colors ${
+          editing ? 'border-[rgb(var(--accent))] bg-parchment-50 shadow-sm' : 'border-parchment-200 hover:bg-parchment-50'
+        } ${category === 'items' ? (RARITY_EDGE[String(entry.rarity ?? '').toLowerCase()] ?? 'border-l-parchment-300') : 'border-l-parchment-300'}`}>
           <div className="flex-1 min-w-0">
-            <div className="font-medium text-parchment-900 truncate">{String(entry.name ?? '(unnamed)')}</div>
+            <div className="flex items-center gap-2">
+              <span className="font-semibold text-parchment-900 truncate">{String(entry.name ?? '(unnamed)')}</span>
+              {editing && <span className="text-[10px] font-bold uppercase tracking-wide text-[rgb(var(--accent))]">Editing</span>}
+            </div>
             <div className="flex items-center gap-2 mt-0.5">
               {category === 'items' && !!entry.rarity && (
                 <span className={`text-[10px] font-bold uppercase ${rarityColor(String(entry.rarity))}`}>{String(entry.rarity)}</span>
@@ -1006,8 +1029,8 @@ function EntryList({ category, entries, onEdit, onDelete }: {
                   {(entry.startingGold as number) > 0 ? ` · ${entry.startingGold} gp` : ''}
                 </span>
               )}
-              <span className="text-[10px] text-parchment-300 font-mono">{String(entry.slug ?? '')}</span>
             </div>
+            {desc && <p className="text-xs text-parchment-500 truncate mt-0.5">{desc}</p>}
           </div>
           {confirmIdx === idx ? (
             <>
@@ -1022,7 +1045,8 @@ function EntryList({ category, entries, onEdit, onDelete }: {
             </>
           )}
         </div>
-      ))}
+        )
+      })}
     </div>
   )
 }
@@ -1113,9 +1137,9 @@ export default function Homebrew() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
         {/* Form panel */}
-        <div className="card">
+        <div className={`card ${editIdx !== null ? 'ring-2 ring-[rgb(var(--accent))]' : ''}`}>
           <h2 className="section-header mb-4">
-            {editIdx !== null ? `Edit ${CATEGORY_SINGULAR[category]}` : `New ${CATEGORY_SINGULAR[category]}`}
+            {editIdx !== null ? `Editing: ${String(editEntry?.name ?? CATEGORY_SINGULAR[category])}` : `New ${CATEGORY_SINGULAR[category]}`}
           </h2>
           {category === 'items' && <ItemForm key={editIdx ?? 'new'} initial={editEntry ?? undefined} {...formProps} />}
           {category === 'spells' && <SpellForm key={editIdx ?? 'new'} initial={editEntry ?? undefined} {...formProps} />}
@@ -1128,7 +1152,7 @@ export default function Homebrew() {
         {/* List panel */}
         <div>
           <h2 className="section-header mb-4">Existing {CATEGORY_LABELS[category]} ({entries.length})</h2>
-          <EntryList category={category} entries={entries} onEdit={handleEdit} onDelete={handleDelete} />
+          <EntryList category={category} entries={entries} editIdx={editIdx} onEdit={handleEdit} onDelete={handleDelete} />
         </div>
       </div>
 
