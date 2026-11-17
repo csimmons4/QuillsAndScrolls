@@ -294,7 +294,7 @@ export const CLASS_OPTIONS: Record<string, ClassOptionsDef> = {
     features: [
       { level: 1, name: 'Magical Tinkering', description: 'Infuse a tiny object with one minor magical effect: shed light, emit a recorded message, emit a faint odor, or create a static visual. PB objects active at once.' },
       { level: 1, name: 'Spellcasting (INT)', description: 'Prepare spells from the Artificer list equal to INT mod + half Artificer level (min 1). Cast using INT.' },
-      { level: 2, name: 'Infuse Item', description: 'Infuse mundane items with magic. 4 infusions known at L2 (more as you level), 2 active at once. Options: Enhanced Weapon, Enhanced Defense, Enhanced Arcane Focus, Returning Weapon, Repeating Shot, Bag of Holding, etc.' },
+      { level: 2, name: 'Infuse Item', description: 'Learn 4 infusions at L2 (more as you level) and keep 2 active at once (more as you level). Most put magic into a nonmagical item you carry (Enhanced Weapon, Enhanced Defense, Repeating Shot…); Homunculus Servant creates a creature and Replicate Magic Item makes a magic item. Manage them on the Inventory tab.' },
       { level: 3, name: 'Artificer Specialist', description: 'Choose your Artificer subclass (Alchemist, Armorer, Artillerist, or Battle Smith).' },
       { level: 3, name: 'The Right Tool for the Job', description: 'Spend 1 hour and 10gp in materials to create any artisan\'s tool from nothing. It vanishes if you use this feature again.' },
       { level: 4, name: 'Ability Score Improvement', description: '+2 to one ability score or +1 to two (max 20), or choose a feat.' },

@@ -3,7 +3,10 @@ import { Link, useNavigate } from 'react-router-dom'
 import { Character } from '../character/model'
 import { importCharacter } from '../storage/ioFile'
 import { listCharactersFromDisk, saveCharacterToDisk, deleteCharacterFromDisk, type CharacterLoadFailure } from '../storage/charApi'
-import { totalLevel } from '../character/derive'
+import { totalLevel, hpMax } from '../character/derive'
+import { sumFeatBonuses } from '../character/featBonuses'
+import { sumItemBonuses, effectiveAbilityScores } from '../character/itemBonuses'
+import { CLASS_OPTIONS } from '../data/classData'
 import { useContent } from '../content/ContentProvider'
 import { useRecentCharacter } from '../storage/recentCharacter'
 import { useConfirm } from '../components/ConfirmDialog'
@@ -15,7 +18,10 @@ export default function Vault() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
   const fileRef = useRef<HTMLInputElement>(null)
-  const { races, classes } = useContent()
+  const content = useContent()
+  const { races, classes } = content
+  // The card whose ⋯ menu is open
+  const [menuFor, setMenuFor] = useState<string | null>(null)
   const { recent, setRecent } = useRecentCharacter()
   const navigate = useNavigate()
   const { askConfirm, confirmDialog } = useConfirm()
@@ -33,6 +39,17 @@ export default function Vault() {
   }
 
   useEffect(() => { refresh() }, [])
+
+  // Close the ⋯ menu on a click elsewhere or Escape
+  useEffect(() => {
+    if (!menuFor) return
+    const close = (e: MouseEvent | KeyboardEvent) => {
+      if (e instanceof KeyboardEvent ? e.key === 'Escape' : !(e.target as Element).closest('[data-card-menu]')) setMenuFor(null)
+    }
+    document.addEventListener('mousedown', close)
+    document.addEventListener('keydown', close)
+    return () => { document.removeEventListener('mousedown', close); document.removeEventListener('keydown', close) }
+  }, [menuFor])
 
   async function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -77,10 +94,157 @@ export default function Vault() {
     return char.classes
       .map(cc => {
         const cls = classes.find(c => c.slug === cc.classSlug)
-        return `${cls?.name ?? cc.classSlug} ${cc.level}`
+        const sub = cc.subclassSlug ? CLASS_OPTIONS[cc.classSlug]?.subclasses.find(sc => sc.slug === cc.subclassSlug)?.name : undefined
+        return `${cls?.name ?? cc.classSlug} ${cc.level}${sub ? ` (${sub})` : ''}`
       })
       .join(' / ')
   }
+
+  /** Hit point maximum the way the sheet works it out: equipped items' CON, plus Tough */
+  function maxHpOf(char: Character) {
+    const featSlugs = char.featuresChosen
+      .filter(fc => fc.key.startsWith('feat-'))
+      .map(fc => typeof fc.value === 'string' ? fc.value : fc.value[0])
+    const scores = effectiveAbilityScores(char.abilityScores as Record<string, number>, sumItemBonuses(char.equipment, content.items))
+    return hpMax({ ...char, abilityScores: scores as Character['abilityScores'] }, content)
+      + sumFeatBonuses(featSlugs, content.feats).hpBonusPerLevel * totalLevel(char)
+  }
+
+  // At 0 HP with three failed death saves the sheet shows "You have died", and the Vault lays the
+  // character to rest. Healing on the sheet clears the saves, which brings them back.
+  const isFallen = (c: Character) => c.hp.current <= 0 && c.deathSaves.failures >= 3
+  const initials = (name: string) => name.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]!.toUpperCase()).join('') || '?'
+
+  /** Duplicate and Delete live in a ⋯ menu, so Delete isn't one stray click away */
+  const cardMenu = (char: Character, fallen: boolean) => (
+    <div className="relative shrink-0" data-card-menu>
+      <button type="button" aria-label={`More actions for ${char.name}`} aria-haspopup="menu" aria-expanded={menuFor === char.id}
+        onClick={() => setMenuFor(menuFor === char.id ? null : char.id)}
+        className={`w-8 h-8 -mr-1 -mt-1 rounded-full text-lg leading-none transition-colors ${fallen ? 'text-stone-400 hover:bg-white/10 hover:text-stone-100' : 'text-parchment-500 hover:bg-parchment-100 hover:text-parchment-800'}`}
+      >⋯</button>
+      {menuFor === char.id && (
+        <div role="menu" className="absolute right-0 top-full mt-1 z-20 w-40 rounded-lg border border-parchment-200 bg-parchment-50 shadow-lg py-1">
+          <button type="button" role="menuitem" className="w-full text-left px-3 py-1.5 text-sm text-parchment-800 hover:bg-parchment-100"
+            onClick={() => { setMenuFor(null); handleDuplicate(char) }}>Duplicate</button>
+          <button type="button" role="menuitem" className="w-full text-left px-3 py-1.5 text-sm text-red-600 hover:bg-red-50"
+            onClick={() => { setMenuFor(null); handleDelete(char.id, char.name) }}>Delete…</button>
+        </div>
+      )}
+    </div>
+  )
+
+  const livingCard = (char: Character) => {
+    const maxHp = maxHpOf(char)
+    const hpPct = maxHp > 0 ? Math.max(0, Math.min(100, Math.round(char.hp.current / maxHp * 100))) : 0
+    // At 0 HP but not yet fallen: making death saves, or stable after three successes
+    const down = char.hp.current <= 0
+    const stable = down && char.deathSaves.successes >= 3
+    return (
+    <div key={char.id} className={`card hover:shadow-md transition-shadow flex flex-col ${down ? (stable ? 'ring-2 ring-green-300' : 'ring-2 ring-red-300') : ''}`}>
+      <div className="flex items-start gap-4">
+        <Link to={`/c/${char.id}`} className="shrink-0" tabIndex={-1} aria-hidden>
+          {char.portrait ? (
+            <img src={char.portrait} alt="" className="w-20 h-20 rounded-xl object-cover object-top border-2 border-parchment-300" />
+          ) : (
+            <span className="w-20 h-20 rounded-xl border-2 border-parchment-300 bg-parchment-100 flex items-center justify-center text-2xl font-bold text-parchment-400">
+              {char.name.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]!.toUpperCase()).join('') || '?'}
+            </span>
+          )}
+        </Link>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start gap-2">
+            <h2 className="text-xl font-bold text-parchment-900 truncate flex-1">
+              <Link to={`/c/${char.id}`} className="hover:underline decoration-parchment-300 underline-offset-4">{char.name}</Link>
+            </h2>
+            {cardMenu(char, false)}
+          </div>
+          <p className="text-sm text-parchment-600">Level {totalLevel(char)} {raceName(char.raceSlug)}</p>
+          <p className="text-sm text-parchment-600 truncate" title={classLabel(char)}>{classLabel(char)}</p>
+        </div>
+      </div>
+      {/* Hit points at a glance; at 0 HP, the death saves instead */}
+      {down ? (
+        <div className="mt-3">
+          <div className="flex items-center justify-between text-xs mb-1">
+            <span className="flex items-center gap-2">
+              <span className={`text-[11px] font-bold uppercase tracking-widest ${stable ? 'text-green-700' : 'text-red-600'}`}>{stable ? 'Stable' : 'Down'}</span>
+              <span className="flex items-center gap-0.5" title={`Death save successes: ${char.deathSaves.successes}`}>
+                {[0, 1, 2].map(i => <span key={i} className={`w-2 h-2 rounded-full border ${i < char.deathSaves.successes ? 'bg-green-500 border-green-500' : 'border-green-400'}`} />)}
+              </span>
+              <span className="flex items-center gap-0.5" title={`Death save failures: ${char.deathSaves.failures}`}>
+                {[0, 1, 2].map(i => <span key={i} className={`w-2 h-2 rounded-full border ${i < char.deathSaves.failures ? 'bg-red-500 border-red-500' : 'border-red-400'}`} />)}
+              </span>
+            </span>
+            <span className="text-parchment-500" title="Last saved">{new Date(char.updatedAt).toLocaleDateString()}</span>
+          </div>
+          <div className="h-1.5 rounded-full overflow-hidden bg-parchment-200">
+            <div className={`h-full w-full rounded-full ${stable ? 'bg-green-400' : 'bg-red-500 animate-pulse'}`} />
+          </div>
+        </div>
+      ) : (
+      <div className="mt-3">
+        <div className="flex items-baseline justify-between text-xs text-parchment-500 mb-1">
+          <span>HP <span className="font-bold text-parchment-800">{char.hp.current}</span> / {maxHp}{char.hp.temp > 0 && <span className="text-blue-600"> +{char.hp.temp} temp</span>}</span>
+          <span title="Last saved">{new Date(char.updatedAt).toLocaleDateString()}</span>
+        </div>
+        <div className="h-1.5 bg-parchment-200 rounded-full overflow-hidden">
+          <div className={`h-full rounded-full ${hpPct > 50 ? 'bg-green-500' : hpPct > 25 ? 'bg-amber-400' : 'bg-red-500'}`} style={{ width: `${hpPct}%` }} />
+        </div>
+      </div>
+      )}
+      <button className="btn-primary text-sm mt-4" onClick={() => navigate(`/c/${char.id}`)}>
+        Open
+      </button>
+    </div>
+    )
+  }
+
+  /** A fallen character: dark stone with the death screen's red glow, a greyed portrait, a faint
+   *  headstone and the three failed saves. The sheet still opens (a Revivify can bring them back). */
+  const fallenCard = (char: Character) => (
+    <div key={char.id} className="vault-fallen relative overflow-hidden rounded-lg p-4 flex flex-col">
+      <svg viewBox="0 0 64 80" className="absolute -right-3 -bottom-4 w-28 h-32 text-stone-400 opacity-[0.12] pointer-events-none"
+        fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinejoin="round" aria-hidden>
+        <path d="M12 76V30a20 20 0 0 1 40 0v46z" /><path d="M32 20v26M23 29h18" /><path d="M4 76h56" />
+      </svg>
+      <div className="relative flex items-start gap-4">
+        <Link to={`/c/${char.id}`} className="shrink-0" tabIndex={-1} aria-hidden>
+          {char.portrait ? (
+            <img src={char.portrait} alt="" className="w-20 h-20 rounded-xl object-cover object-top border-2 border-stone-600 grayscale brightness-75 contrast-125" />
+          ) : (
+            <span className="w-20 h-20 rounded-xl border-2 border-stone-600 bg-stone-800 flex items-center justify-center text-2xl font-bold text-stone-500">
+              {initials(char.name)}
+            </span>
+          )}
+        </Link>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start gap-2">
+            <h2 className="text-xl font-bold text-stone-200 truncate flex-1">
+              <Link to={`/c/${char.id}`} className="hover:underline decoration-stone-500 underline-offset-4">
+                <span className="text-red-400/80 mr-1.5" aria-hidden>†</span>{char.name}
+              </Link>
+            </h2>
+            {cardMenu(char, true)}
+          </div>
+          <p className="text-sm text-stone-400">Level {totalLevel(char)} {raceName(char.raceSlug)}</p>
+          <p className="text-sm text-stone-400 truncate" title={classLabel(char)}>{classLabel(char)}</p>
+        </div>
+      </div>
+      <div className="relative mt-3 flex items-center gap-2.5">
+        <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-red-400/90">Fallen</span>
+        <span className="flex gap-1.5" title="Three failed death saving throws">
+          {[0, 1, 2].map(i => (
+            <span key={i} className="w-2.5 h-2.5 rounded-full bg-red-700 border border-red-500 shadow-[0_0_6px_rgba(239,68,68,0.6)]" />
+          ))}
+        </span>
+        <span className="ml-auto text-xs text-stone-500" title="Last saved">{new Date(char.updatedAt).toLocaleDateString()}</span>
+      </div>
+      <button className="relative mt-4 py-2 rounded text-sm font-semibold border border-stone-600 text-stone-300 hover:bg-white/5 hover:text-stone-100 transition-colors"
+        onClick={() => navigate(`/c/${char.id}`)}>
+        Open sheet
+      </button>
+    </div>
+  )
 
   return (
     <div>
@@ -127,44 +291,25 @@ export default function Vault() {
           <Link to="/new" className="btn-primary">+ New Character</Link>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {characters.map(char => (
-            <div key={char.id} className="card hover:shadow-md transition-shadow">
-              <div className="flex justify-between items-start">
-                <div className="flex items-center gap-3 min-w-0">
-                  {char.portrait ? (
-                    <img src={char.portrait} alt="" className="w-14 h-14 rounded-lg object-cover object-top border-2 border-parchment-300 shrink-0" />
-                  ) : (
-                    <span className="w-14 h-14 rounded-lg border-2 border-parchment-300 bg-parchment-100 shrink-0 flex items-center justify-center text-lg font-bold text-parchment-400" aria-hidden>
-                      {char.name.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]!.toUpperCase()).join('') || '?'}
-                    </span>
-                  )}
-                  <div className="min-w-0">
-                    <h2 className="text-xl font-bold text-parchment-900 truncate">{char.name}</h2>
-                    <p className="text-sm text-parchment-600">
-                      Level {totalLevel(char)} {raceName(char.raceSlug)}
-                    </p>
-                    <p className="text-sm text-parchment-600">{classLabel(char)}</p>
-                  </div>
-                </div>
-                <span className="text-xs text-parchment-400">
-                  {new Date(char.updatedAt).toLocaleDateString()}
-                </span>
-              </div>
-              <div className="mt-4 flex gap-2">
-                <button className="btn-primary text-sm flex-1" onClick={() => navigate(`/c/${char.id}`)}>
-                  Open
-                </button>
-                <button className="btn-secondary text-sm" title="Duplicate character" onClick={() => handleDuplicate(char)}>
-                  Copy
-                </button>
-                <button className="btn-danger text-sm" onClick={() => handleDelete(char.id, char.name)}>
-                  Delete
-                </button>
-              </div>
+        <>
+          {characters.some(c => !isFallen(c)) && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {characters.filter(c => !isFallen(c)).map(livingCard)}
             </div>
-          ))}
-        </div>
+          )}
+          {/* The fallen rest together at the bottom */}
+          {characters.some(isFallen) && (
+            <>
+              <div className="flex items-center gap-3 mt-8 mb-3">
+                <span className="text-xs font-bold uppercase tracking-[0.3em] text-parchment-500">Fallen</span>
+                <div className="flex-1 h-px bg-parchment-300" />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {characters.filter(isFallen).map(fallenCard)}
+              </div>
+            </>
+          )}
+        </>
       )}
     </div>
   )

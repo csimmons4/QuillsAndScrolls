@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { Fragment, useEffect, useState, useCallback, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { Character, Summon, SKILLS, SKILL_LABELS, SKILL_ABILITY, ABILITIES } from '../character/model'
 import { listCharactersFromDisk, saveCharacterToDisk } from '../storage/charApi'
@@ -27,7 +27,7 @@ import {
   languageChoiceCount, languageChoicePlaceholder, splitRaceLanguages,
 } from '../data/raceData'
 import { STRIXHAVEN_COLLEGES } from '../data/strixhavenSpells'
-import { SpellStatBlock, cleanHigherLevels } from '../components/SpellStatBlock'
+import { SpellStatBlock, cleanHigherLevels, levelLine, parseMaterial } from '../components/SpellStatBlock'
 import { WeaponStatBlock, ArmorStatBlock, MagicItemStatBlock } from '../components/ItemStatBlock'
 import { sumFeatBonuses } from '../character/featBonuses'
 import { sumItemBonuses, effectiveAbilityScores, itemIsActive } from '../character/itemBonuses'
@@ -42,12 +42,12 @@ import { FeatGrantsBlock } from '../components/FeatGrantsBlock'
 import { useConfirm } from '../components/ConfirmDialog'
 import { InspirationToken } from '../components/InspirationToken'
 import { ARMOR_KINDS, ARTISAN_TOOLS, MUSICAL_INSTRUMENTS, GAMING_SETS, OTHER_TOOLS, armorKindsOf, profKey, isToolItem, featArmorKinds, proficiencySources, type ArmorKind } from '../character/proficiencies'
-import { HourglassIcon, MoonIcon, LevelUpIcon, SaveIcon, CheckIcon, ExportIcon } from '../components/SheetIcons'
+import { HourglassIcon, MoonIcon, LevelUpIcon, SaveIcon, CheckIcon, ExportIcon, TargetIcon, ClockIcon, FlaskIcon, BookIcon, SearchIcon } from '../components/SheetIcons'
 import { PortraitPicker } from '../components/PortraitPicker'
 import { runningPotions, sumPotionEffects, describePotionEffects } from '../character/potionEffects'
 import { FeatAbilityPicker } from '../components/FeatAbilityPicker'
 import { BATTLE_MASTER_MANEUVERS } from '../data/classData'
-import type { WeaponStats, ArmorStats, ItemDef } from '../content/loaders'
+import type { WeaponStats, ArmorStats, ItemDef, SpellDef } from '../content/loaders'
 
 // ── Weapon / armor resolution ─────────────────────────────────────────────
 // The lookup tables formerly defined here are now in `src/data/itemOverlay.ts`
@@ -1078,13 +1078,17 @@ export default function Sheet() {
   const [spellBrowserLevel, setSpellBrowserLevel] = useState<number | null>(null)
   const [browserSelectedSpell, setBrowserSelectedSpell] = useState<string | null>(null)
   const [showSpellLibrary, setShowSpellLibrary] = useState(false)
-  const [preparedTab, setPreparedTab] = useState<number>(0)
   // Brief highlight of the slot level a spell was just cast at (slug + slot level).
   const [castHighlight, setCastHighlight] = useState<{ slug: string; level: number } | null>(null)
-  const [expandedInnate, setExpandedInnate] = useState<string | null>(null)
+  // The spell open in the Spells tab's side panel ('entry:<slug>' or 'free:<key>')
+  const [selectedSpellKey, setSelectedSpellKey] = useState<string | null>(null)
   const [expandedInventoryItem, setExpandedInventoryItem] = useState<number | null>(null)
+  const [inventorySearch, setInventorySearch] = useState('')
   const [saveFlash, setSaveFlash] = useState<'idle' | 'saved'>('idle')
   const [journeyOpen, setJourneyOpen] = useState(true)
+  // Feature descriptions show one line until clicked; "Show all text" flips the default for every card
+  const [openFeatures, setOpenFeatures] = useState<Set<string>>(new Set())
+  const [allFeaturesOpen, setAllFeaturesOpen] = useState(false)
   const [damageInput, setDamageInput] = useState('')
   const [txAmount, setTxAmount] = useState('')
   const [txCoin, setTxCoin] = useState<Coin>('gp')
@@ -1099,7 +1103,8 @@ export default function Sheet() {
     setLedgerOpenState(open)
     try { localStorage.setItem('qs:ledgerOpen', String(open)) } catch { /* storage unavailable */ }
   }
-  const [expandedCondition, setExpandedCondition] = useState<string | null>(null)
+  // Marks where the tab bar sits before it pins to the top of the window
+  const tabsAnchor = useRef<HTMLDivElement>(null)
   const [healInput, setHealInput] = useState('')
   const [shortRestOpen, setShortRestOpen] = useState(false)
   const [shortRestDice, setShortRestDice] = useState<Record<string, number>>({})
@@ -1258,6 +1263,43 @@ export default function Sheet() {
     const updates = missingProficiencies(char, content)
     if (updates) save({ ...char, ...updates })
   }, [char, content, save])
+
+  // Quick find (⌘K / Ctrl+K): jump to any spell, item, feature, feat or tab
+  const [findOpen, setFindOpen] = useState(false)
+  const [findQuery, setFindQuery] = useState('')
+  const [findIndex, setFindIndex] = useState(0)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        setFindQuery(''); setFindIndex(0); setFindOpen(o => !o)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
+  // Whether the tab bar is pinned to the top of the window (scrolled past its place); the status strip shows then
+  const [tabsPinned, setTabsPinned] = useState(false)
+  useEffect(() => {
+    const onScroll = () => setTabsPinned((tabsAnchor.current?.getBoundingClientRect().top ?? 1) < 0)
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
+
+  // A few seconds to take back a slip (a removed spell, a deleted item, a rest taken by mistake): the
+  // character as it was just before
+  const [undo, setUndo] = useState<{ message: string; before: Character; id: number } | null>(null)
+  useEffect(() => {
+    if (!undo) return
+    const t = window.setTimeout(() => setUndo(null), 7000)
+    return () => window.clearTimeout(t)
+  }, [undo])
+  /** Call just before a change the player might regret; a toast offers to put the character back */
+  const offerUndo = (message: string) => {
+    if (charRef.current) setUndo({ message, before: charRef.current, id: Date.now() })
+  }
 
   function patch(updates: Partial<Character>) {
     if (!char) return
@@ -1471,7 +1513,7 @@ export default function Sheet() {
 
   /** A resource's uses: gems for small counts, a gauge for big pools (Ki, Lay on Hands). The same
    *  tracker shows on the Resources card and on the class feature it belongs to. */
-  const resourceTracker = (r: ClassResource) => {
+  const resourceTracker = (r: ClassResource, compact = false) => {
     const isPool = (r.max ?? 0) > 6  // large pools get a number input
     const current = r.current
     const max = r.max
@@ -1484,6 +1526,30 @@ export default function Sheet() {
           const pct = cap > 0 ? Math.min(100, Math.round((current / cap) * 100)) : 0
           const setVal = (v: number) =>
             patch({ classResources: { ...char.classResources, [r.key]: Math.max(0, Math.min(cap, v)) } })
+          // One line for the Resources strip: a short gauge beside the count
+          if (compact) return (
+            <div className="flex items-center gap-1">
+              <div
+                className="res-pool-track relative h-2.5 w-20 rounded-full overflow-hidden cursor-pointer"
+                title="Click to set remaining"
+                onClick={e => {
+                  const rect = e.currentTarget.getBoundingClientRect()
+                  setVal(Math.round(((e.clientX - rect.left) / rect.width) * cap))
+                }}
+              >
+                <div className="res-pool-fill absolute inset-y-0 left-0 rounded-full transition-all duration-200" style={{ width: `${pct}%` }} />
+              </div>
+              <button className="btn-ghost px-1 py-0 text-sm" onClick={() => setVal(current - 1)} aria-label={`Spend 1 ${r.name}`}>−</button>
+              <input
+                type="number" min={0} max={max ?? 9999} aria-label={`${r.name} remaining`}
+                className="w-11 text-center text-sm font-bold bg-transparent border border-parchment-300 rounded py-0"
+                value={current}
+                onChange={e => setVal(parseInt(e.target.value, 10) || 0)}
+              />
+              <span className="text-xs text-parchment-400">/ {max ?? '∞'}</span>
+              <button className="btn-ghost px-1 py-0 text-sm" onClick={() => setVal(current + 1)} aria-label={`Restore 1 ${r.name}`}>+</button>
+            </div>
+          )
           return (
             <div>
               <div
@@ -1606,6 +1672,21 @@ export default function Sheet() {
       <div className="min-w-[8rem]">{resourceTracker(r)}</div>
     </div>
   ))
+  /** A feature's description: one line until clicked, so the Features tab reads as a list */
+  const featureText = (anchor: string, text: string, className = '') => {
+    const open = openFeatures.has(anchor) !== allFeaturesOpen
+    return (
+      <button type="button" aria-expanded={open} title={open ? undefined : 'Show the full text'}
+        onClick={() => setOpenFeatures(prev => {
+          const next = new Set(prev)
+          if (next.has(anchor)) next.delete(anchor); else next.add(anchor)
+          return next
+        })}
+        // line-clamp sets its own display, so `block` only when open
+        className={`w-full text-left text-sm text-parchment-600 ${open ? 'block' : 'line-clamp-1'} ${className}`}
+      >{text}</button>
+    )
+  }
   const isMulticlassCaster = isMulticlassSpellcaster(char.classes)
   const multiclassMaxes = isMulticlassCaster ? multiclassSpellSlotsMax(char.classes) : null
   const jackOfAllTrades = hasBardJackOfAllTrades(char)
@@ -1621,6 +1702,12 @@ export default function Sheet() {
     { key: 'summons', label: 'Summons' },
     { key: 'notes', label: 'Notes' },
   ]
+  // Switching tabs from the pinned bar further down the page starts the new tab at its top
+  const selectTab = (key: Tab) => {
+    setTab(key)
+    const top = (tabsAnchor.current?.getBoundingClientRect().top ?? 0) + window.scrollY
+    if (window.scrollY > top) window.scrollTo({ top })
+  }
 
   // HP card derived values
   const hpPct = maxHp > 0 ? Math.min(100, Math.round(char.hp.current / maxHp * 100)) : 0
@@ -1662,13 +1749,15 @@ export default function Sheet() {
   return (
     <div>
       {/* Header: back link, name and summary on the left; rests, Level Up and the file actions on the right */}
-      <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3 mb-6">
+      <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3 mb-4">
         <div className="min-w-0 flex items-end gap-4">
-          <PortraitPicker name={char.name} portrait={char.portrait} onChange={p => patch({ portrait: p })} />
+          <PortraitPicker name={char.name} portrait={char.portrait} onChange={p => patch({ portrait: p })} className="w-14 h-14 sm:w-20 sm:h-20" />
           <div className="min-w-0">
           <Link to="/" className="text-xs text-parchment-500 hover:text-parchment-800 px-1">← Vault</Link>
           <input
-            className="block text-3xl font-bold bg-transparent border-none outline-none focus:bg-parchment-50 rounded px-1"
+            // Sized to the name (an input is ~20 characters wide by default), never wider than the screen
+            size={Math.max(4, char.name.length + 1)}
+            className="block max-w-full text-2xl sm:text-3xl font-bold bg-transparent border-none outline-none focus:bg-parchment-50 rounded px-1"
             value={char.name}
             onChange={e => patch({ name: e.target.value })}
             aria-label="Character name"
@@ -1685,17 +1774,21 @@ export default function Sheet() {
           <div className="inline-flex rounded border border-parchment-300 overflow-hidden" role="group" aria-label="Rest">
             <button type="button"
               className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-semibold bg-parchment-200 text-dungeon-900 hover:bg-parchment-300 transition-colors"
-              onClick={() => { setShortRestDice({}); setShortRestOpen(true) }}
-            ><HourglassIcon className="w-4 h-4" />Short Rest</button>
+              onClick={() => { setShortRestDice({}); setShortRestOpen(true) }} title="Short Rest" aria-label="Short Rest"
+            ><HourglassIcon className="w-4 h-4" /><span className="hidden sm:inline">Short Rest</span></button>
             <button type="button"
               className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-semibold bg-parchment-200 text-dungeon-900 hover:bg-parchment-300 transition-colors border-l border-parchment-300"
-              onClick={() => setLongRestOpen(true)}
-            ><MoonIcon className="w-4 h-4" />Long Rest</button>
+              onClick={() => setLongRestOpen(true)} title="Long Rest" aria-label="Long Rest"
+            ><MoonIcon className="w-4 h-4" /><span className="hidden sm:inline">Long Rest</span></button>
           </div>
-          <Link to={`/c/${char.id}/level-up`} className="btn-primary text-sm gap-1.5 px-3">
-            <LevelUpIcon className="w-4 h-4" />Level Up
+          <Link to={`/c/${char.id}/level-up`} className="btn-primary text-sm gap-1.5 px-3" title="Level Up" aria-label="Level Up">
+            <LevelUpIcon className="w-4 h-4" /><span className="hidden sm:inline">Level Up</span>
           </Link>
           <span className="hidden sm:block w-px h-7 bg-parchment-300 mx-1" aria-hidden />
+          <button type="button" onClick={() => { setFindQuery(''); setFindIndex(0); setFindOpen(true) }}
+            title={`Find a spell, item or feature (${/Mac|iPhone|iPad/.test(navigator.platform) ? '⌘K' : 'Ctrl+K'})`} aria-label="Find on this sheet"
+            className="inline-flex items-center justify-center w-9 h-9 rounded border border-parchment-300 text-parchment-600 hover:text-parchment-900 hover:border-parchment-500 hover:bg-parchment-100 transition-colors"
+          ><SearchIcon className="w-5 h-5" /></button>
           {/* File actions. The sheet also saves on its own; this saves this instant (⌘S / Ctrl+S). */}
           <button type="button" onClick={saveToFile}
             title={saveFlash === 'saved' ? 'Saved' : 'Save now (⌘S / Ctrl+S). Changes also save automatically.'}
@@ -1713,129 +1806,148 @@ export default function Sheet() {
         </div>
       </div>
 
-      {/* HP Card — display + quick controls combined */}
-      <div className="card mb-4 px-4 py-3">
-        {/* Top row: HP display + temp HP */}
-        <div className="flex items-center gap-4 mb-3">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-baseline gap-1.5 mb-2">
+      {/* Vitals: hit points and the quick damage/heal controls on the left, the numbers you look up
+          most on the right */}
+      <div className="card mb-3 px-4 py-3 flex flex-col lg:flex-row gap-4">
+        <div className="lg:w-[25rem] shrink-0">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="flex items-baseline gap-1.5">
               <input
                 type="number"
+                aria-label="Current hit points"
                 className={`text-3xl font-bold w-16 bg-transparent border-none focus:outline-none focus:border-b-2 focus:border-parchment-400 rounded-none pb-0.5 ${hpTextColor}`}
                 value={char.hp.current}
                 onChange={e => patch({ hp: { ...char.hp, current: Math.max(0, Math.min(maxHp, parseInt(e.target.value, 10) || 0)) } })}
               />
               <span className="text-base text-parchment-300 select-none">/</span>
-              <span className="text-base font-medium text-parchment-400">{maxHp}</span>
+              <span className="text-base font-medium text-parchment-400" title="Hit point maximum">{maxHp}</span>
               {featBonuses.hpBonusPerLevel > 0 && (
                 <span className="text-xs text-amber-500 ml-1">+{featBonuses.hpBonusPerLevel * level} Tough</span>
               )}
             </div>
-            <div className="h-1.5 bg-parchment-200 rounded-full overflow-hidden">
-              <div className={`h-full rounded-full transition-all duration-300 ${hpBarColor}`} style={{ width: `${hpPct}%` }} />
+            {/* Temporary hit points sit beside the total they protect */}
+            <div className="flex items-center gap-1.5" title="Temporary hit points">
+              <div className="relative w-8 h-9 shrink-0">
+                <svg viewBox="0 0 56 64" className="absolute inset-0 w-full h-full temp-shield" fill="currentColor" aria-hidden>
+                  <path d="M28 2 L54 14 L54 36 C54 50 28 62 28 62 C28 62 2 50 2 36 L2 14 Z" />
+                </svg>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  aria-label="Temporary hit points"
+                  className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-sm font-bold temp-shield-value w-8 text-center bg-transparent border-none focus:outline-none"
+                  value={char.hp.temp}
+                  onChange={e => {
+                    const v = parseInt(e.target.value, 10)
+                    patch({ hp: { ...char.hp, temp: isNaN(v) ? 0 : Math.max(0, v) } })
+                  }}
+                />
+              </div>
+              <span className="text-[10px] uppercase tracking-wide text-parchment-400">Temp</span>
             </div>
+            <span className="ml-auto text-[11px] uppercase tracking-wide text-parchment-500">Hit Points</span>
           </div>
-          <div className="flex flex-col items-center shrink-0">
-            <div className="text-xs text-parchment-400 mb-1">Temp</div>
-            <div className="relative w-9 h-10">
-              <svg viewBox="0 0 56 64" className="absolute inset-0 w-full h-full temp-shield" fill="currentColor" aria-hidden>
-                <path d="M28 2 L54 14 L54 36 C54 50 28 62 28 62 C28 62 2 50 2 36 L2 14 Z" />
-              </svg>
+          <div className="h-1.5 bg-parchment-200 rounded-full overflow-hidden">
+            <div className={`h-full rounded-full transition-all duration-300 ${hpBarColor}`} style={{ width: `${hpPct}%` }} />
+          </div>
+
+          {/* Quick controls */}
+          <div className="flex items-center gap-2 mt-3">
+            <div className="flex items-center gap-1 shrink-0">
+              <button
+                type="button"
+                aria-label="Decrease amount"
+                className="w-7 h-7 rounded border border-parchment-300 text-parchment-600 hover:border-parchment-500 hover:bg-parchment-50 font-bold text-base leading-none transition-colors"
+                onClick={() => setDamageInput(v => String(Math.max(1, (parseInt(v, 10) || 0) - 1)))}
+              >−</button>
               <input
-                type="text"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                aria-label="Temporary hit points"
-                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-sm font-bold temp-shield-value w-8 text-center bg-transparent border-none focus:outline-none"
-                value={char.hp.temp}
-                onChange={e => {
-                  const v = parseInt(e.target.value, 10)
-                  patch({ hp: { ...char.hp, temp: isNaN(v) ? 0 : Math.max(0, v) } })
-                }}
+                type="number"
+                min={1}
+                aria-label="Amount to damage, heal or add as temporary hit points"
+                className="w-14 text-center text-xl font-bold border border-parchment-200 rounded py-0.5 bg-parchment-50 focus:border-parchment-400 focus:outline-none"
+                placeholder="0"
+                value={damageInput}
+                onChange={e => setDamageInput(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && quickValid) { applyDamage(quickN); setDamageInput('') } }}
               />
+              <button
+                type="button"
+                aria-label="Increase amount"
+                className="w-7 h-7 rounded border border-parchment-300 text-parchment-600 hover:border-parchment-500 hover:bg-parchment-50 font-bold text-base leading-none transition-colors"
+                onClick={() => setDamageInput(v => String((parseInt(v, 10) || 0) + 1))}
+              >+</button>
+            </div>
+            <div className="flex gap-1.5 flex-1 min-w-0">
+              <button
+                type="button"
+                disabled={!quickValid}
+                className="flex-1 min-w-0 py-1.5 px-1 rounded text-sm font-medium transition-colors bg-red-100 text-red-700 border border-red-200 hover:bg-red-200 disabled:opacity-40 disabled:cursor-not-allowed"
+                onClick={() => { applyDamage(quickN); setDamageInput('') }}
+              >
+                <div>Damage</div>
+                {quickAfterDamage !== null && <div className="text-xs opacity-70">→ {quickAfterDamage}</div>}
+              </button>
+              <button
+                type="button"
+                disabled={!quickValid}
+                className="flex-1 min-w-0 py-1.5 px-1 rounded text-sm font-medium transition-colors bg-green-100 text-green-700 border border-green-200 hover:bg-green-200 disabled:opacity-40 disabled:cursor-not-allowed"
+                onClick={() => { patch({ hp: { ...char.hp, current: Math.min(maxHp, char.hp.current + quickN) } }); setDamageInput('') }}
+              >
+                <div>Heal</div>
+                {quickAfterHeal !== null && <div className="text-xs opacity-70">→ {quickAfterHeal}</div>}
+              </button>
+              <button
+                type="button"
+                disabled={!quickValid}
+                className="flex-1 min-w-0 py-1.5 px-1 rounded text-sm font-medium transition-colors bg-blue-100 text-blue-700 border border-blue-200 hover:bg-blue-200 disabled:opacity-40 disabled:cursor-not-allowed"
+                title="Temporary hit points don't add together — you keep the larger amount"
+                onClick={() => { patch({ hp: { ...char.hp, temp: Math.max(char.hp.temp, quickN) } }); setDamageInput('') }}
+              >
+                <div>Temp</div>
+                {quickValid && <div className="text-xs opacity-70">→ {Math.max(char.hp.temp, quickN)}</div>}
+              </button>
             </div>
           </div>
         </div>
 
-        {/* Divider */}
-        <div className="border-t border-parchment-100 mb-3" />
+        <div className="hidden lg:block w-px bg-parchment-200 shrink-0" aria-hidden />
 
-        {/* Quick controls */}
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              className="w-7 h-7 rounded border border-parchment-300 text-parchment-600 hover:border-parchment-500 hover:bg-parchment-50 font-bold text-base leading-none transition-colors"
-              onClick={() => setDamageInput(v => String(Math.max(1, (parseInt(v, 10) || 0) - 1)))}
-            >−</button>
-            <input
-              type="number"
-              min={1}
-              className="w-16 text-center text-xl font-bold border border-parchment-200 rounded py-0.5 bg-parchment-50 focus:border-parchment-400 focus:outline-none"
-              placeholder="0"
-              value={damageInput}
-              onChange={e => setDamageInput(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter' && quickValid) { applyDamage(quickN); setDamageInput('') } }}
-            />
-            <button
-              type="button"
-              className="w-7 h-7 rounded border border-parchment-300 text-parchment-600 hover:border-parchment-500 hover:bg-parchment-50 font-bold text-base leading-none transition-colors"
-              onClick={() => setDamageInput(v => String((parseInt(v, 10) || 0) + 1))}
-            >+</button>
-          </div>
-          <div className="flex gap-1.5 flex-1">
-            <button
-              type="button"
-              disabled={!quickValid}
-              className="flex-1 py-1.5 px-2 rounded text-sm font-medium transition-colors bg-red-100 text-red-700 border border-red-200 hover:bg-red-200 disabled:opacity-40 disabled:cursor-not-allowed"
-              onClick={() => { applyDamage(quickN); setDamageInput('') }}
-            >
-              <div>Damage</div>
-              {quickAfterDamage !== null && <div className="text-xs opacity-70">→ {quickAfterDamage}</div>}
-            </button>
-            <button
-              type="button"
-              disabled={!quickValid}
-              className="flex-1 py-1.5 px-2 rounded text-sm font-medium transition-colors bg-green-100 text-green-700 border border-green-200 hover:bg-green-200 disabled:opacity-40 disabled:cursor-not-allowed"
-              onClick={() => { patch({ hp: { ...char.hp, current: Math.min(maxHp, char.hp.current + quickN) } }); setDamageInput('') }}
-            >
-              <div>Heal</div>
-              {quickAfterHeal !== null && <div className="text-xs opacity-70">→ {quickAfterHeal}</div>}
-            </button>
-            <button
-              type="button"
-              disabled={!quickValid}
-              className="flex-1 py-1.5 px-2 rounded text-sm font-medium transition-colors bg-blue-100 text-blue-700 border border-blue-200 hover:bg-blue-200 disabled:opacity-40 disabled:cursor-not-allowed"
-              title="Temporary hit points don't add together — you keep the larger amount"
-              onClick={() => { patch({ hp: { ...char.hp, temp: Math.max(char.hp.temp, quickN) } }); setDamageInput('') }}
-            >
-              <div>Temp</div>
-              {quickValid && <div className="text-xs opacity-70">→ {Math.max(char.hp.temp, quickN)}</div>}
-            </button>
+        {/* Quick stats; the three passive scores share one box */}
+        <div className="flex-1 grid grid-cols-4 sm:grid-cols-5 gap-1.5 sm:gap-2">
+          {[
+            { label: 'AC', value: ac, note: acSource + (stealthDisadv ? ' ⚠ Stealth disadv.' : '') },
+            { label: 'Initiative', value: formatMod(initiative), note: featBonuses.initiativeBonus ? `+${featBonuses.initiativeBonus} Alert` : undefined },
+            { label: 'Speed', value: `${speed}ft`, note: [
+              potionFx.speedMultiplier > 1 ? `×${potionFx.speedMultiplier} potion` : monkMovement ? `+${monkMovement}ft Unarmored Movement` : fastMovement ? `+${fastMovement}ft Fast Movement` : featBonuses.speedBonus ? `+${featBonuses.speedBonus}ft feat` : '',
+              ...potionSpeedNotes,
+            ].filter(Boolean).join(' · ') || undefined },
+            { label: 'Prof. Bonus', value: formatMod(pb) },
+          ].map(s => (
+            <div key={s.label} className="stat-box justify-start text-center !p-1.5 sm:!p-2" title={s.note}>
+              <div className="text-[10px] sm:text-[11px] text-parchment-500 uppercase tracking-wide whitespace-nowrap">{s.label === 'Prof. Bonus' ? <><span className="sm:hidden">Prof.</span><span className="hidden sm:inline">Prof. Bonus</span></> : s.label === 'Initiative' ? <><span className="sm:hidden">Init.</span><span className="hidden sm:inline">Initiative</span></> : s.label}</div>
+              <div className="text-xl sm:text-2xl font-bold leading-tight">{s.value}</div>
+              {s.note && <div className="hidden sm:block text-[10px] leading-snug text-amber-600 mt-0.5">{s.note}</div>}
+            </div>
+          ))}
+          {/* Passive scores: one box on wide screens, a line of their own on phones */}
+          <div className="col-span-4 sm:col-span-1 rounded border border-parchment-300 bg-parchment-50 px-2.5 py-1.5 sm:p-2 flex flex-wrap sm:flex-col items-center sm:items-stretch gap-x-3 gap-y-0.5 sm:gap-0">
+            <div className="text-[10px] sm:text-[11px] text-parchment-500 uppercase tracking-wide sm:text-center sm:mb-1">Passive</div>
+            {[
+              { label: 'Perception', value: passive, note: featBonuses.passivePerceptionBonus ? `+${featBonuses.passivePerceptionBonus} Observant` : undefined },
+              { label: 'Investigation', value: passiveInvestigation, note: featBonuses.passiveInvestigationBonus ? `+${featBonuses.passiveInvestigationBonus} Observant` : undefined },
+              { label: 'Insight', value: passiveInsight },
+            ].map(p => (
+              <div key={p.label}>
+                <div className="flex items-baseline justify-between gap-1.5 sm:gap-2 text-xs">
+                  <span className="text-parchment-600">{p.label}</span>
+                  <span className="text-sm font-bold">{p.value}</span>
+                </div>
+                {p.note && <div className="text-[10px] leading-snug text-amber-600 text-right">{p.note}</div>}
+              </div>
+            ))}
           </div>
         </div>
-      </div>
-
-      {/* Quick stats bar */}
-      <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-7 gap-2 mb-4">
-        {[
-          { label: 'AC', value: ac, note: acSource + (stealthDisadv ? ' ⚠ Stealth disadv.' : '') },
-          { label: 'Initiative', value: formatMod(initiative), note: featBonuses.initiativeBonus ? `+${featBonuses.initiativeBonus} Alert` : undefined },
-          { label: 'Speed', value: `${speed}ft`, note: [
-            potionFx.speedMultiplier > 1 ? `×${potionFx.speedMultiplier} potion` : monkMovement ? `+${monkMovement}ft Unarmored Movement` : fastMovement ? `+${fastMovement}ft Fast Movement` : featBonuses.speedBonus ? `+${featBonuses.speedBonus}ft feat` : '',
-            ...potionSpeedNotes,
-          ].filter(Boolean).join(' · ') || undefined },
-          { label: 'Prof. Bonus', value: formatMod(pb) },
-          { label: 'Passive Perc.', value: passive, note: featBonuses.passivePerceptionBonus ? `+${featBonuses.passivePerceptionBonus} Observant` : undefined },
-          { label: 'Passive Inv.', value: passiveInvestigation, note: featBonuses.passiveInvestigationBonus ? `+${featBonuses.passiveInvestigationBonus} Observant` : undefined },
-          { label: 'Passive Ins.', value: passiveInsight },
-        ].map(s => (
-          <div key={s.label} className="stat-box justify-start text-center">
-            <div className="text-xs text-parchment-500 uppercase">{s.label}</div>
-            <div className="text-xl font-bold">{s.value}</div>
-            {s.note && <div className="text-xs text-amber-600 mt-0.5">{s.note}</div>}
-          </div>
-        ))}
       </div>
 
       {/* Resources — class resources plus the player's own custom trackers */}
@@ -1864,17 +1976,49 @@ export default function Sheet() {
           delete newClassRes[key]
           patch({ customResources: (char.customResources ?? []).filter(x => x.key !== key), classResources: newClassRes })
         }
+        // One strip: each resource is its name and its gems. The name jumps to the feature card,
+        // which has the full description.
         return (
-        <div className="card mb-4">
-          <div className="mb-3 flex items-center justify-between gap-2">
-            <h3 className="section-header mb-0 flex-1">Resources</h3>
+        <div className="card mb-3 px-4 py-2.5">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            <h3 className="text-xs font-bold uppercase tracking-widest text-parchment-700 mr-1">Resources</h3>
+            {trackedResources.length === 0 && !addResourceOpen && (
+              <span className="text-xs text-parchment-400">None yet. Use + Custom to track item charges, boons or anything else that resets on a rest.</span>
+            )}
+            {trackedResources.map(r => {
+              // Short notes (a die size, a damage bonus) stay in view; longer ones show on hover
+              const shortNote = r.display && r.display.length <= 14 ? r.display : undefined
+              const hoverNote = shortNote ? undefined : r.display
+              return (
+                <div key={r.key} className="group inline-flex items-center gap-2 rounded-lg border border-parchment-200 bg-parchment-100 pl-2.5 pr-1.5 py-0.5">
+                  {resourceAnchor.has(r.key) ? (
+                    <button type="button" onClick={() => jumpToFeature(resourceAnchor.get(r.key)!)}
+                      title={`${hoverNote ? `${hoverNote}. ` : ''}Show this feature on the Features tab`}
+                      className="text-sm font-semibold text-parchment-800 truncate max-w-[14rem] text-left hover:underline decoration-dotted underline-offset-2"
+                    >{r.name}</button>
+                  ) : (
+                    <span className="text-sm font-semibold text-parchment-800 truncate max-w-[14rem]" title={hoverNote}>{r.name}</span>
+                  )}
+                  {shortNote && <span className="text-xs text-parchment-500 whitespace-nowrap">{shortNote}</span>}
+                  <span className={`text-[10px] font-semibold rounded px-1 ${r.recharge === 'short' ? 'bg-blue-100 text-blue-600' : 'bg-amber-100 text-amber-600'}`}
+                    title={r.recharge === 'short' ? 'Comes back on a short or long rest' : 'Comes back on a long rest'}>
+                    {r.recharge === 'short' ? 'SR' : 'LR'}
+                  </span>
+                  {resourceTracker(r, true)}
+                  {r.isCustom && (
+                    <button type="button" onClick={() => removeCustomResource(r.key, r.name)} title="Stop tracking" aria-label={`Stop tracking ${r.name}`}
+                      className="text-[10px] text-parchment-300 hover:text-red-500 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity">✕</button>
+                  )}
+                </div>
+              )
+            })}
             <button type="button" onClick={() => setAddResourceOpen(o => !o)}
               title="Track something the sheet doesn't know about: a magic item's uses, a DM-granted boon, a racial ability…"
-              className="text-xs rounded-full px-2.5 py-0.5 border border-parchment-200 text-parchment-500 hover:border-parchment-500 hover:text-parchment-800 transition-colors"
+              className="ml-auto text-xs rounded-full px-2.5 py-0.5 border border-parchment-200 text-parchment-500 hover:border-parchment-500 hover:text-parchment-800 transition-colors"
             >{addResourceOpen ? 'Cancel' : '+ Custom'}</button>
           </div>
           {addResourceOpen && (
-            <div className="mb-3 p-2 rounded border border-parchment-200 bg-parchment-50 flex gap-2 flex-wrap items-center">
+            <div className="mt-2.5 p-2 rounded border border-parchment-200 bg-parchment-50 flex gap-2 flex-wrap items-center">
               <input type="text" placeholder="Name (e.g. Luck Points)" autoFocus value={newResourceName}
                 onChange={e => setNewResourceName(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') addCustomResource() }}
@@ -1891,40 +2035,6 @@ export default function Sheet() {
               <button type="button" onClick={addCustomResource} className="btn-primary text-sm px-3 py-1">Add</button>
             </div>
           )}
-          {trackedResources.length === 0 && !addResourceOpen && (
-            <p className="text-xs text-parchment-400">No limited-use class resources yet. Use + Custom to track item charges, boons or anything else that resets on a rest.</p>
-          )}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-            {trackedResources.map(r => {
-              return (
-                <div key={r.key} className="group p-2 rounded border border-parchment-100 bg-parchment-50">
-                  <div className="flex items-center justify-between gap-1 mb-1">
-                    {resourceAnchor.has(r.key) ? (
-                      <button type="button" onClick={() => jumpToFeature(resourceAnchor.get(r.key)!)}
-                        title="Show this feature on the Features tab"
-                        className="text-xs font-semibold text-parchment-700 truncate text-left hover:underline decoration-dotted underline-offset-2"
-                      >{r.name}</button>
-                    ) : (
-                      <span className="text-xs font-semibold text-parchment-700 truncate">{r.name}</span>
-                    )}
-                    <span className="flex items-center gap-1 shrink-0">
-                      {r.isCustom && (
-                        <button type="button" onClick={() => removeCustomResource(r.key, r.name)} title="Stop tracking"
-                          className="text-[10px] text-parchment-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">✕</button>
-                      )}
-                      {r.isCustom && <span className="text-[10px] rounded px-1 bg-parchment-200 text-parchment-600">Custom</span>}
-                      <span className={`text-xs rounded px-1 ${r.recharge === 'short' ? 'bg-blue-100 text-blue-600' : 'bg-amber-100 text-amber-600'}`}>
-                        {r.recharge === 'short' ? 'SR' : 'LR'}
-                      </span>
-                    </span>
-                  </div>
-                  {r.display && <div className="text-xs text-parchment-400 mb-1">{r.display}</div>}
-
-                  {resourceTracker(r)}
-                </div>
-              )
-            })}
-          </div>
         </div>
         )
       })()}
@@ -2103,11 +2213,12 @@ export default function Sheet() {
         })()
       ) : (
       <>
-      {/* Tabs */}
-      <div className="flex gap-5 border-b border-parchment-200 mb-6">
+      {/* Tabs: pinned to the top of the window, so they're in reach anywhere on a long tab */}
+      <div ref={tabsAnchor} />
+      <div className="sticky top-0 z-30 bg-parchment-100 flex gap-5 border-b border-parchment-200 pt-3 mb-5 overflow-x-auto [scrollbar-width:none]">
         {TABS.map(t => t.key === 'summons' ? (
-          <button key={t.key} onClick={() => setTab(t.key)}
-            className={`pb-2 text-sm font-medium flex items-center gap-1.5 ${tab === 'summons' ? 'tab-active' : 'tab-inactive'}`}>
+          <button key={t.key} onClick={() => selectTab(t.key)}
+            className={`pb-2 text-sm font-medium flex items-center gap-1.5 shrink-0 whitespace-nowrap ${tab === 'summons' ? 'tab-active' : 'tab-inactive'}`}>
             {t.label}
             {char.summons.length > 0 && (
               <span className="text-[10px] bg-amber-500 text-white rounded-full px-1.5 py-0.5 font-bold leading-none">
@@ -2116,401 +2227,47 @@ export default function Sheet() {
             )}
           </button>
         ) : (
-          <button key={t.key} onClick={() => setTab(t.key)}
-            className={`pb-2 text-sm font-medium ${tab === t.key ? 'tab-active' : 'tab-inactive'}`}>
+          <button key={t.key} onClick={() => selectTab(t.key)}
+            className={`pb-2 text-sm font-medium shrink-0 whitespace-nowrap ${tab === t.key ? 'tab-active' : 'tab-inactive'}`}>
             {t.label}
           </button>
         ))}
+        {/* Once pinned: the numbers you glance at mid-fight, from any tab */}
+        <div aria-hidden={!tabsPinned}
+          className={`hidden sm:flex ml-auto items-center gap-3 pb-2 pl-4 shrink-0 text-sm transition-opacity duration-200 ${tabsPinned ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+          <span className="tabular-nums" title="Hit points">
+            <span className="text-[10px] uppercase tracking-wide text-parchment-500 mr-1">HP</span>
+            <span className={`font-bold ${hpTextColor}`}>{char.hp.current}</span>
+            <span className="text-parchment-400">/{maxHp}</span>
+            {char.hp.temp > 0 && <span className="ml-1 text-xs font-semibold text-blue-600" title="Temporary hit points">+{char.hp.temp}</span>}
+          </span>
+          <span className="tabular-nums" title="Armor Class">
+            <span className="text-[10px] uppercase tracking-wide text-parchment-500 mr-1">AC</span>
+            <span className="font-bold text-parchment-800">{ac}</span>
+          </span>
+          {char.concentratingOn && (() => {
+            const concName = content.spells.find(sp => sp.slug === char.concentratingOn)?.name ?? char.concentratingOn
+            return (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-300 bg-amber-50 pl-2 pr-0.5 py-0.5 text-xs font-semibold text-amber-800" title={`Concentrating on ${concName}`}>
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400" style={{ boxShadow: '0 0 5px 1px rgba(251,191,36,0.8)' }} />
+                {concName}
+                <button type="button" onClick={() => patch({ concentratingOn: undefined })} tabIndex={tabsPinned ? 0 : -1}
+                  title="Stop concentrating" aria-label={`Stop concentrating on ${concName}`}
+                  className="w-4 h-4 rounded-full leading-none text-amber-500 hover:text-red-600 hover:bg-amber-100">✕</button>
+              </span>
+            )
+          })()}
+          {char.inspiration && (
+            <span className="w-3 h-3 rotate-45 bg-amber-400 border border-amber-500" title="Inspired"
+              style={{ boxShadow: '0 0 6px 2px rgba(251,191,36,0.55)' }} />
+          )}
+        </div>
       </div>
 
       {/* Stats Tab */}
       {tab === 'stats' && (
         <div className="space-y-5">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-
-            {/* Col 1: Ability Scores + Saving Throws */}
-            <div className="space-y-4">
-              <div className="card p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <h2 className="section-header mb-0 flex-1">Ability Scores</h2>
-                  {abilitiesChanged.length > 0 && (
-                    <button type="button" onClick={resetAllAbilities}
-                      title={`Changed by hand: ${abilitiesChanged.map(a => ABILITY_LABELS[a]).join(', ')}. Click to restore them.`}
-                      className="text-xs rounded-full px-2.5 py-0.5 border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors shrink-0"
-                    >↺ Reset {abilitiesChanged.length} changed</button>
-                  )}
-                </div>
-                <div className="grid grid-cols-3 gap-2">
-                  {ABILITIES.map(a => (
-                    <div key={a} className="stat-box relative">
-                      <div className="text-xs text-parchment-500 uppercase">{ABILITY_LABELS[a]}</div>
-                      <input
-                        type="number"
-                        min={1}
-                        max={30}
-                        className="text-2xl font-bold w-12 text-center bg-transparent border-none outline-none focus:bg-parchment-50 rounded"
-                        value={char.abilityScores[a]}
-                        onChange={e => {
-                          const scores = { ...char.abilityScores, [a]: parseInt(e.target.value, 10) || 10 }
-                          patch({ abilityScores: scores as Character['abilityScores'] })
-                        }}
-                      />
-                      <div className="text-sm font-semibold text-parchment-600">
-                        {formatMod(abilityModFor(effectiveChar, a))}
-                        {effectiveChar.abilityScores[a] !== char.abilityScores[a] && (
-                          <span className="text-xs text-indigo-500 ml-0.5"
-                            title={`Currently ${effectiveChar.abilityScores[a]} from ${potionScoreOverrides[a] === effectiveChar.abilityScores[a] ? 'an active potion' : 'an equipped item'}`}
-                          >★{effectiveChar.abilityScores[a]}</span>
-                        )}
-                      </div>
-                      {/* In the corner, so a changed box keeps the same layout as the others */}
-                      {abilitiesChanged.includes(a) && (
-                        <button type="button" onClick={() => patch({ abilityScores: { ...char.abilityScores, [a]: abilityBase[a] } })}
-                          title={`Changed by hand (was ${abilityBase[a]}). Click to reset.`}
-                          className="absolute top-1 right-1.5 text-[11px] font-semibold text-amber-700 hover:text-amber-900"
-                        >↺ {abilityBase[a]}</button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="card p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <h2 className="section-header mb-0 flex-1">Saving Throws</h2>
-                  {savesChanged.length > 0 && (
-                    <button type="button" onClick={resetAllSaves}
-                      title={`Changed by hand: ${savesChanged.map(a => ABILITY_FULL[a]).join(', ')}. Click to restore them.`}
-                      className="text-xs rounded-full px-2.5 py-0.5 border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors shrink-0"
-                    >↺ Reset {savesChanged.length} changed</button>
-                  )}
-                </div>
-                <div className="space-y-1.5">
-                  {ABILITIES.map(a => (
-                    <div key={a} className="flex items-center gap-2 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={char.saveProficiencies.includes(a)}
-                        onChange={e => {
-                          const s = new Set(char.saveProficiencies)
-                          e.target.checked ? s.add(a) : s.delete(a)
-                          patch({ saveProficiencies: [...s] })
-                        }}
-                      />
-                      <span className="w-10 font-mono text-right text-parchment-700">{formatMod(saveMod(effectiveChar, a) + itemBonuses.savingThrowBonus + paladinAura)}</span>
-                      <span className="flex-1">{ABILITY_FULL[a]}</span>
-                      {savesChanged.includes(a) && (
-                        <button type="button" onClick={() => resetSave(a)}
-                          title={`Changed by hand. Originally ${saveBase.has(a) ? 'proficient' : 'not proficient'}. Click to reset.`}
-                          className="text-[11px] font-semibold text-amber-700 hover:text-amber-900 shrink-0"
-                        >↺ reset</button>
-                      )}
-                      {paladinAura > 0 && <span className="text-xs bg-yellow-100 text-yellow-700 rounded px-1.5 py-0.5">+{paladinAura} Aura</span>}
-                      {a === 'con' && featBonuses.concentrationAdvantage && (
-                        <span className="text-xs bg-amber-100 text-amber-700 rounded px-1.5 py-0.5">War Caster</span>
-                      )}
-                      {/* Active potions: advantage/disadvantage (they cancel out) and Bless dice */}
-                      {potionFx.saveAdvantage.has(a) && !potionFx.saveDisadvantage.has(a) && (
-                        <span className="text-xs bg-teal-100 text-teal-700 rounded px-1.5 py-0.5" title="From an active potion">Adv</span>
-                      )}
-                      {potionFx.saveDisadvantage.has(a) && !potionFx.saveAdvantage.has(a) && (
-                        <span className="text-xs bg-red-100 text-red-700 rounded px-1.5 py-0.5" title="From an active potion">Disadv</span>
-                      )}
-                      {potionFx.rollBonusDice.map(d => (
-                        <span key={d} className="text-xs bg-teal-100 text-teal-700 rounded px-1.5 py-0.5" title="From an active potion">{d}</span>
-                      ))}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Active Potions — added by Drink; minute-long effects count down in rounds */}
-              {char.activePotions.length > 0 && (
-                <div className="card p-4">
-                  <h2 className="section-header">Active Potions</h2>
-                  <div className="space-y-2">
-                    {char.activePotions.map(p => {
-                      const def = content.items.find(i => i.slug === p.itemSlug)?.potion
-                      const outOfUses = p.usesLeft === 0
-                      const ended = p.roundsLeft === 0 || outOfUses
-                      const update = (changes: Partial<typeof p>) =>
-                        patch({ activePotions: char.activePotions.map(x => x.id === p.id ? { ...x, ...changes } : x) })
-                      const action = def?.action
-                      const applied = describePotionEffects(def, p.choice, walkSpeed)
-                      // Potion of Poison after a failed save: usesLeft counts the damage dice still to come
-                      const poisonFx = def?.onDrink?.damage
-                      const isPoison = !!poisonFx?.ongoingDice && !def?.uses
-                      return (
-                        <div key={p.id} className={`rounded-lg border px-3 py-2 ${ended ? 'border-parchment-200 bg-parchment-50 opacity-70' : 'border-teal-200 bg-teal-50'}`}>
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="min-w-0">
-                              <div className="text-sm font-semibold text-parchment-900 truncate">{p.name}</div>
-                              <span className="inline-block mt-0.5 text-[11px] font-semibold rounded px-1.5 py-0.5 bg-teal-100 text-teal-700">{p.effect}</span>
-                            </div>
-                            <button type="button" onClick={() => endPotion(p.id)}
-                              title="End this effect"
-                              className="shrink-0 text-xs rounded border border-parchment-300 px-2 py-0.5 text-parchment-600 hover:border-red-400 hover:text-red-600 transition-colors"
-                            >End</button>
-                          </div>
-                          {/* What the potion lets you do — its own DC, not yours */}
-                          {action && !ended && (
-                            <div className="mt-1.5 rounded border border-teal-200 bg-parchment-50 px-2 py-1.5 text-xs space-y-0.5">
-                              <div className="font-semibold text-parchment-800">
-                                {action.name}
-                                <span className="font-normal text-parchment-500"> · {action.timing}{action.range ? ` · ${action.range}` : ''}</span>
-                              </div>
-                              {(action.save || action.damage) && (
-                                <div className="text-parchment-700">
-                                  {action.save && <>DC {action.save.dc} {ABILITY_FULL[action.save.ability]} save</>}
-                                  {action.save && action.damage && ' · '}
-                                  {action.damage && <span className="font-semibold">{action.damage}</span>}
-                                  {action.onSave === 'half' && ' (half on a success)'}
-                                </div>
-                              )}
-                              {action.text && <div className="text-parchment-500">{action.text}</div>}
-                            </div>
-                          )}
-                          {/* Poison: damage each turn until saves wear it down */}
-                          {isPoison && p.usesLeft! > 0 && (
-                            <div className="mt-1.5 rounded border border-red-200 bg-red-50 px-2 py-1.5 text-xs space-y-1">
-                              <div className="text-red-800">
-                                Start of your turn: take <strong>{p.usesLeft}{poisonFx!.dice.replace(/^\d+/, '')} {poisonFx!.type}</strong>.
-                                End of your turn: DC {poisonFx!.save.dc} {ABILITY_FULL[poisonFx!.save.ability]} save; a success removes one die.
-                              </div>
-                              <button type="button"
-                                onClick={() => p.usesLeft === 1 ? endPotion(p.id) : update({ usesLeft: p.usesLeft! - 1 })}
-                                className="text-[11px] font-semibold rounded border border-red-300 bg-parchment-50 px-2 py-0.5 text-red-700 hover:bg-red-100 transition-colors"
-                              >Saved (−1 die){p.usesLeft === 1 ? ': poison ends' : ''}</button>
-                            </div>
-                          )}
-                          {/* Limited uses (Fire Breath ×3, Fragments of Possibility ×2…) */}
-                          {p.usesLeft !== undefined && !isPoison && (
-                            <div className="flex items-center gap-1.5 mt-1.5">
-                              {Array.from({ length: def?.uses ?? p.usesLeft }).map((_, i) => (
-                                <span key={i} className={`w-3 h-3 rounded-full border-2 ${i < p.usesLeft! ? 'bg-teal-500 border-teal-500' : 'border-teal-300'}`} />
-                              ))}
-                              <span className={`text-xs font-semibold ml-1 ${outOfUses ? 'text-red-600' : 'text-teal-800'}`}>
-                                {outOfUses ? 'All used' : `${p.usesLeft} left`}
-                              </span>
-                              {!outOfUses && (
-                                <button type="button" onClick={() => update({ usesLeft: p.usesLeft! - 1 })}
-                                  className="ml-auto text-[11px] font-semibold rounded border border-teal-400 bg-teal-100 px-2 py-0.5 text-teal-800 hover:bg-teal-200 transition-colors"
-                                >Use</button>
-                              )}
-                            </div>
-                          )}
-                          {/* What it's doing to your sheet right now */}
-                          {applied.length > 0 && !ended && (
-                            <ul className="mt-1.5 text-xs font-semibold text-indigo-600 space-y-0.5">
-                              {applied.map(line => <li key={line}>✓ {line}</li>)}
-                            </ul>
-                          )}
-                          {def?.note && !ended && <div className="text-[11px] text-parchment-600 mt-1">{def.note}</div>}
-                          {outOfUses || isPoison ? null : p.roundsLeft !== undefined ? (
-                            <div className="flex items-center gap-2 mt-1.5">
-                              <span className={`text-xs font-semibold ${ended ? 'text-red-600' : 'text-teal-800'}`}>
-                                {ended ? 'Duration over' : `${p.roundsLeft} round${p.roundsLeft === 1 ? '' : 's'} left`}
-                              </span>
-                              <span className="text-[11px] text-parchment-400">({p.duration})</span>
-                              {!ended && (
-                                <button type="button" onClick={() => update({ roundsLeft: Math.max(0, p.roundsLeft! - 1) })}
-                                  className="ml-auto text-[11px] rounded border border-teal-300 px-1.5 py-0.5 text-teal-700 hover:bg-teal-100 transition-colors"
-                                >−1 round</button>
-                              )}
-                            </div>
-                          ) : (
-                            <div className="text-xs text-teal-800 mt-1.5">Lasts {p.duration}</div>
-                          )}
-                        </div>
-                      )
-                    })}
-                  </div>
-                  <p className="text-[11px] text-parchment-400 mt-2">Short rests end effects of up to 1 hour; long rests up to 8 hours.</p>
-                </div>
-              )}
-            </div>
-
-            {/* Col 2: Skills */}
-            <div className="card p-4 self-start">
-              {(() => {
-                const changed = SKILLS.filter(s => skillChanged(s))
-                return (
-                  <div className="flex items-center gap-2 mb-2">
-                    <h2 className="section-header mb-0 flex-1">Skills</h2>
-                    {changed.length > 0 && (
-                      <button type="button" onClick={resetAllSkills}
-                        title={`Changed by hand: ${changed.map(s => SKILL_LABELS[s]).join(', ')}. Click to restore them.`}
-                        className="text-xs rounded-full px-2.5 py-0.5 border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors shrink-0"
-                      >↺ Reset {changed.length} changed</button>
-                    )}
-                  </div>
-                )
-              })()}
-              <div className="space-y-0.5">
-                {SKILLS.map(skill => {
-                  const profTags = skillInfo.profTags.get(skill) ?? []
-                  const expertTags = skillInfo.expertTags.get(skill) ?? []
-                  const isAutoProf = skillInfo.autoProfs.has(skill)
-                  const isAutoExpert = skillInfo.autoExpert.has(skill)
-                  const isManualProf = char.skillProficiencies.includes(skill)
-                  const isManualExpert = char.skillExpertise.includes(skill)
-                  const effectiveProf = isManualProf || isAutoProf
-                  const effectiveExpert = isManualExpert || isAutoExpert
-                  const hasTags = profTags.length > 0 || expertTags.length > 0
-
-                  const tagColor = (kind: SkillSourceTag['kind']) => {
-                    if (kind === 'bg')     return 'bg-blue-100 text-blue-700'
-                    if (kind === 'race')   return 'bg-green-100 text-green-700'
-                    if (kind === 'class')  return 'bg-purple-100 text-purple-700'
-                    if (kind === 'feat')   return 'bg-amber-100 text-amber-700'
-                    if (kind === 'item')   return 'bg-indigo-100 text-indigo-700'
-                    return 'bg-parchment-100 text-parchment-500'
-                  }
-
-                  const isModified = skillChanged(skill)
-
-                  return (
-                    <div key={skill} className="py-0.5">
-                      <div className={`flex items-center gap-1.5 text-sm px-1 py-0.5 rounded ${isModified ? 'bg-amber-50' : 'hover:bg-parchment-50'}`}>
-                        {/* Prof checkbox — manual only; auto profs show as locked */}
-                        <input
-                          type="checkbox"
-                          checked={effectiveProf}
-                          disabled={isAutoProf && !isManualProf}
-                          title={isAutoProf && !isManualProf ? `Granted by: ${profTags.map(t => t.label).join(', ')}` : 'Proficient'}
-                          onChange={e => {
-                            const s = new Set(char.skillProficiencies)
-                            e.target.checked ? s.add(skill) : s.delete(skill)
-                            patch({ skillProficiencies: [...s] })
-                          }}
-                        />
-                        {/* Expert checkbox */}
-                        <input
-                          type="checkbox"
-                          checked={effectiveExpert}
-                          disabled={isAutoExpert && !isManualExpert}
-                          title={isAutoExpert && !isManualExpert ? `Expertise granted by: ${expertTags.map(t => t.label).join(', ')}` : 'Expertise (double proficiency)'}
-                          onChange={e => {
-                            const s = new Set(char.skillExpertise)
-                            e.target.checked ? s.add(skill) : s.delete(skill)
-                            patch({ skillExpertise: [...s] })
-                          }}
-                        />
-                        <span className="w-8 font-mono text-right text-xs text-parchment-700 shrink-0">{formatMod(skillMod(effectiveCharSkills, skill) + itemBonuses.abilityCheckBonus)}</span>
-                        <span className={`flex-1 min-w-0 ${effectiveExpert ? 'font-semibold' : ''}`}>{SKILL_LABELS[skill]}</span>
-                        {(() => {
-                          // Active potions giving advantage/disadvantage on this skill's ability checks
-                          const ab = SKILL_ABILITY[skill]
-                          const adv = potionFx.checkAdvantage.has(ab), dis = potionFx.checkDisadvantage.has(ab)
-                          if (adv === dis) return null
-                          return adv
-                            ? <span className="text-[10px] font-semibold rounded px-1.5 py-0.5 bg-teal-100 text-teal-700 shrink-0" title="From an active potion">Adv</span>
-                            : <span className="text-[10px] font-semibold rounded px-1.5 py-0.5 bg-red-100 text-red-700 shrink-0" title="From an active potion">Disadv</span>
-                        })()}
-                        {isModified && (
-                          <button type="button" onClick={() => resetSkill(skill)}
-                            title={`Changed by hand. Originally ${skillBaseProf.has(skill) ? (skillBaseExpert.has(skill) ? 'expertise' : 'proficient') : 'not proficient'}. Click to reset.`}
-                            className="text-[11px] font-semibold text-amber-700 hover:text-amber-900 shrink-0"
-                          >↺ reset</button>
-                        )}
-                        {/* Source tags */}
-                        <div className="flex items-center gap-1 flex-wrap justify-end">
-                          {profTags.map((tag, i) => (
-                            <span key={i} className={`text-[10px] font-semibold rounded px-1.5 py-0.5 leading-none whitespace-nowrap ${tagColor(tag.kind)}`}
-                              title={tag.kind === 'item' ? `Item: ${tag.label}` : tag.kind === 'feat' ? `Feat: ${tag.label}` : undefined}>
-                              {tag.kind === 'item' ? tag.label.split(' ').slice(0, 2).join(' ') : tag.label}
-                            </span>
-                          ))}
-                          {expertTags.map((tag, i) => (
-                            <span key={`e${i}`} className={`text-[10px] font-semibold rounded px-1.5 py-0.5 leading-none whitespace-nowrap border border-current/30 ${tagColor(tag.kind)}`}
-                              title={`Expertise — ${tag.kind === 'item' ? `Item: ${tag.label}` : tag.kind === 'feat' ? `Feat: ${tag.label}` : tag.label}`}>
-                              {tag.kind === 'item' ? tag.label.split(' ').slice(0, 2).join(' ') : tag.label} ★
-                            </span>
-                          ))}
-                          {/* If proficient but no tagged source, it's a plain class choice or manual */}
-                          {isManualProf && profTags.filter(t => t.kind !== 'manual').length === 0 && !hasTags && (
-                            <span className="text-[10px] text-parchment-300">manual</span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-              <p className="text-xs text-parchment-400 mt-2">☐ prof · ☐ expertise{jackOfAllTrades ? ' · Bard: ½ PB on non-prof' : ''}</p>
-              {char.classes.some(c => c.classSlug === 'rogue' && c.level >= 11) && (
-                <p className="text-xs text-amber-600 mt-1">Reliable Talent: treat proficient roll ≤ 9 as 10.</p>
-              )}
-            </div>
-
-            {/* Col 3: Status + Conditions */}
-            <div className="space-y-4">
-              <div className="card p-4">
-                <h2 className="section-header">Status</h2>
-                {/* Inspiration: click to gain it; press and hold the glowing gem to spend it */}
-                <InspirationToken held={char.inspiration} onChange={v => patch({ inspiration: v })} />
-                <div className="text-xs font-semibold text-parchment-600 uppercase tracking-wide mb-1.5">Exhaustion</div>
-                <div className="flex gap-1 mb-1">
-                  {[1,2,3,4,5,6].map(lvl => (
-                    <button
-                      key={lvl}
-                      title={(['Disadv. on ability checks','Speed halved','Disadv. on attacks & saves','HP max halved','Speed = 0','Death'])[lvl-1]}
-                      onClick={() => patch({ exhaustionLevel: char.exhaustionLevel === lvl ? lvl - 1 : lvl })}
-                      className={`w-7 h-7 rounded text-xs font-bold border-2 transition-colors ${
-                        char.exhaustionLevel >= lvl
-                          ? lvl === 6 ? 'bg-red-700 border-red-700 text-white' : 'bg-red-500 border-red-500 text-white'
-                          : 'border-parchment-300 text-parchment-400 hover:border-red-300'
-                      }`}
-                    >{lvl}</button>
-                  ))}
-                </div>
-                {char.exhaustionLevel > 0 && (
-                  <ul className="text-xs text-red-600 mt-1 space-y-0.5">
-                    {(['Disadv. on ability checks','Speed halved','Disadv. on attacks & saves','HP max halved','Speed = 0','Dead'] as const)
-                      .slice(0, char.exhaustionLevel)
-                      .map((effect, i) => <li key={i}>· {effect}</li>)}
-                  </ul>
-                )}
-
-              </div>
-
-              <div className="card p-4">
-                <h2 className="section-header">Conditions</h2>
-                <div className="space-y-0.5">
-                  {CONDITIONS.map(({ name, effect }) => {
-                    const active = char.conditions.includes(name)
-                    const expanded = expandedCondition === name
-                    return (
-                      <div key={name} className={`rounded ${active ? 'bg-red-50' : ''}`}>
-                        <div className="flex items-center gap-2 p-1.5">
-                          <input
-                            type="checkbox"
-                            className="shrink-0"
-                            checked={active}
-                            onChange={e => {
-                              const s = new Set(char.conditions)
-                              e.target.checked ? s.add(name) : s.delete(name)
-                              patch({ conditions: [...s] })
-                            }}
-                          />
-                          <button
-                            className={`flex-1 text-left text-sm font-medium hover:underline ${active ? 'text-red-700' : 'text-parchment-800'}`}
-                            onClick={() => setExpandedCondition(expanded ? null : name)}
-                          >{name}</button>
-                          <span className="text-parchment-300 text-xs">{expanded ? '▲' : '▼'}</span>
-                        </div>
-                        {expanded && (
-                          <p className="text-xs text-parchment-500 leading-snug px-1.5 pb-1.5">{effect}</p>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Attacks — full width */}
+          {/* Attacks — full width, first: they're what you look at most in a fight */}
           <div className="card">
             <h2 className="section-header">Attacks</h2>
             <div className="overflow-x-auto">
@@ -2640,6 +2397,399 @@ export default function Sheet() {
                   })()}
                 </tbody>
               </table>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+
+            {/* Col 1: Ability Scores + Saving Throws */}
+            <div className="space-y-4">
+              <div className="card p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <h2 className="section-header mb-0 flex-1">Ability Scores</h2>
+                  {abilitiesChanged.length > 0 && (
+                    <button type="button" onClick={resetAllAbilities}
+                      title={`Changed by hand: ${abilitiesChanged.map(a => ABILITY_LABELS[a]).join(', ')}. Click to restore them.`}
+                      className="text-xs rounded-full px-2.5 py-0.5 border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors shrink-0"
+                    >↺ Reset {abilitiesChanged.length} changed</button>
+                  )}
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  {ABILITIES.map(a => (
+                    <div key={a} className="stat-box relative">
+                      <div className="text-xs text-parchment-500 uppercase">{ABILITY_LABELS[a]}</div>
+                      <input
+                        type="number"
+                        min={1}
+                        max={30}
+                        className="text-2xl font-bold w-12 text-center bg-transparent border-none outline-none focus:bg-parchment-50 rounded"
+                        value={char.abilityScores[a]}
+                        onChange={e => {
+                          const scores = { ...char.abilityScores, [a]: parseInt(e.target.value, 10) || 10 }
+                          patch({ abilityScores: scores as Character['abilityScores'] })
+                        }}
+                      />
+                      <div className="text-sm font-semibold text-parchment-600">
+                        {formatMod(abilityModFor(effectiveChar, a))}
+                        {effectiveChar.abilityScores[a] !== char.abilityScores[a] && (
+                          <span className="text-xs text-indigo-500 ml-0.5"
+                            title={`Currently ${effectiveChar.abilityScores[a]} from ${potionScoreOverrides[a] === effectiveChar.abilityScores[a] ? 'an active potion' : 'an equipped item'}`}
+                          >★{effectiveChar.abilityScores[a]}</span>
+                        )}
+                      </div>
+                      {/* In the corner, so a changed box keeps the same layout as the others */}
+                      {abilitiesChanged.includes(a) && (
+                        <button type="button" onClick={() => patch({ abilityScores: { ...char.abilityScores, [a]: abilityBase[a] } })}
+                          title={`Changed by hand (was ${abilityBase[a]}). Click to reset.`}
+                          className="absolute top-1 right-1.5 text-[11px] font-semibold text-amber-700 hover:text-amber-900"
+                        >↺ {abilityBase[a]}</button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="card p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <h2 className="section-header mb-0 flex-1">Saving Throws</h2>
+                  {savesChanged.length > 0 && (
+                    <button type="button" onClick={resetAllSaves}
+                      title={`Changed by hand: ${savesChanged.map(a => ABILITY_FULL[a]).join(', ')}. Click to restore them.`}
+                      className="text-xs rounded-full px-2.5 py-0.5 border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors shrink-0"
+                    >↺ Reset {savesChanged.length} changed</button>
+                  )}
+                </div>
+                <div className="space-y-1.5">
+                  {ABILITIES.map(a => (
+                    <div key={a} className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={char.saveProficiencies.includes(a)}
+                        onChange={e => {
+                          const s = new Set(char.saveProficiencies)
+                          e.target.checked ? s.add(a) : s.delete(a)
+                          patch({ saveProficiencies: [...s] })
+                        }}
+                      />
+                      <span className="w-10 font-mono text-right text-parchment-700">{formatMod(saveMod(effectiveChar, a) + itemBonuses.savingThrowBonus + paladinAura)}</span>
+                      <span className="flex-1">{ABILITY_FULL[a]}</span>
+                      {savesChanged.includes(a) && (
+                        <button type="button" onClick={() => resetSave(a)}
+                          title={`Changed by hand. Originally ${saveBase.has(a) ? 'proficient' : 'not proficient'}. Click to reset.`}
+                          className="text-[11px] font-semibold text-amber-700 hover:text-amber-900 shrink-0"
+                        >↺ reset</button>
+                      )}
+                      {paladinAura > 0 && <span className="text-xs bg-yellow-100 text-yellow-700 rounded px-1.5 py-0.5">+{paladinAura} Aura</span>}
+                      {a === 'con' && featBonuses.concentrationAdvantage && (
+                        <span className="text-xs bg-amber-100 text-amber-700 rounded px-1.5 py-0.5">War Caster</span>
+                      )}
+                      {/* Active potions: advantage/disadvantage (they cancel out) and Bless dice */}
+                      {potionFx.saveAdvantage.has(a) && !potionFx.saveDisadvantage.has(a) && (
+                        <span className="text-xs bg-teal-100 text-teal-700 rounded px-1.5 py-0.5" title="From an active potion">Adv</span>
+                      )}
+                      {potionFx.saveDisadvantage.has(a) && !potionFx.saveAdvantage.has(a) && (
+                        <span className="text-xs bg-red-100 text-red-700 rounded px-1.5 py-0.5" title="From an active potion">Disadv</span>
+                      )}
+                      {potionFx.rollBonusDice.map(d => (
+                        <span key={d} className="text-xs bg-teal-100 text-teal-700 rounded px-1.5 py-0.5" title="From an active potion">{d}</span>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Active Potions — added by Drink; minute-long effects count down in rounds */}
+              {char.activePotions.length > 0 && (
+                <div className="card p-4">
+                  <h2 className="section-header">Active Potions</h2>
+                  <div className="space-y-2">
+                    {char.activePotions.map(p => {
+                      const def = content.items.find(i => i.slug === p.itemSlug)?.potion
+                      const outOfUses = p.usesLeft === 0
+                      const ended = p.roundsLeft === 0 || outOfUses
+                      const update = (changes: Partial<typeof p>) =>
+                        patch({ activePotions: char.activePotions.map(x => x.id === p.id ? { ...x, ...changes } : x) })
+                      const action = def?.action
+                      const applied = describePotionEffects(def, p.choice, walkSpeed)
+                      // Potion of Poison after a failed save: usesLeft counts the damage dice still to come
+                      const poisonFx = def?.onDrink?.damage
+                      const isPoison = !!poisonFx?.ongoingDice && !def?.uses
+                      return (
+                        <div key={p.id} className={`rounded-lg border px-3 py-2 ${ended ? 'border-parchment-200 bg-parchment-50 opacity-70' : 'border-teal-200 bg-teal-50'}`}>
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <div className="text-sm font-semibold text-parchment-900 truncate">{p.name}</div>
+                              <span className="inline-block mt-0.5 text-[11px] font-semibold rounded px-1.5 py-0.5 bg-teal-100 text-teal-700">{p.effect}</span>
+                            </div>
+                            <button type="button" onClick={() => { offerUndo(`Ended ${p.name}`); endPotion(p.id) }}
+                              title="End this effect"
+                              className="shrink-0 text-xs rounded border border-parchment-300 px-2 py-0.5 text-parchment-600 hover:border-red-400 hover:text-red-600 transition-colors"
+                            >End</button>
+                          </div>
+                          {/* What the potion lets you do — its own DC, not yours */}
+                          {action && !ended && (
+                            <div className="mt-1.5 rounded border border-teal-200 bg-parchment-50 px-2 py-1.5 text-xs space-y-0.5">
+                              <div className="font-semibold text-parchment-800">
+                                {action.name}
+                                <span className="font-normal text-parchment-500"> · {action.timing}{action.range ? ` · ${action.range}` : ''}</span>
+                              </div>
+                              {(action.save || action.damage) && (
+                                <div className="text-parchment-700">
+                                  {action.save && <>DC {action.save.dc} {ABILITY_FULL[action.save.ability]} save</>}
+                                  {action.save && action.damage && ' · '}
+                                  {action.damage && <span className="font-semibold">{action.damage}</span>}
+                                  {action.onSave === 'half' && ' (half on a success)'}
+                                </div>
+                              )}
+                              {action.text && <div className="text-parchment-500">{action.text}</div>}
+                            </div>
+                          )}
+                          {/* Poison: damage each turn until saves wear it down */}
+                          {isPoison && p.usesLeft! > 0 && (
+                            <div className="mt-1.5 rounded border border-red-200 bg-red-50 px-2 py-1.5 text-xs space-y-1">
+                              <div className="text-red-800">
+                                Start of your turn: take <strong>{p.usesLeft}{poisonFx!.dice.replace(/^\d+/, '')} {poisonFx!.type}</strong>.
+                                End of your turn: DC {poisonFx!.save.dc} {ABILITY_FULL[poisonFx!.save.ability]} save; a success removes one die.
+                              </div>
+                              <button type="button"
+                                onClick={() => p.usesLeft === 1 ? endPotion(p.id) : update({ usesLeft: p.usesLeft! - 1 })}
+                                className="text-[11px] font-semibold rounded border border-red-300 bg-parchment-50 px-2 py-0.5 text-red-700 hover:bg-red-100 transition-colors"
+                              >Saved (−1 die){p.usesLeft === 1 ? ': poison ends' : ''}</button>
+                            </div>
+                          )}
+                          {/* Limited uses (Fire Breath ×3, Fragments of Possibility ×2…) */}
+                          {p.usesLeft !== undefined && !isPoison && (
+                            <div className="flex items-center gap-1.5 mt-1.5">
+                              {Array.from({ length: def?.uses ?? p.usesLeft }).map((_, i) => (
+                                <span key={i} className={`w-3 h-3 rounded-full border-2 ${i < p.usesLeft! ? 'bg-teal-500 border-teal-500' : 'border-teal-300'}`} />
+                              ))}
+                              <span className={`text-xs font-semibold ml-1 ${outOfUses ? 'text-red-600' : 'text-teal-800'}`}>
+                                {outOfUses ? 'All used' : `${p.usesLeft} left`}
+                              </span>
+                              {!outOfUses && (
+                                <button type="button" onClick={() => update({ usesLeft: p.usesLeft! - 1 })}
+                                  className="ml-auto text-[11px] font-semibold rounded border border-teal-400 bg-teal-100 px-2 py-0.5 text-teal-800 hover:bg-teal-200 transition-colors"
+                                >Use</button>
+                              )}
+                            </div>
+                          )}
+                          {/* What it's doing to your sheet right now */}
+                          {applied.length > 0 && !ended && (
+                            <ul className="mt-1.5 text-xs font-semibold text-indigo-600 space-y-0.5">
+                              {applied.map(line => <li key={line}>✓ {line}</li>)}
+                            </ul>
+                          )}
+                          {def?.note && !ended && <div className="text-[11px] text-parchment-600 mt-1">{def.note}</div>}
+                          {outOfUses || isPoison ? null : p.roundsLeft !== undefined ? (
+                            <div className="flex items-center gap-2 mt-1.5">
+                              <span className={`text-xs font-semibold ${ended ? 'text-red-600' : 'text-teal-800'}`}>
+                                {ended ? 'Duration over' : `${p.roundsLeft} round${p.roundsLeft === 1 ? '' : 's'} left`}
+                              </span>
+                              <span className="text-[11px] text-parchment-400">({p.duration})</span>
+                              {!ended && (
+                                <button type="button" onClick={() => update({ roundsLeft: Math.max(0, p.roundsLeft! - 1) })}
+                                  className="ml-auto text-[11px] rounded border border-teal-300 px-1.5 py-0.5 text-teal-700 hover:bg-teal-100 transition-colors"
+                                >−1 round</button>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="text-xs text-teal-800 mt-1.5">Lasts {p.duration}</div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                  <p className="text-[11px] text-parchment-400 mt-2">Short rests end effects of up to 1 hour; long rests up to 8 hours.</p>
+                </div>
+              )}
+            </div>
+
+            {/* Col 2: Skills */}
+            <div className="card p-4 self-start">
+              {(() => {
+                const changed = SKILLS.filter(s => skillChanged(s))
+                return (
+                  <div className="flex items-center gap-2 mb-2">
+                    <h2 className="section-header mb-0 flex-1">Skills</h2>
+                    {changed.length > 0 && (
+                      <button type="button" onClick={resetAllSkills}
+                        title={`Changed by hand: ${changed.map(s => SKILL_LABELS[s]).join(', ')}. Click to restore them.`}
+                        className="text-xs rounded-full px-2.5 py-0.5 border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors shrink-0"
+                      >↺ Reset {changed.length} changed</button>
+                    )}
+                  </div>
+                )
+              })()}
+              <div className="space-y-0.5">
+                {SKILLS.map(skill => {
+                  const profTags = skillInfo.profTags.get(skill) ?? []
+                  const expertTags = skillInfo.expertTags.get(skill) ?? []
+                  const isAutoProf = skillInfo.autoProfs.has(skill)
+                  const isAutoExpert = skillInfo.autoExpert.has(skill)
+                  const isManualProf = char.skillProficiencies.includes(skill)
+                  const isManualExpert = char.skillExpertise.includes(skill)
+                  const effectiveProf = isManualProf || isAutoProf
+                  const effectiveExpert = isManualExpert || isAutoExpert
+                  const hasTags = profTags.length > 0 || expertTags.length > 0
+
+                  // Sources show as small coloured dots (legend under the card); hover one to name it
+                  const tagDot = (kind: SkillSourceTag['kind']) => {
+                    if (kind === 'bg')     return 'bg-blue-400'
+                    if (kind === 'race')   return 'bg-green-500'
+                    if (kind === 'class')  return 'bg-purple-400'
+                    if (kind === 'feat')   return 'bg-amber-400'
+                    if (kind === 'item')   return 'bg-indigo-400'
+                    return 'bg-parchment-300'
+                  }
+                  const tagStar = (kind: SkillSourceTag['kind']) => {
+                    if (kind === 'bg')     return 'text-blue-500'
+                    if (kind === 'race')   return 'text-green-600'
+                    if (kind === 'class')  return 'text-purple-500'
+                    if (kind === 'feat')   return 'text-amber-500'
+                    if (kind === 'item')   return 'text-indigo-500'
+                    return 'text-parchment-400'
+                  }
+                  const tagTitle = (tag: SkillSourceTag) =>
+                    tag.kind === 'bg' ? 'Background' : tag.kind === 'item' ? `Item: ${tag.label}` : tag.kind === 'feat' ? `Feat: ${tag.label}`
+                      : tag.kind === 'class' ? `Class: ${tag.label.charAt(0).toUpperCase()}${tag.label.slice(1)}` : tag.kind === 'race' ? `Race: ${tag.label}` : tag.label
+
+                  const isModified = skillChanged(skill)
+
+                  return (
+                    <div key={skill}>
+                      <div className={`flex items-center gap-1.5 text-sm px-1 py-[3px] rounded ${isModified ? 'bg-amber-50' : 'hover:bg-parchment-50'}`}>
+                        {/* Prof checkbox — manual only; auto profs show as locked */}
+                        <input
+                          type="checkbox"
+                          checked={effectiveProf}
+                          disabled={isAutoProf && !isManualProf}
+                          title={isAutoProf && !isManualProf ? `Granted by: ${profTags.map(t => t.label).join(', ')}` : 'Proficient'}
+                          onChange={e => {
+                            const s = new Set(char.skillProficiencies)
+                            e.target.checked ? s.add(skill) : s.delete(skill)
+                            patch({ skillProficiencies: [...s] })
+                          }}
+                        />
+                        {/* Expert checkbox */}
+                        <input
+                          type="checkbox"
+                          checked={effectiveExpert}
+                          disabled={isAutoExpert && !isManualExpert}
+                          title={isAutoExpert && !isManualExpert ? `Expertise granted by: ${expertTags.map(t => t.label).join(', ')}` : 'Expertise (double proficiency)'}
+                          onChange={e => {
+                            const s = new Set(char.skillExpertise)
+                            e.target.checked ? s.add(skill) : s.delete(skill)
+                            patch({ skillExpertise: [...s] })
+                          }}
+                        />
+                        <span className="w-8 font-mono text-right text-xs text-parchment-700 shrink-0">{formatMod(skillMod(effectiveCharSkills, skill) + itemBonuses.abilityCheckBonus)}</span>
+                        <span className={`flex-1 min-w-0 ${effectiveExpert ? 'font-semibold' : ''}`}>{SKILL_LABELS[skill]}</span>
+                        {(() => {
+                          // Active potions giving advantage/disadvantage on this skill's ability checks
+                          const ab = SKILL_ABILITY[skill]
+                          const adv = potionFx.checkAdvantage.has(ab), dis = potionFx.checkDisadvantage.has(ab)
+                          if (adv === dis) return null
+                          return adv
+                            ? <span className="text-[10px] font-semibold rounded px-1.5 py-0.5 bg-teal-100 text-teal-700 shrink-0" title="From an active potion">Adv</span>
+                            : <span className="text-[10px] font-semibold rounded px-1.5 py-0.5 bg-red-100 text-red-700 shrink-0" title="From an active potion">Disadv</span>
+                        })()}
+                        {isModified && (
+                          <button type="button" onClick={() => resetSkill(skill)}
+                            title={`Changed by hand. Originally ${skillBaseProf.has(skill) ? (skillBaseExpert.has(skill) ? 'expertise' : 'proficient') : 'not proficient'}. Click to reset.`}
+                            className="text-[11px] font-semibold text-amber-700 hover:text-amber-900 shrink-0"
+                          >↺ reset</button>
+                        )}
+                        {/* Where it comes from: a dot per source, a star for expertise */}
+                        <div className="flex items-center gap-1 shrink-0">
+                          {profTags.map((tag, i) => (
+                            <span key={i} className={`w-2 h-2 rounded-full ${tagDot(tag.kind)}`} title={tagTitle(tag)} />
+                          ))}
+                          {expertTags.map((tag, i) => (
+                            <span key={`e${i}`} className={`text-[11px] leading-none ${tagStar(tag.kind)}`} title={`Expertise from ${tagTitle(tag)}`}>★</span>
+                          ))}
+                          {isManualProf && profTags.filter(t => t.kind !== 'manual').length === 0 && !hasTags && (
+                            <span className="w-2 h-2 rounded-full border border-parchment-400" title="Added by hand" />
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+              <p className="text-xs text-parchment-400 mt-2">☐ prof · ☐ expertise{jackOfAllTrades ? ' · Bard: ½ PB on non-prof' : ''}</p>
+              <p className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] text-parchment-500 mt-1">
+                <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-purple-400" />class</span>
+                <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-400" />background</span>
+                <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500" />race</span>
+                <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-400" />feat</span>
+                <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-indigo-400" />item</span>
+                <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full border border-parchment-400" />by hand</span>
+                <span>★ expertise</span>
+              </p>
+              {char.classes.some(c => c.classSlug === 'rogue' && c.level >= 11) && (
+                <p className="text-xs text-amber-600 mt-1">Reliable Talent: treat proficient roll ≤ 9 as 10.</p>
+              )}
+            </div>
+
+            {/* Col 3: Status (Inspiration, Exhaustion, Conditions) */}
+            <div className="space-y-4">
+              <div className="card p-4">
+                <h2 className="section-header">Status</h2>
+                {/* Inspiration: click to gain it; press and hold the glowing gem to spend it */}
+                <InspirationToken held={char.inspiration} onChange={v => patch({ inspiration: v })} />
+                <div className="text-xs font-semibold text-parchment-600 uppercase tracking-wide mb-1.5">Exhaustion</div>
+                <div className="flex gap-1 mb-1">
+                  {[1,2,3,4,5,6].map(lvl => (
+                    <button
+                      key={lvl}
+                      title={(['Disadv. on ability checks','Speed halved','Disadv. on attacks & saves','HP max halved','Speed = 0','Death'])[lvl-1]}
+                      onClick={() => patch({ exhaustionLevel: char.exhaustionLevel === lvl ? lvl - 1 : lvl })}
+                      className={`w-7 h-7 rounded text-xs font-bold border-2 transition-colors ${
+                        char.exhaustionLevel >= lvl
+                          ? lvl === 6 ? 'bg-red-700 border-red-700 text-white' : 'bg-red-500 border-red-500 text-white'
+                          : 'border-parchment-300 text-parchment-400 hover:border-red-300'
+                      }`}
+                    >{lvl}</button>
+                  ))}
+                </div>
+                {char.exhaustionLevel > 0 && (
+                  <ul className="text-xs text-red-600 mt-1 space-y-0.5">
+                    {(['Disadv. on ability checks','Speed halved','Disadv. on attacks & saves','HP max halved','Speed = 0','Dead'] as const)
+                      .slice(0, char.exhaustionLevel)
+                      .map((effect, i) => <li key={i}>· {effect}</li>)}
+                  </ul>
+                )}
+
+                {/* Conditions: only the ones you have, each with its effect; add more from the list */}
+                <div className="text-xs font-semibold text-parchment-600 uppercase tracking-wide mt-4 mb-1.5">Conditions</div>
+                {char.conditions.length === 0 && <p className="text-xs text-parchment-400 mb-2">None</p>}
+                {char.conditions.length > 0 && (
+                  <ul className="space-y-1.5 mb-2">
+                    {char.conditions.map(name => (
+                      <li key={name} className="rounded border border-red-200 bg-red-50 px-2.5 py-1.5">
+                        <div className="flex items-center gap-2">
+                          <span className="flex-1 text-sm font-semibold text-red-700">{name}</span>
+                          <button type="button" onClick={() => patch({ conditions: char.conditions.filter(c => c !== name) })}
+                            title={`Remove ${name}`} aria-label={`Remove ${name}`}
+                            className="text-xs text-red-400 hover:text-red-700 transition-colors">✕</button>
+                        </div>
+                        {CONDITIONS.find(c => c.name === name) && (
+                          <p className="text-xs text-parchment-600 leading-snug mt-0.5">{CONDITIONS.find(c => c.name === name)!.effect}</p>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {CONDITIONS.some(c => !char.conditions.includes(c.name)) && (
+                  <select className="input text-xs py-1" value="" aria-label="Add a condition"
+                    onChange={e => { if (e.target.value) patch({ conditions: [...char.conditions, e.target.value] }) }}>
+                    <option value="">+ Add a condition…</option>
+                    {CONDITIONS.filter(c => !char.conditions.includes(c.name)).map(c => (
+                      <option key={c.name} value={c.name}>{c.name}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
             </div>
           </div>
 
@@ -2830,21 +2980,6 @@ export default function Sheet() {
                     </div>
                   </div>
                 )}
-            <div className="mt-4 pt-3 border-t border-parchment-100">
-              <div className="font-semibold text-parchment-700 mb-2 text-sm">Saving Throw Proficiencies</div>
-              <div className="flex flex-wrap gap-1">
-                {ABILITIES.map(a => {
-                  const proficient = char.saveProficiencies.includes(a)
-                  const cls = char.classes.find(cc => content.classes.find(c => c.slug === cc.classSlug)?.saveProficiencies.includes(a))
-                  const src = cls ? content.classes.find(c => c.slug === cls.classSlug)?.name : null
-                  return (
-                    <span key={a} className={`rounded px-2 py-0.5 text-xs ${proficient ? 'bg-indigo-100 text-indigo-700 font-semibold' : 'bg-parchment-100 text-parchment-400'}`}>
-                      {ABILITY_FULL[a]}{proficient && src ? ` (${src})` : ''}
-                    </span>
-                  )
-                })}
-              </div>
-            </div>
               </div>
             )
           })()}
@@ -2915,7 +3050,7 @@ export default function Sheet() {
             const atKnownCap = !!knownMax && knownCount >= knownMax
             const ordinals = ['Cantrips','1st','2nd','3rd','4th','5th','6th','7th','8th','9th']
 
-            // School → left-border accent color (hex, used via inline style to avoid Tailwind class conflicts)
+            // School → left-border accent color in the Spell Library (hex, used via inline style to avoid Tailwind class conflicts)
             const schoolAccentHex: Record<string, string> = {
               Abjuration: '#60a5fa', Conjuration: '#fbbf24',
               Divination: '#22d3ee', Enchantment: '#f472b6',
@@ -2935,13 +3070,432 @@ export default function Sheet() {
             const totalSpellDC  = (cls: string) => spellSaveDC(effectiveChar, cls, content)  + itemBonuses.spellDCBonus
             const totalSpellAtk = (cls: string) => spellAttackBonus(effectiveChar, cls, content) + itemBonuses.spellAttackBonus
 
+            const slotMaxAt = (lvl: number) => multiclassMaxes
+              ? (multiclassMaxes[String(lvl)] ?? 0)
+              : (char.spellSlots[String(lvl)]?.max ?? 0)
+            /** A level's spell slots as violet gems: click a lit one to spend it, a spent one to get it back */
+            const slotGems = (lvl: number) => {
+              const slotMax = slotMaxAt(lvl)
+              const slotUsed = char.spellSlots[String(lvl)]?.used ?? 0
+              const slotLeft = slotMax - slotUsed
+              return (
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: slotMax }, (_, i) => {
+                    const available = i < slotLeft
+                    return (
+                      <button
+                        key={i}
+                        type="button"
+                        title={available ? 'Expend slot' : 'Recover slot'}
+                        aria-label={`${ordinals[lvl]}-level slot ${i + 1} of ${slotMax}: ${available ? 'available' : 'spent'}`}
+                        onClick={() => {
+                          const used = available ? slotUsed + 1 : slotUsed - 1
+                          patch({ spellSlots: { ...char.spellSlots, [String(lvl)]: { max: slotMax, used } } })
+                        }}
+                        className="w-6 h-6 flex items-center justify-center group"
+                      >
+                        <div className={`w-3.5 h-3.5 rotate-45 border ${
+                          available
+                            ? 'spell-gem'
+                            : 'bg-parchment-200 border-parchment-300 opacity-40 transition-all duration-150 group-hover:scale-125'
+                        }`}
+                          style={available ? {
+                            animation: 'pip-pulse 2.4s ease-in-out infinite',
+                            animationDelay: `${i * 0.18}s`,
+                          } : undefined}
+                        />
+                      </button>
+                    )
+                  })}
+                  <span className="text-xs text-parchment-400 w-9 text-right">{slotLeft}/{slotMax}</span>
+                </div>
+              )
+            }
+            /** Casting time as a word or two for the list: "Action", "Bonus", "Reaction", "1 min" */
+            const shortTime = (t?: string) => {
+              if (!t) return ''
+              const lower = t.toLowerCase()
+              if (lower.startsWith('1 action')) return 'Action'
+              if (lower.startsWith('1 bonus')) return 'Bonus'
+              if (lower.startsWith('1 reaction')) return 'Reaction'
+              const m = lower.match(/^(\d+)\s*(minute|hour|round)/)
+              if (m) return `${m[1]} ${m[2] === 'minute' ? 'min' : m[2] === 'hour' ? 'hr' : 'rd'}`
+              return t.split(',')[0]
+            }
+
+            // Every spell the character can cast, as one row: the class's own (`entry`) and those from
+            // feats, race and subclass
+            type SpellRow = {
+              key: string
+              name: string
+              level: number
+              def?: SpellDef
+              cls: string                                   // class whose DC and attack bonus it uses
+              dmg: { dice: string; type?: string } | null   // at the character's level (cantrips scale)
+              usesLeft?: number
+              usesMax?: number
+              useKey?: string                               // its counter in freeSpellUses
+              source?: string                               // what grants it
+              sourceNote?: string
+              slotCast: boolean                             // can be cast with a spell slot
+              entry?: Character['spells'][number]
+              library?: boolean                             // in the spell library, not yet learned
+            }
+            const entryRow = (s: Character['spells'][number]): SpellRow => {
+              const def = content.spells.find(d => d.slug === s.spellSlug)
+              const lvl = def?.level ?? 0
+              const dice = def?.damage ? (lvl === 0 ? cantripDiceAtLevel(def.slug, level, def.damage.dice) ?? def.damage.dice : def.damage.dice) : undefined
+              const source = !s.grantedBy ? undefined
+                : s.grantedBy.startsWith('feat:') ? content.feats.find(f => f.slug === s.grantedBy!.slice(5))?.name ?? 'a feat'
+                : s.grantedBy === 'strixhaven' ? 'Strixhaven Initiate' : 'High Elf'
+              const uses = s.usesPerLongRest && s.freeUseKey
+                ? { usesMax: s.usesPerLongRest, usesLeft: Math.max(0, s.usesPerLongRest - (char.freeSpellUses?.[s.freeUseKey] ?? 0)), useKey: s.freeUseKey }
+                : {}
+              return {
+                key: `entry:${s.spellSlug}`, name: s.name, level: lvl, def, cls: classForEntry(s.classSlug),
+                dmg: dice ? { dice, type: def?.damage?.type } : null, ...uses,
+                source, sourceNote: source ? `Always prepared · ${source}` : undefined,
+                slotCast: lvl > 0, entry: s,
+              }
+            }
+            const freeRow = (f: (typeof freeSpells)[number]): SpellRow => {
+              const def = content.spells.find(d => d.slug === f.slug)
+              // Cast with a higher slot (Tiefling's Hellish Rebuke at 2nd level): scale the dice
+              const upBy = def && f.castLevel ? f.castLevel - def.level : 0
+              const inc = upBy > 0 && def?.higherLevels ? parseUpcastScaling(def.higherLevels) : null
+              const dice = !def?.damage ? undefined
+                : inc ? computeUpcastDamage(def.damage.dice, inc.dice, upBy) ?? def.damage.dice
+                : def.level === 0 ? cantripDiceAtLevel(def.slug, level, def.damage.dice) ?? def.damage.dice
+                : def.damage.dice
+              const fromSubclass = f.key.startsWith('subclass:')
+              const uses = f.usesPerLongRest !== undefined
+                ? { usesMax: f.usesPerLongRest, usesLeft: Math.max(0, f.usesPerLongRest - (char.freeSpellUses?.[f.key] ?? 0)), useKey: f.key }
+                : {}
+              return {
+                key: `free:${f.key}`, name: f.name, level: f.level, def,
+                cls: classForEntry(fromSubclass ? f.key.split(':')[1] : undefined),
+                dmg: dice ? { dice, type: def?.damage?.type } : null, ...uses,
+                source: f.source,
+                sourceNote: f.alwaysPrepared ? `Always prepared · ${f.source}`
+                  : f.usesPerLongRest !== undefined ? `From ${f.source} · ${f.usesPerLongRest} free cast${f.usesPerLongRest > 1 ? 's' : ''} per long rest${f.castLevel ? ` at ${ordinals[f.castLevel]} level` : ''}`
+                  : `From ${f.source} · at will`,
+                // Subclass spells use your slots; feats' spells can be cast with slots too, racial ones can't
+                slotCast: f.level > 0 && (fromSubclass || f.key.startsWith('feat:')),
+              }
+            }
+
+            const libraryRow = (def: SpellDef): SpellRow => ({
+              key: `lib:${def.slug}`, name: def.name, level: def.level, def, cls: primarySlug,
+              dmg: def.damage ? { dice: def.damage.dice, type: def.damage.type } : null,
+              slotCast: false, library: true,
+            })
+            /** Prepare or learn a spell from the library (a wizard can also just copy it into the spellbook) */
+            const learnSpell = (def: SpellDef, prepared: boolean) => {
+              patch({ spells: [...char.spells, { spellSlug: def.slug, name: def.name, classSlug: primarySlug, prepared, isHomebrew: def.source.site === 'homebrew' }] })
+              setSelectedSpellKey(prepared || !isSpellbookCaster ? `entry:${def.slug}` : null)
+            }
+            const learnLabel = isSpellbookCaster ? 'Add to spellbook' : isPrepared ? 'Prepare' : 'Learn'
+
+            // Name · casting time · hit or DC · damage · marks. Spelled out so Tailwind keeps it.
+            const SPELL_COLS = 'sm:grid-cols-[minmax(0,1fr)_4.5rem_4.5rem_8.5rem_4.5rem]'
+            const spellRow = (r: SpellRow) => {
+              const selected = selectedSpellKey === r.key
+              const conc = !!r.def && char.concentratingOn === r.def.slug
+              const roll = r.def?.attackRoll ? formatMod(totalSpellAtk(r.cls))
+                : r.def?.savingThrow ? `${r.def.savingThrow.ability.toUpperCase()} ${totalSpellDC(r.cls)}` : ''
+              const dmgText = r.dmg?.type ? (DAMAGE_TYPE_STYLE[r.dmg.type] ?? DAMAGE_TYPE_STYLE.force).text : 'text-parchment-700'
+              return (
+                <div key={r.key} data-spell-key={r.key} className="scroll-mt-16">
+                  <div className="flex items-center gap-1">
+                  <button type="button" aria-expanded={selected}
+                    onClick={() => setSelectedSpellKey(selected ? null : r.key)}
+                    className={`flex-1 min-w-0 grid grid-cols-[minmax(0,1fr)_auto] ${SPELL_COLS} items-center gap-x-3 px-2.5 py-1.5 rounded-md text-left transition-colors ${
+                      conc ? 'bg-amber-50 ring-1 ring-amber-300' : selected ? 'bg-parchment-100 ring-1 ring-parchment-300' : 'hover:bg-parchment-100'
+                    }`}>
+                    <span className="flex items-center gap-1.5 min-w-0">
+                      {conc && <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" style={{ boxShadow: '0 0 6px 2px rgba(251,191,36,0.7)' }} title="Concentrating" />}
+                      <span className="text-sm font-semibold text-parchment-900 truncate">{r.name}</span>
+                      {r.source && <span className="text-[11px] text-indigo-500 shrink-0" title={r.sourceNote}>★</span>}
+                    </span>
+                    <span className="hidden sm:block text-xs text-parchment-500 truncate">{shortTime(r.def?.castingTime)}</span>
+                    <span className="hidden sm:block text-xs font-semibold text-violet-700 whitespace-nowrap">{roll}</span>
+                    <span className={`hidden sm:block text-xs font-semibold truncate ${dmgText}`}>{r.dmg ? `${r.dmg.dice}${r.dmg.type ? ` ${r.dmg.type}` : ''}` : ''}</span>
+                    <span className="flex items-center justify-end gap-1">
+                      {r.usesMax !== undefined && (
+                        <span className={`text-[10px] font-semibold rounded px-1 ${r.usesLeft! > 0 ? 'bg-indigo-50 text-indigo-700' : 'bg-parchment-100 text-parchment-400 line-through'}`}
+                          title="Free casts left before a long rest">{r.usesLeft}/{r.usesMax}</span>
+                      )}
+                      {r.def?.concentration && <span className="w-4 h-4 rounded text-[9px] font-bold flex items-center justify-center bg-amber-100 text-amber-700" title="Concentration">C</span>}
+                      {r.def?.ritual && <span className="w-4 h-4 rounded text-[9px] font-bold flex items-center justify-center bg-blue-100 text-blue-700" title="Ritual">R</span>}
+                    </span>
+                  </button>
+                  {r.library && r.def && (
+                    <button type="button" disabled={!isSpellbookCaster && atPrepCap}
+                      onClick={() => learnSpell(r.def!, !isSpellbookCaster)}
+                      title={!isSpellbookCaster && atPrepCap ? `Prepared limit reached (${prepLimit})` : `${learnLabel}: ${r.name}`}
+                      aria-label={`${learnLabel}: ${r.name}`}
+                      className="shrink-0 w-7 h-7 rounded-full border border-violet-300 text-violet-700 text-base font-bold leading-none hover:bg-violet-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    >+</button>
+                  )}
+                  </div>
+                  {/* Narrow screens open the spell under its row; wide ones show it in the panel beside the list */}
+                  {selected && (
+                    <div className="lg:hidden mx-1 mt-1 mb-2">{spellDetails(r)}</div>
+                  )}
+                </div>
+              )
+            }
+
+            /** The open spell as a card: a seal with its level in the school's colour, the four facts,
+             *  its big numbers, ways to cast it, then its text and what it does at higher levels */
+            const spellDetails = (r: SpellRow) => {
+              const def = r.def
+              const slotOrdinals = ['1st','2nd','3rd','4th','5th','6th','7th','8th','9th']
+              if (!def) return (
+                <div className="rounded-xl border border-parchment-200 bg-parchment-50 p-4 text-sm text-parchment-500">{r.name}: no details in the reference data.</div>
+              )
+              const hex = schoolAccentHex[def.school] ?? '#b08d57'
+              const slotLevels = r.slotCast ? [1,2,3,4,5,6,7,8,9].filter(lvl => lvl >= r.level && slotMaxAt(lvl) > 0) : []
+              const isConcentrating = char.concentratingOn === def.slug
+              const castAt = async (lvl: number) => {
+                const max = slotMaxAt(lvl)
+                const used = char.spellSlots[String(lvl)]?.used ?? 0
+                if (used >= max) return
+                const startConc = !!def.concentration && char.concentratingOn !== def.slug
+                if (startConc && char.concentratingOn) {
+                  const prev = content.spells.find(sp => sp.slug === char.concentratingOn)?.name ?? char.concentratingOn
+                  if (!(await askConfirm({ title: 'End Concentration?', message: `Casting ${r.name} ends your concentration on ${prev}.`, confirmLabel: `Cast ${r.name}` }))) return
+                }
+                patch({
+                  spellSlots: { ...char.spellSlots, [String(lvl)]: { max, used: used + 1 } },
+                  ...(startConc ? { concentratingOn: def.slug } : {}),
+                })
+                setCastHighlight({ slug: def.slug, level: lvl })
+              }
+              const toggleConcentration = async () => {
+                if (isConcentrating) { patch({ concentratingOn: undefined }); return }
+                if (char.concentratingOn) {
+                  const prev = content.spells.find(sp => sp.slug === char.concentratingOn)?.name ?? char.concentratingOn
+                  if (!(await askConfirm({ title: 'End Concentration?', message: `Concentrating on ${r.name} ends your concentration on ${prev}.`, confirmLabel: 'Switch' }))) return
+                }
+                patch({ concentratingOn: def.slug })
+              }
+              const spent = r.useKey ? char.freeSpellUses?.[r.useKey] ?? 0 : 0
+              const upcast = r.level > 0 && def.higherLevels ? parseUpcastScaling(def.higherLevels) : null
+              const upcastLevels = slotLevels.filter(lvl => lvl > r.level)
+              const s = r.entry
+              // "1 reaction, which you take when…": the short form up top, the trigger underneath
+              const [castMain, ...castRest] = (def.castingTime ?? '').split(',')
+              const material = parseMaterial(def.components)
+              const materialText = def.components?.match(/\(([^)]+)\)/)?.[1]
+              const componentLetters = (def.components ?? '').split('(')[0].split(',').map(c => c.trim()).filter(Boolean)
+              const dmgStyle = r.dmg?.type ? DAMAGE_TYPE_STYLE[r.dmg.type] ?? DAMAGE_TYPE_STYLE.force : null
+              const fact = (icon: React.ReactNode, label: string, value: React.ReactNode, sub?: string) => (
+                <div className="bg-parchment-50 px-3 py-2 flex gap-2 min-w-0">
+                  <span className="mt-0.5 shrink-0" style={{ color: hex }}>{icon}</span>
+                  <div className="min-w-0">
+                    <div className="text-[10px] font-bold uppercase tracking-widest text-parchment-500">{label}</div>
+                    <div className="text-sm text-parchment-900 leading-snug">{value}</div>
+                    {sub && <div className="text-[11px] text-parchment-500 leading-snug mt-0.5">{sub}</div>}
+                  </div>
+                </div>
+              )
+              return (
+                <article key={r.key} className="spell-card-in rounded-xl border bg-parchment-50 shadow-sm overflow-hidden" style={{ borderColor: `${hex}88` }}>
+                  {/* Header, washed with the school's colour */}
+                  <header className="px-4 pt-4 pb-3" style={{ background: `linear-gradient(135deg, ${hex}38, ${hex}10 55%, transparent 85%)` }}>
+                    <div className="flex items-start gap-3">
+                      <div className="spell-seal shrink-0" style={{ '--seal': hex } as React.CSSProperties}
+                        title={r.level === 0 ? 'Cantrip' : `${slotOrdinals[r.level - 1]}-level spell`}>
+                        {r.level === 0 ? '✦' : r.level}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-xl font-bold text-parchment-900 leading-tight">{r.name}</h3>
+                        <p className="text-xs italic text-parchment-600 mt-0.5 first-letter:uppercase">{levelLine(def)}{def.ritual ? ' (ritual)' : ''}</p>
+                        {r.sourceNote && <p className="text-[11px] font-semibold text-indigo-600 mt-0.5">{r.sourceNote}</p>}
+                      </div>
+                      <button type="button" onClick={() => setSelectedSpellKey(null)} aria-label="Close" title="Close"
+                        className="w-7 h-7 -mr-1 -mt-1 rounded-full text-sm text-parchment-500 hover:bg-parchment-100 hover:text-parchment-900 shrink-0">✕</button>
+                    </div>
+                    {(def.concentration || def.ritual || material) && (
+                      <div className="flex flex-wrap gap-1 mt-2.5">
+                        {def.concentration && (
+                          <span className={`text-[11px] font-semibold rounded-full px-2 py-0.5 border ${isConcentrating ? 'bg-amber-400 border-amber-400 text-white' : 'bg-amber-50 border-amber-300 text-amber-800'}`}>
+                            {isConcentrating ? '● Concentrating' : 'Concentration'}
+                          </span>
+                        )}
+                        {def.ritual && <span className="text-[11px] font-semibold rounded-full px-2 py-0.5 border bg-blue-50 border-blue-200 text-blue-700" title="Can be cast as a ritual: 10 minutes longer, no slot">Ritual</span>}
+                        {material && (
+                          <span className={`text-[11px] font-semibold rounded-full px-2 py-0.5 border ${material.consumed ? 'bg-orange-50 border-orange-200 text-orange-700' : 'bg-parchment-100 border-parchment-300 text-parchment-700'}`}>
+                            {material.cost}{material.consumed ? ', consumed' : ''}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </header>
+
+                  {/* The four facts */}
+                  <div className="grid grid-cols-2 gap-px bg-parchment-200 border-y border-parchment-200">
+                    {fact(<HourglassIcon className="w-4 h-4" />, 'Casting time', castMain, castRest.join(',').trim() || undefined)}
+                    {fact(<TargetIcon className="w-4 h-4" />, 'Range', def.range)}
+                    {fact(<ClockIcon className="w-4 h-4" />, 'Duration', def.concentration ? def.duration.replace(/^concentration,\s*/i, '') : def.duration)}
+                    {fact(<FlaskIcon className="w-4 h-4" />, 'Components',
+                      <span className="flex gap-1">
+                        {componentLetters.map(c => (
+                          <span key={c} className="w-5 h-5 rounded text-[11px] font-bold flex items-center justify-center bg-parchment-100 border border-parchment-300 text-parchment-700">{c}</span>
+                        ))}
+                      </span>,
+                      materialText)}
+                  </div>
+
+                  {/* The numbers that matter in the moment */}
+                  {(r.dmg || def.savingThrow || def.attackRoll) && (
+                    <div className="px-4 py-3 flex items-stretch gap-3 border-b border-parchment-200">
+                      {(def.attackRoll || def.savingThrow) && (
+                        <div className="flex-1 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-center">
+                          <div className="text-2xl font-bold leading-none text-violet-800">
+                            {def.attackRoll ? formatMod(totalSpellAtk(r.cls)) : `DC ${totalSpellDC(r.cls)}`}
+                          </div>
+                          <div className="text-[10px] font-bold uppercase tracking-widest text-violet-600 mt-1">
+                            {def.attackRoll ? 'to hit' : `${def.savingThrow!.ability.toUpperCase()} save`}
+                          </div>
+                          {!def.attackRoll && def.savingThrow!.effectOnSave === 'half' && (
+                            <div className="text-[10px] text-violet-500 leading-tight">half damage on a save</div>
+                          )}
+                        </div>
+                      )}
+                      {r.dmg && (
+                        <div className={`flex-1 rounded-lg border px-3 py-2 text-center ${dmgStyle ? `${dmgStyle.bg} ${dmgStyle.border}` : 'bg-red-50 border-red-200'}`}>
+                          <div className={`text-2xl font-bold leading-none ${dmgStyle ? dmgStyle.text : 'text-red-800'}`}>{r.dmg.dice}</div>
+                          <div className={`text-[10px] font-bold uppercase tracking-widest mt-1 ${dmgStyle ? dmgStyle.text : 'text-red-700'}`}>{r.dmg.type ? `${r.dmg.type} damage` : 'damage'}</div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* From the library: add it */}
+                  {r.library && (
+                    <div className="px-4 py-3 border-b border-parchment-200 flex flex-wrap items-center gap-2">
+                      {isSpellbookCaster && (
+                        <button type="button" onClick={() => learnSpell(def, false)}
+                          className="px-3 py-1 rounded-full text-xs font-semibold bg-amber-600 text-white hover:bg-amber-700 transition-colors shadow-sm"
+                        >Add to spellbook</button>
+                      )}
+                      <button type="button" disabled={atPrepCap} onClick={() => learnSpell(def, true)}
+                        className="px-3 py-1 rounded-full text-xs font-semibold bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-sm"
+                      >{isSpellbookCaster ? 'Prepare directly' : isPrepared ? 'Prepare' : 'Learn'}</button>
+                      {atPrepCap && <span className="text-xs text-amber-600">Prepared limit reached ({prepLimit})</span>}
+                    </div>
+                  )}
+
+                  {/* Ways to cast it */}
+                  {!r.library && (slotLevels.length > 0 || r.slotCast || r.useKey || def.concentration) && (
+                    <div className="px-4 py-3 border-b border-parchment-200 space-y-2">
+                      {slotLevels.length > 0 && (
+                        <div>
+                          <div className="text-[10px] font-bold uppercase tracking-widest text-parchment-500 mb-1.5">Cast with a slot</div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {slotLevels.map(lvl => {
+                              const left = slotMaxAt(lvl) - (char.spellSlots[String(lvl)]?.used ?? 0)
+                              const out = left <= 0
+                              return (
+                                <button key={lvl} type="button" disabled={out} onClick={() => castAt(lvl)}
+                                  title={out ? `No ${slotOrdinals[lvl - 1]}-level slots left` : `Cast ${r.name} with a ${slotOrdinals[lvl - 1]}-level slot — ${left} left`}
+                                  className={`inline-flex items-center gap-1.5 pl-2 pr-2.5 py-1 rounded-full border text-xs font-semibold transition-colors ${out ? 'opacity-40 cursor-not-allowed border-parchment-200 text-parchment-400 bg-parchment-50' : 'bg-violet-600 border-violet-600 text-white hover:bg-violet-700 shadow-sm'}`}
+                                >
+                                  <span className={`w-2 h-2 rotate-45 ${out ? 'bg-parchment-300' : 'bg-violet-200'}`} aria-hidden />
+                                  {slotOrdinals[lvl - 1]}
+                                  <span className="font-normal opacity-75">{left} left</span>
+                                </button>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      )}
+                      {r.slotCast && slotLevels.length === 0 && <p className="text-xs italic text-parchment-400">No spell slots to cast this with.</p>}
+                      {(r.useKey || def.concentration) && (
+                        <div className="flex flex-wrap gap-1.5">
+                          {r.useKey && r.usesMax !== undefined && (
+                            <>
+                              <button type="button" disabled={r.usesLeft === 0}
+                                onClick={() => patch({ freeSpellUses: { ...char.freeSpellUses, [r.useKey!]: spent + 1 } })}
+                                className={`px-3 py-1 rounded-full border text-xs font-semibold transition-colors ${r.usesLeft === 0 ? 'opacity-40 cursor-not-allowed border-parchment-200 text-parchment-400' : 'bg-indigo-50 border-indigo-300 text-indigo-700 hover:bg-indigo-100'}`}
+                              >Cast free · {r.usesLeft}/{r.usesMax}</button>
+                              {spent > 0 && (
+                                <button type="button" onClick={() => patch({ freeSpellUses: { ...char.freeSpellUses, [r.useKey!]: Math.max(0, spent - 1) } })}
+                                  className="px-2.5 py-1 rounded-full border text-xs text-parchment-500 hover:text-indigo-600 border-parchment-200 hover:border-indigo-300 transition-colors"
+                                >Restore</button>
+                              )}
+                            </>
+                          )}
+                          {def.concentration && (
+                            <button type="button" onClick={toggleConcentration}
+                              className={`px-3 py-1 rounded-full border text-xs font-semibold transition-colors ${isConcentrating ? 'bg-amber-400 border-amber-400 text-white' : 'bg-amber-50 border-amber-300 text-amber-700 hover:bg-amber-100'}`}
+                            >{isConcentrating ? 'Stop concentrating' : 'Concentrate'}</button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* The spell's text, opening with an illuminated letter */}
+                  {def.description && (
+                    <div className="px-4 py-3">
+                      <p className="text-sm text-parchment-800 leading-relaxed whitespace-pre-line first-letter:float-left first-letter:text-4xl first-letter:leading-[0.85] first-letter:font-bold first-letter:mr-1.5 first-letter:mt-0.5 first-letter:text-[rgb(var(--accent))]">
+                        {def.description}
+                      </p>
+                    </div>
+                  )}
+                  {def.higherLevels && (
+                    <div className="mx-4 mb-3 rounded-lg border border-parchment-200 border-l-[3px] bg-parchment-100/60 px-3 py-2 space-y-2" style={{ borderLeftColor: hex }}>
+                      <div className="text-[10px] font-bold uppercase tracking-widest text-parchment-600">At Higher Levels</div>
+                      {upcast && def.damage && upcastLevels.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5">
+                          {[r.level, ...upcastLevels].map(lvl => {
+                            const total = lvl === r.level ? def.damage!.dice : computeUpcastDamage(def.damage!.dice, upcast.dice, lvl - r.level)
+                            const lit = castHighlight?.slug === def.slug && castHighlight.level === lvl
+                            return (
+                              <div key={lvl} className={`flex flex-col items-center px-2 py-1 rounded border text-xs ${lvl === r.level ? 'border-parchment-200 bg-parchment-50' : 'border-violet-200 bg-violet-50'} ${lit ? 'ring-2 ring-violet-400 ring-offset-1' : ''}`}>
+                                <span className={lvl === r.level ? 'text-parchment-400' : 'text-violet-400'}>{slotOrdinals[lvl - 1]}</span>
+                                <span className={`font-semibold ${lvl === r.level ? 'text-parchment-700' : 'text-violet-800'}`}>{total ?? `+${upcast.dice}`}{def.damage!.type ? ` ${def.damage!.type}` : ''}</span>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+                      <p className="text-xs italic text-parchment-600 whitespace-pre-line">{cleanHigherLevels(def.higherLevels)}</p>
+                    </div>
+                  )}
+
+                  {/* A feat's, race's or Strixhaven's spell is always prepared, and only its source can add it
+                      back, so it gets no Unprepare. Mystic Arcanum and imported spells can be removed. */}
+                  {s && !s.grantedBy && r.level > 0 && (
+                    <div className="px-4 pb-3 flex justify-end">
+                      {isSpellbookCaster && !s.freeUseKey ? (
+                        <button type="button"
+                          className="px-3 py-1 rounded border text-xs text-parchment-500 hover:text-amber-600 border-parchment-200 hover:border-amber-300 transition-colors"
+                          onClick={() => { setSelectedSpellKey(null); offerUndo(`Unprepared ${r.name}`); patch({ spells: char.spells.map(sp => sp.spellSlug === s.spellSlug ? { ...sp, prepared: false } : sp) }) }}
+                        >Unprepare (stays in your spellbook)</button>
+                      ) : (
+                        <button type="button"
+                          className="px-3 py-1 rounded border text-xs text-parchment-500 hover:text-red-500 border-parchment-200 hover:border-red-300 transition-colors"
+                          onClick={() => { setSelectedSpellKey(null); offerUndo(`${isPrepared && !s.freeUseKey ? 'Unprepared' : 'Removed'} ${r.name}`); patch({ spells: char.spells.filter(sp => sp.spellSlug !== s.spellSlug) }) }}
+                        >{isPrepared && !s.freeUseKey ? 'Unprepare' : 'Remove'}</button>
+                      )}
+                    </div>
+                  )}
+                </article>
+              )
+            }
+
             return (
               <>
                 {/* ── Spellcasting Header ── */}
                 <div className="card px-4 py-3 space-y-3">
-                  {/* Title row */}
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
+                  {/* Who's casting; the two numbers every spell uses, as a pair of seals; and how full the
+                      spell list is, as fill bars */}
+                  <div className="grid gap-4 items-center sm:grid-cols-[minmax(0,1fr)_auto] lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,16rem)]">
+                    <div className="min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         {casterClasses.length > 1 ? (
                           // Multiclass caster: choose which class's spells, limits and list to work with
@@ -2961,63 +3515,64 @@ export default function Sheet() {
                           <span className="text-xs bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-full px-2 py-0.5 font-semibold">Multiclass</span>
                         )}
                       </div>
-                      <p className="text-[11px] text-parchment-400 mt-0.5 tracking-wide">
-                        {({ str: 'Strength', dex: 'Dexterity', con: 'Constitution', int: 'Intelligence', wis: 'Wisdom', cha: 'Charisma' } as Record<string,string>)[spellAbility] ?? spellAbility.toUpperCase()} Spellcasting
+                      <p className="text-xs text-parchment-500 mt-1">
+                        Casts with <span className="font-semibold text-parchment-700">{ABILITY_FULL[spellAbility] ?? spellAbility.toUpperCase()}</span> ({formatMod(abilMod)})
                       </p>
+                      {isMulticlassCaster && (() => {
+                        const parts = char.classes.map(cc => {
+                          const ct = CASTER_TYPE[cc.classSlug]
+                          const type = typeof ct === 'function' ? ct(cc.subclassSlug) : (ct ?? 'none')
+                          if (type === 'none' || type === 'pact') return null
+                          const cl = type === 'full' ? cc.level : type === 'half-up' ? Math.ceil(cc.level / 2) : type === 'half' ? Math.floor(cc.level / 2) : Math.floor(cc.level / 3)
+                          if (cl === 0) return null
+                          const label = content.classes.find(c => c.slug === cc.classSlug)?.name ?? cc.classSlug
+                          return `${label} ${cc.level} (CL ${cl})`
+                        }).filter(Boolean)
+                        const totalCL = effectiveCasterLevel(char.classes)
+                        return parts.length > 0 ? (
+                          <p className="text-[11px] text-indigo-500 mt-0.5">
+                            {parts.join(' + ')} → CL {totalCL}
+                          </p>
+                        ) : null
+                      })()}
                     </div>
-                    <button
-                      type="button"
-                      className="shrink-0 text-xs text-parchment-500 hover:text-parchment-800 border border-parchment-300 hover:border-parchment-500 rounded px-2.5 py-1.5 transition-colors font-medium"
-                      onClick={() => {
-                        const reset: Character['spellSlots'] = {}
-                        const maxSource = multiclassMaxes ?? Object.fromEntries(
-                          Object.entries(char.spellSlots).map(([k, v]) => [k, v.max])
-                        )
-                        for (const [lvl, max] of Object.entries(maxSource)) {
-                          if (max > 0) reset[lvl] = { max, used: 0 }
-                        }
-                        patch({ spellSlots: reset })
-                      }}
-                    >↺ Long Rest</button>
-                  </div>
 
-                  {/* Stat boxes */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    <div className="flex flex-col items-center py-2 px-2 rounded-lg border border-violet-200 bg-violet-50">
-                      <span className="text-[9px] text-violet-400 font-bold uppercase tracking-widest mb-0.5">Spell DC</span>
-                      <span className="text-2xl font-bold text-violet-800 leading-none">{totalSpellDC(spellClassSlug)}</span>
+                    <div className="flex items-center gap-2.5">
+                      <div className="spell-stat" title="Creatures make saving throws against this">
+                        <span className="text-2xl font-bold leading-none text-violet-800">{totalSpellDC(spellClassSlug)}</span>
+                        <span className="text-[9px] font-bold uppercase tracking-widest text-violet-600">Save DC</span>
+                      </div>
+                      <div className="spell-stat" title="Added to your d20 for spell attacks">
+                        <span className="text-2xl font-bold leading-none text-violet-800">{formatMod(totalSpellAtk(spellClassSlug))}</span>
+                        <span className="text-[9px] font-bold uppercase tracking-widest text-violet-600">Attack</span>
+                      </div>
                     </div>
-                    <div className="flex flex-col items-center py-2 px-2 rounded-lg border border-violet-200 bg-violet-50">
-                      <span className="text-[9px] text-violet-400 font-bold uppercase tracking-widest mb-0.5">Spell Atk</span>
-                      <span className="text-2xl font-bold text-violet-800 leading-none">{formatMod(totalSpellAtk(spellClassSlug))}</span>
-                    </div>
-                    {isPrepared && prepLimit !== null ? (
-                      <div className={`flex flex-col items-center py-2 px-2 rounded-lg border ${preparedCount >= prepLimit ? 'border-amber-300 bg-amber-50' : 'border-parchment-200 bg-parchment-50'}`}>
-                        <span className={`text-[9px] font-bold uppercase tracking-widest mb-0.5 ${preparedCount >= prepLimit ? 'text-amber-500' : 'text-parchment-400'}`}>Prepared</span>
-                        <span className={`text-2xl font-bold leading-none ${preparedCount >= prepLimit ? 'text-amber-700' : 'text-parchment-800'}`}>{preparedCount}<span className="text-sm text-parchment-400">/{prepLimit}</span></span>
-                      </div>
-                    ) : knownMax ? (
-                      <div className={`flex flex-col items-center py-2 px-2 rounded-lg border ${atKnownCap ? 'border-amber-300 bg-amber-50' : 'border-parchment-200 bg-parchment-50'}`}>
-                        <span className={`text-[9px] font-bold uppercase tracking-widest mb-0.5 ${atKnownCap ? 'text-amber-500' : 'text-parchment-400'}`}>Known</span>
-                        <span className={`text-2xl font-bold leading-none ${atKnownCap ? 'text-amber-700' : 'text-parchment-800'}`}>{knownCount}<span className="text-sm text-parchment-400">/{knownMax}</span></span>
-                      </div>
-                    ) : (
-                      <div className="flex flex-col items-center py-2 px-2 rounded-lg border border-parchment-200 bg-parchment-50">
-                        <span className="text-[9px] text-parchment-400 font-bold uppercase tracking-widest mb-0.5">{spellAbility.toUpperCase()} Mod</span>
-                        <span className="text-2xl font-bold text-parchment-800 leading-none">{formatMod(abilMod)}</span>
-                      </div>
-                    )}
-                    {cantripMax > 0 ? (
-                      <div className={`flex flex-col items-center py-2 px-2 rounded-lg border ${atCantripCap ? 'border-amber-300 bg-amber-50' : 'border-parchment-200 bg-parchment-50'}`}>
-                        <span className={`text-[9px] font-bold uppercase tracking-widest mb-0.5 ${atCantripCap ? 'text-amber-500' : 'text-parchment-400'}`}>Cantrips</span>
-                        <span className={`text-2xl font-bold leading-none ${atCantripCap ? 'text-amber-700' : 'text-parchment-800'}`}>{cantripCount}<span className="text-sm text-parchment-400">/{cantripMax}</span></span>
-                      </div>
-                    ) : (
-                      <div className="flex flex-col items-center py-2 px-2 rounded-lg border border-parchment-200 bg-parchment-50">
-                        <span className="text-[9px] text-parchment-400 font-bold uppercase tracking-widest mb-0.5">{spellAbility.toUpperCase()} Mod</span>
-                        <span className="text-2xl font-bold text-parchment-800 leading-none">{formatMod(abilMod)}</span>
-                      </div>
-                    )}
+
+                    {(() => {
+                      const meter = (label: string, count: number, max: number) => {
+                        const over = count > max
+                        return (
+                          <div key={label}>
+                            <div className="flex items-baseline justify-between gap-2 text-xs">
+                              <span className="font-semibold text-parchment-700">{label}</span>
+                              <span className={over ? 'font-bold text-amber-700' : 'text-parchment-600'}>
+                                {count} / {max}{over ? ` · ${count - max} over` : ''}
+                              </span>
+                            </div>
+                            <div className="h-1.5 mt-1 rounded-full bg-parchment-200 overflow-hidden">
+                              <div className={`h-full rounded-full transition-all ${over ? 'bg-amber-500' : 'bg-violet-500'}`}
+                                style={{ width: `${Math.min(100, Math.round(count / Math.max(1, max) * 100))}%` }} />
+                            </div>
+                          </div>
+                        )
+                      }
+                      const meters = [
+                        isPrepared && prepLimit !== null ? meter('Prepared', preparedCount, prepLimit)
+                          : knownMax ? meter('Spells known', knownCount, knownMax) : null,
+                        cantripMax > 0 ? meter('Cantrips', cantripCount, cantripMax) : null,
+                      ].filter(Boolean)
+                      return meters.length > 0 ? <div className="space-y-2.5 sm:col-span-2 lg:col-span-1">{meters}</div> : null
+                    })()}
                   </div>
 
                   {/* Concentration banner */}
@@ -3036,76 +3591,42 @@ export default function Sheet() {
                   )}
                 </div>
 
-                {/* ── Spell Slots card ── */}
-                {(Object.keys(char.spellSlots).length > 0 || multiclassMaxes) && (
+                {/* ── Pact Magic ── */}
+                {char.pactSlots && (
                   <div className="card">
-                    <div className="flex items-center justify-between mb-3">
-                      <h3 className="text-sm font-bold text-parchment-700 uppercase tracking-wider">Spell Slots</h3>
-                      {isMulticlassCaster && (
-                        <span className="text-xs bg-indigo-100 text-indigo-700 rounded-full px-2.5 py-0.5 font-medium">Multiclass</span>
-                      )}
+                    <div className="flex items-center gap-3 mb-3">
+                      <h3 className="text-sm font-bold text-parchment-700 uppercase tracking-wider">Pact Magic</h3>
+                      <span className="text-xs bg-indigo-100 text-indigo-700 rounded-full px-2.5 py-0.5 font-medium">Level {char.pactSlots.level} · Short Rest</span>
                     </div>
-                    {isMulticlassCaster && (() => {
-                      const parts = char.classes.map(cc => {
-                        const ct = CASTER_TYPE[cc.classSlug]
-                        const type = typeof ct === 'function' ? ct(cc.subclassSlug) : (ct ?? 'none')
-                        if (type === 'none' || type === 'pact') return null
-                        const cl = type === 'full' ? cc.level : type === 'half-up' ? Math.ceil(cc.level / 2) : type === 'half' ? Math.floor(cc.level / 2) : Math.floor(cc.level / 3)
-                        if (cl === 0) return null
-                        const label = content.classes.find(c => c.slug === cc.classSlug)?.name ?? cc.classSlug
-                        return `${label} ${cc.level} (CL ${cl})`
-                      }).filter(Boolean)
-                      const totalCL = effectiveCasterLevel(char.classes)
-                      return parts.length > 0 ? (
-                        <p className="text-[11px] text-indigo-500 mb-2.5">
-                          {parts.join(' + ')} → CL {totalCL}
-                        </p>
-                      ) : null
-                    })()}
-                    <div className="space-y-2.5">
-                      {[1,2,3,4,5,6,7,8,9].map(lvl => {
-                        const slotMax = multiclassMaxes
-                          ? (multiclassMaxes[String(lvl)] ?? 0)
-                          : (char.spellSlots[String(lvl)]?.max ?? 0)
-                        if (slotMax === 0) return null
-                        const slotUsed = char.spellSlots[String(lvl)]?.used ?? 0
-                        const slotLeft = slotMax - slotUsed
-                        const ordinal = ['1st','2nd','3rd','4th','5th','6th','7th','8th','9th'][lvl - 1]
-                        return (
-                          <div key={lvl} className="flex items-center gap-3">
-                            <span className="text-xs font-semibold text-parchment-500 w-7 shrink-0 text-right">{ordinal}</span>
-                            <div className="flex gap-2 items-center flex-1">
-                              {Array.from({ length: slotMax }, (_, i) => {
-                                const available = i < slotLeft
-                                return (
-                                  <button
-                                    key={i}
-                                    type="button"
-                                    title={available ? 'Expend slot' : 'Recover slot'}
-                                    onClick={() => {
-                                      const used = available ? slotUsed + 1 : slotUsed - 1
-                                      patch({ spellSlots: { ...char.spellSlots, [String(lvl)]: { max: slotMax, used } } })
-                                    }}
-                                    className="w-6 h-6 flex items-center justify-center group"
-                                  >
-                                    <div className={`w-3.5 h-3.5 rotate-45 border ${
-                                      available
-                                        ? 'spell-gem'
-                                        : 'bg-parchment-200 border-parchment-300 opacity-40 transition-all duration-150 group-hover:scale-125'
-                                    }`}
-                                      style={available ? {
-                                        animation: 'pip-pulse 2.4s ease-in-out infinite',
-                                        animationDelay: `${i * 0.18}s`,
-                                      } : undefined}
-                                    />
-                                  </button>
-                                )
-                              })}
-                            </div>
-                            <span className="text-xs text-parchment-400 w-10 text-right shrink-0">{slotLeft}/{slotMax}</span>
-                          </div>
-                        )
-                      })}
+                    <div className="flex items-center gap-3">
+                      <div className="flex gap-2">
+                        {Array.from({ length: char.pactSlots.max }, (_, i) => {
+                          const available = i < char.pactSlots!.max - char.pactSlots!.used
+                          return (
+                            <button key={i} type="button"
+                              title={available ? 'Expend slot' : 'Recover slot'}
+                              onClick={() => {
+                                if (!char.pactSlots) return
+                                const used = available ? char.pactSlots.used + 1 : char.pactSlots.used - 1
+                                patch({ pactSlots: { ...char.pactSlots, used } })
+                              }}
+                              className="w-5 h-5 flex items-center justify-center group"
+                            >
+                              <div className={`w-3.5 h-3.5 rotate-45 border-2 ${
+                                available ? 'spell-gem' : 'bg-parchment-200 border-parchment-300 opacity-40 transition-all duration-150 group-hover:scale-125'
+                              }`} style={available ? {
+                                animation: 'pip-pulse 2.4s ease-in-out infinite',
+                                animationDelay: `${i * 0.18}s`,
+                              } : undefined} />
+                            </button>
+                          )
+                        })}
+                      </div>
+                      <span className="text-sm text-parchment-500">{char.pactSlots.max - char.pactSlots.used}/{char.pactSlots.max} remaining</span>
+                      <button type="button"
+                        className="ml-auto text-xs text-parchment-400 hover:text-parchment-700 border border-parchment-200 hover:border-parchment-400 rounded px-2.5 py-1 transition-colors"
+                        onClick={() => { if (char.pactSlots) patch({ pactSlots: { ...char.pactSlots, used: 0 } }) }}
+                      >Short Rest</button>
                     </div>
                   </div>
                 )}
@@ -3178,309 +3699,135 @@ export default function Sheet() {
                   )
                 })()}
 
-                {/* ── Prepared / Known Spells ── */}
-                <div className="card">
-                  {(() => {
-                    const presentLevels = [0,1,2,3,4,5,6,7,8,9].filter(lvl =>
-                      preparedSpells.some(s => (content.spells.find(d => d.slug === s.spellSlug)?.level ?? 0) === lvl)
-                    )
-                    const activeLevel = presentLevels.includes(preparedTab) ? preparedTab : (presentLevels[0] ?? 0)
-                    const tabSpells = preparedSpells.filter(s => {
-                      const def = content.spells.find(d => d.slug === s.spellSlug)
-                      return (def?.level ?? 0) === activeLevel && s.name.toLowerCase().includes(spellFilter.toLowerCase())
-                    })
-                    const isCantrip = activeLevel === 0
-
-                    return (
-                      <>
-                        {/* Header row */}
-                        <div className="flex items-center justify-between mb-3">
-                          <h2 className="text-sm font-bold text-parchment-700 uppercase tracking-wider">
-                            {isPrepared ? 'Prepared Spells' : 'Known Spells'}
-                          </h2>
-                          {presentLevels.length > 0 && (
-                            <input
-                              className="input text-sm py-1 w-28"
-                              placeholder="Filter…"
-                              value={spellFilter}
-                              onChange={e => setSpellFilter(e.target.value)}
-                            />
-                          )}
-                        </div>
-
-                        {preparedSpells.length === 0 ? (
-                          <p className="text-sm text-parchment-400 py-4 text-center">
-                            No spells yet — use the spell library below to {isPrepared ? 'prepare spells' : 'learn spells'}.
-                          </p>
-                        ) : (
-                          <>
-                            {/* Level tabs — clean, no pips */}
-                            <div className="flex gap-1.5 flex-wrap mb-4">
-                              {presentLevels.map(lvl => {
-                                const active = lvl === activeLevel
-                                const isCtip = lvl === 0
-                                const count = preparedSpells.filter(s => (content.spells.find(d => d.slug === s.spellSlug)?.level ?? 0) === lvl).length
-                                return (
-                                  <button
-                                    key={lvl}
-                                    type="button"
-                                    onClick={() => setPreparedTab(lvl)}
-                                    className={`px-3 py-1.5 rounded-lg border text-xs font-bold transition-all ${
-                                      active
-                                        ? isCtip
-                                          ? 'bg-amber-500 border-amber-500 text-white shadow-sm'
-                                          : 'bg-dungeon-900 border-dungeon-900 text-parchment-100 shadow-sm'
-                                        : 'border-parchment-200 text-parchment-600 hover:border-parchment-400 bg-parchment-50'
-                                    }`}
-                                  >
-                                    {ordinals[lvl]}
-                                    <span className={`ml-1.5 font-normal ${active ? 'opacity-70' : 'text-parchment-400'}`}>{count}</span>
-                                  </button>
-                                )
-                              })}
+                {/* ── Spells: one slim row each, grouped by level (each level's slots in its heading). The
+                    chosen spell opens in the panel beside the list, so the list stays short. ── */}
+                {(() => {
+                  const filter = spellFilter.trim().toLowerCase()
+                  const rows = [...preparedSpells.map(entryRow), ...freeSpells.map(freeRow)]
+                    .sort((x, y) => x.name.localeCompare(y.name))
+                  const levels = [...new Set([
+                    ...rows.map(r => r.level),
+                    ...[1, 2, 3, 4, 5, 6, 7, 8, 9].filter(lvl => slotMaxAt(lvl) > 0),
+                  ])].sort((x, y) => x - y)
+                  // The open spell may be one of yours or one from the library below
+                  const librarySelected = selectedSpellKey?.startsWith('lib:') ? availableSpells.find(sp => `lib:${sp.slug}` === selectedSpellKey) : undefined
+                  const selectedRow = rows.find(r => r.key === selectedSpellKey) ?? (librarySelected ? libraryRow(librarySelected) : undefined)
+                  const jumpTo = (lvl: number) => document.getElementById(`spell-level-${lvl}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                  let shown = 0
+                  return (
+                    <div className="card">
+                      <div className="flex flex-wrap items-center gap-1.5 mb-3">
+                        <h2 className="text-sm font-bold text-parchment-700 uppercase tracking-wider mr-2">
+                          {isPrepared ? 'Prepared Spells' : 'Known Spells'}
+                        </h2>
+                        {/* Jump straight to a level */}
+                        {levels.length > 2 && levels.map(lvl => (
+                          <button key={lvl} type="button" onClick={() => jumpTo(lvl)}
+                            className="text-xs rounded-full px-2.5 py-0.5 border border-parchment-200 text-parchment-600 hover:border-parchment-500 hover:text-parchment-900 transition-colors"
+                          >{lvl === 0 ? 'Cantrips' : ordinals[lvl]}</button>
+                        ))}
+                        {rows.length > 0 && (
+                          <input className="input text-sm py-1 w-36 ml-auto" placeholder="Filter…" aria-label="Filter spells"
+                            value={spellFilter} onChange={e => setSpellFilter(e.target.value)} />
+                        )}
+                      </div>
+                      {rows.length === 0 && (
+                        <p className="text-sm text-parchment-400 py-2 text-center">
+                          No spells yet — use the spell library below to {isPrepared ? 'prepare spells' : 'learn spells'}.
+                        </p>
+                      )}
+                      <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_24rem] lg:gap-5 lg:items-start">
+                        <div>
+                          {rows.length > 0 && (
+                            <div className={`hidden sm:grid ${SPELL_COLS} gap-x-3 px-2.5 pb-1 mb-1.5 text-[10px] font-bold uppercase tracking-widest text-parchment-400`}>
+                              <span>Spell</span><span>Cast</span><span>Hit / DC</span><span>Effect</span><span />
                             </div>
-
-                            {isCantrip && (
-                              <p className="text-xs text-amber-600 mb-3 px-1">Cantrips are always available — no spell slot needed.</p>
+                          )}
+                          <div className="space-y-3">
+                            {levels.map(lvl => {
+                              const lvlRows = rows.filter(r => r.level === lvl && (!filter || r.name.toLowerCase().includes(filter)))
+                              if (filter && lvlRows.length === 0) return null
+                              shown++
+                              const slotMax = lvl > 0 ? slotMaxAt(lvl) : 0
+                              return (
+                                <section key={lvl} id={`spell-level-${lvl}`} className="scroll-mt-16">
+                                  <div className="flex items-center gap-3 border-b border-parchment-200 pb-1 mb-0.5">
+                                    <h3 className="text-xs font-bold uppercase tracking-widest text-parchment-600">
+                                      {lvl === 0 ? 'Cantrips' : `${ordinals[lvl]} Level`}
+                                    </h3>
+                                    {lvl === 0 && <span className="text-[11px] text-parchment-400">At will</span>}
+                                    {slotMax > 0 && <div className="ml-auto">{slotGems(lvl)}</div>}
+                                  </div>
+                                  {lvlRows.map(spellRow)}
+                                  {lvlRows.length === 0 && (
+                                    <p className="text-xs italic text-parchment-400 px-2.5 py-1">
+                                      No {ordinals[lvl]}-level spells. These slots can cast a lower-level spell at {ordinals[lvl]} level.
+                                    </p>
+                                  )}
+                                </section>
+                              )
+                            })}
+                            {filter && shown === 0 && (
+                              <p className="text-sm text-parchment-400 py-3 text-center">No spells match "{spellFilter}"</p>
                             )}
+                          </div>
 
-                            {/* Spell cards */}
-                            <div className="space-y-1.5">
-                              {tabSpells.length === 0 && (
-                                <p className="text-sm text-parchment-400 py-3 text-center">No spells match "{spellFilter}"</p>
-                              )}
-                              {tabSpells.map(s => {
-                                const def = content.spells.find(d => d.slug === s.spellSlug)
-                                const rawDmg = def?.damage ?? null
-                                const cantripDmg = (isCantrip && def) ? cantripDiceAtLevel(def.slug, level, rawDmg?.dice) : null
-                                // Dice only — the damage type is added once where the badge is drawn
-                                const dmgDisplay = cantripDmg ?? rawDmg?.dice ?? null
-                                const isOpen = browserSelectedSpell === s.spellSlug
-                                const isConcentrating = char.concentratingOn === s.spellSlug
-                                const aoe = def ? extractAoE(def.range) : null
-                                const dmgStyle = rawDmg?.type ? (DAMAGE_TYPE_STYLE[rawDmg.type] ?? DAMAGE_TYPE_STYLE.force) : null
-                                const upcast = (!isCantrip && def?.higherLevels) ? parseUpcastScaling(def.higherLevels) : null
-                                return (
-                                  <div key={s.spellSlug}
-                                    style={{ borderLeftColor: isConcentrating ? '#f59e0b' : schoolBorderColor(def?.school) }}
-                                    className={`rounded-lg border transition-colors ${isConcentrating ? 'border-l-[4px] border-amber-300 bg-amber-50/60 conc-active' : 'border-l-[3px] border-parchment-200 bg-parchment-50 hover:bg-parchment-50/60'}`}
-                                  >
-                                    <button
-                                      type="button"
-                                      className="w-full text-left px-3 py-2.5"
-                                      onClick={() => setBrowserSelectedSpell(isOpen ? null : s.spellSlug)}
-                                    >
-                                      <div className="flex items-start gap-2">
-                                        <div className="flex-1 min-w-0">
-                                          <div className="flex items-center gap-1.5 flex-wrap">
-                                            {isConcentrating && (
-                                              <div className="w-2.5 h-2.5 rounded-full bg-amber-400 shrink-0" style={{ boxShadow: '0 0 8px 3px rgba(251,191,36,0.75)', animation: 'conc-glow 2s ease-in-out infinite' }} />
-                                            )}
-                                            <span className={`font-semibold text-sm ${isConcentrating ? 'text-amber-900' : 'text-parchment-900'}`}>{s.name}</span>
-                                            {def?.concentration && !isConcentrating && <span className="text-xs bg-amber-100 text-amber-800 border border-amber-400 rounded px-1.5 py-0.5 font-semibold">Conc.</span>}
-                                            {isConcentrating && <span className="text-xs bg-amber-500 text-white rounded px-2 py-0.5 font-bold tracking-wide uppercase" style={{ boxShadow: '0 0 8px 2px rgba(245,158,11,0.4)' }}>● Concentrating</span>}
-                                            {def?.ritual && <span className="text-xs bg-blue-50 text-blue-600 border border-blue-200 rounded px-1.5 py-0.5">Ritual</span>}
-                                            {s.usesPerLongRest && s.freeUseKey && (() => {
-                                              const spent = char.freeSpellUses?.[s.freeUseKey] ?? 0
-                                              const left = Math.max(0, s.usesPerLongRest - spent)
-                                              return (
-                                                <span className={`text-xs rounded px-1.5 py-0.5 border ${left > 0 ? 'bg-indigo-50 text-indigo-700 border-indigo-300' : 'bg-parchment-100 text-parchment-400 border-parchment-200 line-through'}`}>
-                                                  {left}/{s.usesPerLongRest}/LR free
-                                                </span>
-                                              )
-                                            })()}
-                                            {def?.savingThrow && (() => {
-                                              const dc = totalSpellDC(classForEntry(s.classSlug))
-                                              return <span className="text-xs bg-violet-50 text-violet-700 border border-violet-200 rounded px-1.5 py-0.5 font-semibold">{def.savingThrow.ability.toUpperCase()} save · DC {dc}</span>
-                                            })()}
-                                            {def?.attackRoll && (() => {
-                                              const atk = totalSpellAtk(classForEntry(s.classSlug))
-                                              return <span className="text-xs bg-violet-50 text-violet-700 border border-violet-200 rounded px-1.5 py-0.5 font-semibold">{atk >= 0 ? '+' : ''}{atk} to hit</span>
-                                            })()}
-                                            {dmgDisplay && (
-                                              <span className={`text-xs px-1.5 py-0.5 rounded border ${dmgStyle ? `${dmgStyle.bg} ${dmgStyle.text} ${dmgStyle.border}` : 'bg-red-100 text-red-800 border-red-300'}`}>
-                                                {dmgDisplay}{rawDmg?.type ? ` ${rawDmg.type}` : ''}
-                                              </span>
-                                            )}
-                                            {aoe && dmgDisplay && (
-                                              <span className="text-xs bg-parchment-100 text-parchment-600 border border-parchment-300 rounded px-1.5 py-0.5">{aoe}</span>
-                                            )}
-                                            {upcast && (
-                                              <span className="text-xs bg-violet-50 text-violet-700 border border-violet-200 rounded px-1.5 py-0.5">↑+{upcast.dice}/lvl</span>
-                                            )}
-                                          </div>
-                                          {def && <div className="text-xs text-parchment-400 mt-0.5">{def.castingTime} · {def.range} · {def.duration}{def.school ? ` · ${def.school}` : ''}</div>}
-                                        </div>
-                                        <span className="text-parchment-300 text-xs mt-0.5 shrink-0">{isOpen ? '▲' : '▼'}</span>
-                                      </div>
-                                    </button>
-                                    {isOpen && (
-                                      <div className="px-3 pb-3 border-t border-parchment-100 pt-2.5 space-y-2">
-                                        {def && (
-                                          <SpellStatBlock
-                                            spell={def}
-                                            saveDc={def.savingThrow ? totalSpellDC(classForEntry(s.classSlug)) : undefined}
-                                            attackBonus={def.attackRoll ? totalSpellAtk(classForEntry(s.classSlug)) : undefined}
-                                          />
-                                        )}
-                                        {def?.description && (
-                                          <p className="text-sm text-parchment-700 leading-relaxed whitespace-pre-line">
-                                            {def.description}
-                                          </p>
-                                        )}
-                                        {def?.higherLevels && (() => {
-                                          const availSlots = [1,2,3,4,5,6,7,8,9].filter(lvl => {
-                                            if (lvl <= (def.level ?? 0)) return false
-                                            const max = multiclassMaxes ? (multiclassMaxes[String(lvl)] ?? 0) : (char.spellSlots[String(lvl)]?.max ?? 0)
-                                            return max > 0
-                                          })
-                                          const showTable = upcast && rawDmg && availSlots.length > 0
-                                          const slotOrdinals = ['1st','2nd','3rd','4th','5th','6th','7th','8th','9th']
-                                          return (
-                                            <div className="border-t border-parchment-100 pt-2 space-y-2">
-                                              <div className="text-xs font-semibold text-parchment-700 uppercase tracking-wide">At Higher Levels</div>
-                                              {showTable && (
-                                                <div className="flex flex-wrap gap-1.5">
-                                                  <div className={`flex flex-col items-center px-2 py-1 rounded border border-parchment-200 bg-parchment-50 text-xs ${castHighlight?.slug === s.spellSlug && castHighlight.level === (def.level ?? 1) ? 'ring-2 ring-violet-400 ring-offset-1' : ''}`}>
-                                                    <span className="text-parchment-400">{slotOrdinals[(def.level ?? 1) - 1]}</span>
-                                                    <span className="font-semibold text-parchment-700">{rawDmg!.dice}{rawDmg!.type ? ` ${rawDmg!.type}` : ''}</span>
-                                                  </div>
-                                                  {availSlots.map(lvl => {
-                                                    const total = computeUpcastDamage(rawDmg!.dice, upcast!.dice, lvl - (def.level ?? 1))
-                                                    const lit = castHighlight?.slug === s.spellSlug && castHighlight.level === lvl
-                                                    return (
-                                                      <div key={lvl} className={`flex flex-col items-center px-2 py-1 rounded border border-violet-200 bg-violet-50 text-xs ${lit ? 'ring-2 ring-violet-400 ring-offset-1' : ''}`}>
-                                                        <span className="text-violet-400">{slotOrdinals[lvl - 1]}</span>
-                                                        <span className="font-semibold text-violet-800">{total ?? `+${upcast!.dice}`}{!total && rawDmg!.type ? ` ${rawDmg!.type}` : (total && rawDmg!.type ? ` ${rawDmg!.type}` : '')}</span>
-                                                      </div>
-                                                    )
-                                                  })}
-                                                </div>
-                                              )}
-                                              <p className="text-xs italic text-parchment-500 whitespace-pre-line">{cleanHigherLevels(def.higherLevels)}</p>
-                                            </div>
-                                          )
-                                        })()}
-                                        {/* Cast at level — spend a slot directly from the card */}
-                                        {!isCantrip && def && (() => {
-                                          const slotOrdinals = ['1st','2nd','3rd','4th','5th','6th','7th','8th','9th']
-                                          const slotLevels = [1,2,3,4,5,6,7,8,9].filter(lvl => {
-                                            if (lvl < (def.level ?? 1)) return false
-                                            const max = multiclassMaxes ? (multiclassMaxes[String(lvl)] ?? 0) : (char.spellSlots[String(lvl)]?.max ?? 0)
-                                            return max > 0
-                                          })
-                                          if (slotLevels.length === 0) {
-                                            return <p className="text-xs italic text-parchment-400 pt-1">No spell slots available to cast this.</p>
-                                          }
-                                          const castAt = async (lvl: number) => {
-                                            const max = multiclassMaxes ? (multiclassMaxes[String(lvl)] ?? 0) : (char.spellSlots[String(lvl)]?.max ?? 0)
-                                            const used = char.spellSlots[String(lvl)]?.used ?? 0
-                                            if (used >= max) return
-                                            const startConc = !!def.concentration && char.concentratingOn !== s.spellSlug
-                                            if (startConc && char.concentratingOn) {
-                                              const prev = content.spells.find(sp => sp.slug === char.concentratingOn)?.name ?? char.concentratingOn
-                                              if (!(await askConfirm({ title: 'End Concentration?', message: `Casting ${s.name} ends your concentration on ${prev}.`, confirmLabel: `Cast ${s.name}` }))) return
-                                            }
-                                            patch({
-                                              spellSlots: { ...char.spellSlots, [String(lvl)]: { max, used: used + 1 } },
-                                              ...(startConc ? { concentratingOn: s.spellSlug } : {}),
-                                            })
-                                            setCastHighlight({ slug: s.spellSlug, level: lvl })
-                                          }
-                                          return (
-                                            <div className="flex items-center gap-1.5 flex-wrap pt-1">
-                                              <span className="text-[10px] font-bold uppercase tracking-widest text-parchment-400 mr-0.5">Cast at</span>
-                                              {slotLevels.map(lvl => {
-                                                const max = multiclassMaxes ? (multiclassMaxes[String(lvl)] ?? 0) : (char.spellSlots[String(lvl)]?.max ?? 0)
-                                                const left = max - (char.spellSlots[String(lvl)]?.used ?? 0)
-                                                const out = left <= 0
-                                                return (
-                                                  <button key={lvl} type="button" disabled={out}
-                                                    onClick={() => castAt(lvl)}
-                                                    title={out ? `No ${slotOrdinals[lvl - 1]}-level slots left` : `Cast ${s.name} with a ${slotOrdinals[lvl - 1]}-level slot — ${left} left`}
-                                                    className={`px-2.5 py-1 rounded border text-xs font-semibold transition-colors ${out ? 'opacity-40 cursor-not-allowed border-parchment-200 text-parchment-400 bg-parchment-50' : 'bg-violet-600 border-violet-600 text-white hover:bg-violet-700'}`}
-                                                  >{slotOrdinals[lvl - 1]} <span className="font-normal opacity-75">({left})</span></button>
-                                                )
-                                              })}
-                                            </div>
-                                          )
-                                        })()}
-                                        <div className="flex items-center gap-2 pt-1 flex-wrap">
-                                          {def?.concentration && (
-                                            <button type="button"
-                                              onClick={async () => {
-                                                if (char.concentratingOn === s.spellSlug) {
-                                                  patch({ concentratingOn: undefined })
-                                                } else {
-                                                  if (char.concentratingOn) {
-                                                    const prev = content.spells.find(sp => sp.slug === char.concentratingOn)?.name ?? char.concentratingOn
-                                                    if (!(await askConfirm({ title: 'End Concentration?', message: `Concentrating on ${s.name} ends your concentration on ${prev}.`, confirmLabel: 'Switch' }))) return
-                                                  }
-                                                  patch({ concentratingOn: s.spellSlug })
-                                                }
-                                              }}
-                                              className={`px-3 py-1.5 rounded border text-xs font-semibold transition-colors ${
-                                                char.concentratingOn === s.spellSlug
-                                                  ? 'bg-amber-400 border-amber-400 text-white'
-                                                  : 'bg-amber-50 border-amber-300 text-amber-700 hover:bg-amber-100'
-                                              }`}
-                                            >{char.concentratingOn === s.spellSlug ? 'Concentrating' : 'Concentrate'}</button>
-                                          )}
-                                          {s.usesPerLongRest && s.freeUseKey && (() => {
-                                            const key = s.freeUseKey
-                                            const spent = char.freeSpellUses?.[key] ?? 0
-                                            const left = Math.max(0, s.usesPerLongRest - spent)
-                                            const isSpent = left === 0
-                                            return (
-                                              <>
-                                                <button type="button" disabled={isSpent}
-                                                  className={`px-3 py-1.5 rounded border text-xs font-semibold transition-colors ${isSpent ? 'opacity-40 cursor-not-allowed border-parchment-200 text-parchment-400' : 'bg-indigo-50 border-indigo-300 text-indigo-700 hover:bg-indigo-100'}`}
-                                                  onClick={() => patch({ freeSpellUses: { ...char.freeSpellUses, [key]: spent + 1 } })}
-                                                >Cast Free ({left}/{s.usesPerLongRest} LR)</button>
-                                                {spent > 0 && (
-                                                  <button type="button"
-                                                    className="px-2 py-1.5 rounded border text-xs text-parchment-400 hover:text-indigo-600 border-parchment-200 hover:border-indigo-300 transition-colors"
-                                                    onClick={() => patch({ freeSpellUses: { ...char.freeSpellUses, [key]: Math.max(0, spent - 1) } })}
-                                                  >Restore</button>
-                                                )}
-                                              </>
-                                            )
-                                          })()}
-                                          {/* A feat's, race's or Strixhaven's spell is always prepared, and only its source can
-                                              add it back, so it gets no Unprepare. Mystic Arcanum and imported spells can be removed. */}
-                                          {!isCantrip && s.grantedBy && (
-                                            <span className="text-xs italic text-parchment-400">
-                                              Always prepared · {s.grantedBy.startsWith('feat:')
-                                                ? content.feats.find(f => f.slug === s.grantedBy!.slice(5))?.name ?? 'a feat'
-                                                : s.grantedBy === 'strixhaven' ? 'Strixhaven Initiate' : 'High Elf'}
-                                            </span>
-                                          )}
-                                          {!isCantrip && !s.grantedBy && (
-                                            isSpellbookCaster && !s.freeUseKey ? (
-                                              <button type="button"
-                                                className="px-3 py-1.5 rounded border text-xs text-parchment-400 hover:text-amber-600 border-parchment-200 hover:border-amber-300 transition-colors"
-                                                onClick={() => patch({ spells: char.spells.map(sp => sp.spellSlug === s.spellSlug ? { ...sp, prepared: false } : sp) })}
-                                              >Unprepare</button>
-                                            ) : (
-                                              <button type="button"
-                                                className="px-3 py-1.5 rounded border text-xs text-parchment-400 hover:text-red-500 border-parchment-200 hover:border-red-300 transition-colors"
-                                                onClick={() => patch({ spells: char.spells.filter(sp => sp.spellSlug !== s.spellSlug) })}
-                                              >{isPrepared && !s.freeUseKey ? 'Unprepare' : 'Remove'}</button>
-                                            )
-                                          )}
-                                        </div>
-                                      </div>
+                          {/* ── Spell library: spells you could add, in the same rows; their cards open in the panel ── */}
+                          <div className="mt-5 pt-3 border-t border-parchment-200">
+                            <button type="button" onClick={() => setShowSpellLibrary(v => !v)} aria-expanded={showSpellLibrary}
+                              className="w-full flex items-center justify-between gap-3 py-1 group">
+                              <span className="text-sm font-bold uppercase tracking-wider text-parchment-700 group-hover:text-parchment-900">
+                                {isSpellbookCaster ? 'Spell library' : isPrepared ? 'Prepare spells' : 'Learn spells'}
+                              </span>
+                              <span className="text-xs text-parchment-500 group-hover:text-parchment-800">
+                                {showSpellLibrary ? 'Hide ▲' : `${availableSpells.filter(sp => sp.level > 0).length} available ▼`}
+                              </span>
+                            </button>
+                            {showSpellLibrary && (() => {
+                              const availLevels = [1,2,3,4,5,6,7,8,9].filter(l => availableSpells.some(sp => sp.level === l))
+                              const activeLib = spellBrowserLevel !== null && availLevels.includes(spellBrowserLevel) ? spellBrowserLevel : availLevels[0] ?? 0
+                              const q = spellBrowserSearch.trim().toLowerCase()
+                              const libRows = availableSpells
+                                .filter(sp => sp.level === activeLib && (!q || sp.name.toLowerCase().includes(q) || sp.school.toLowerCase().includes(q)))
+                                .sort((x, y) => x.name.localeCompare(y.name))
+                                .map(libraryRow)
+                              return (
+                                <div className="mt-2">
+                                  <div className="flex flex-wrap items-center gap-1.5 mb-2">
+                                    {availLevels.map(lvl => (
+                                      <button key={lvl} type="button" onClick={() => setSpellBrowserLevel(lvl)}
+                                        className={`text-xs rounded-full px-2.5 py-0.5 border transition-colors ${lvl === activeLib ? 'bg-parchment-700 border-parchment-700 text-parchment-50' : 'border-parchment-200 text-parchment-600 hover:border-parchment-500 hover:text-parchment-900'}`}
+                                      >{ordinals[lvl]}</button>
+                                    ))}
+                                    <input className="input text-sm py-1 w-36 ml-auto" placeholder="Search…" aria-label="Search the spell library"
+                                      value={spellBrowserSearch} onChange={e => setSpellBrowserSearch(e.target.value)} />
+                                  </div>
+                                  <div className="max-h-[28rem] overflow-y-auto pr-1 [scrollbar-width:thin]">
+                                    {libRows.map(spellRow)}
+                                    {libRows.length === 0 && (
+                                      <p className="text-sm text-parchment-400 text-center py-6">
+                                        {availLevels.length === 0 ? 'You already have every spell you can add.' : `No spells match "${spellBrowserSearch}"`}
+                                      </p>
                                     )}
                                   </div>
-                                )
-                              })}
+                                </div>
+                              )
+                            })()}
+                          </div>
+                        </div>
+                        <aside className="hidden lg:block sticky top-14 max-h-[calc(100vh-4.5rem)] overflow-y-auto rounded-xl [scrollbar-width:thin]">
+                          {selectedRow ? spellDetails(selectedRow) : (
+                            <div className="rounded-xl border-2 border-dashed border-parchment-300 px-6 py-10 text-center">
+                              <BookIcon className="w-10 h-10 mx-auto text-parchment-300" />
+                              <p className="text-sm font-semibold text-parchment-600 mt-2">Choose a spell</p>
+                              <p className="text-xs text-parchment-400 mt-0.5">Its card opens here, ready to cast.</p>
                             </div>
-                          </>
-                        )}
-                      </>
-                    )
-                  })()}
-                </div>
+                          )}
+                        </aside>
+                      </div>
+                    </div>
+                  )
+                })()}
 
                 {/* ── Spellbook (unprepared) — Wizard only ── */}
                 {isSpellbookCaster && (() => {
@@ -3509,7 +3856,7 @@ export default function Sheet() {
                                 >Prepare</button>
                                 <button type="button"
                                   className="px-2.5 py-1 rounded border text-xs text-parchment-400 hover:text-red-500 border-parchment-200 hover:border-red-300 transition-colors"
-                                  onClick={() => patch({ spells: char.spells.filter(sp => sp.spellSlug !== s.spellSlug) })}
+                                  onClick={() => { offerUndo(`Removed ${s.name} from your spellbook`); patch({ spells: char.spells.filter(sp => sp.spellSlug !== s.spellSlug) }) }}
                                 >Remove</button>
                               </div>
                             </div>
@@ -3519,46 +3866,6 @@ export default function Sheet() {
                     </div>
                   )
                 })()}
-
-                {/* ── Pact Magic ── */}
-                {char.pactSlots && (
-                  <div className="card">
-                    <div className="flex items-center gap-3 mb-3">
-                      <h3 className="text-sm font-bold text-parchment-700 uppercase tracking-wider">Pact Magic</h3>
-                      <span className="text-xs bg-indigo-100 text-indigo-700 rounded-full px-2.5 py-0.5 font-medium">Level {char.pactSlots.level} · Short Rest</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <div className="flex gap-2">
-                        {Array.from({ length: char.pactSlots.max }, (_, i) => {
-                          const available = i < char.pactSlots!.max - char.pactSlots!.used
-                          return (
-                            <button key={i} type="button"
-                              title={available ? 'Expend slot' : 'Recover slot'}
-                              onClick={() => {
-                                if (!char.pactSlots) return
-                                const used = available ? char.pactSlots.used + 1 : char.pactSlots.used - 1
-                                patch({ pactSlots: { ...char.pactSlots, used } })
-                              }}
-                              className="w-5 h-5 flex items-center justify-center group"
-                            >
-                              <div className={`w-3.5 h-3.5 rotate-45 border-2 ${
-                                available ? 'spell-gem' : 'bg-parchment-200 border-parchment-300 opacity-40 transition-all duration-150 group-hover:scale-125'
-                              }`} style={available ? {
-                                animation: 'pip-pulse 2.4s ease-in-out infinite',
-                                animationDelay: `${i * 0.18}s`,
-                              } : undefined} />
-                            </button>
-                          )
-                        })}
-                      </div>
-                      <span className="text-sm text-parchment-500">{char.pactSlots.max - char.pactSlots.used}/{char.pactSlots.max} remaining</span>
-                      <button type="button"
-                        className="ml-auto text-xs text-parchment-400 hover:text-parchment-700 border border-parchment-200 hover:border-parchment-400 rounded px-2.5 py-1 transition-colors"
-                        onClick={() => { if (char.pactSlots) patch({ pactSlots: { ...char.pactSlots, used: 0 } }) }}
-                      >Short Rest</button>
-                    </div>
-                  </div>
-                )}
 
                 {/* ── Mystic Arcanum owed (Warlock 11+) but never picked ── */}
                 {(() => {
@@ -3593,292 +3900,6 @@ export default function Sheet() {
                   )
                 })()}
 
-                {/* ── Innate / Free Spells (feats, race, subclass — single source of truth) ── */}
-                {freeSpells.length > 0 && (
-                  <div className="card">
-                    <h3 className="text-sm font-bold text-parchment-700 uppercase tracking-wider mb-3">Innate Spells</h3>
-                    <div className="space-y-3">
-                      {[...new Set(freeSpells.map(s => s.level))].sort((a, b) => a - b).map(lvl => {
-                        const group = freeSpells.filter(s => s.level === lvl)
-                        const label = lvl === 0 ? 'Cantrips' : `${['1st','2nd','3rd','4th','5th','6th','7th','8th','9th'][lvl - 1]} Level`
-                        return (
-                          <div key={lvl}>
-                            <div className="text-[10px] font-bold text-parchment-400 uppercase tracking-widest mb-1.5">{label}</div>
-                            <div className="space-y-1.5">
-                              {group.map(spell => {
-                                const def = content.spells.find(s => s.slug === spell.slug)
-                                // Cast with a higher slot (Tiefling's Hellish Rebuke at 2nd level): scale the dice
-                                const upcastBy = def && spell.castLevel ? spell.castLevel - def.level : 0
-                                const upcastInc = upcastBy > 0 && def?.higherLevels ? parseUpcastScaling(def.higherLevels) : null
-                                const dmg = def?.damage && upcastInc
-                                  ? { ...def.damage, dice: computeUpcastDamage(def.damage.dice, upcastInc.dice, upcastBy) ?? def.damage.dice }
-                                  : def?.damage ?? null
-                                const usesMax = spell.usesPerLongRest
-                                const usesLeft = usesMax !== undefined
-                                  ? Math.max(0, usesMax - (char.freeSpellUses?.[spell.key] ?? 0))
-                                  : null
-                                const isAlwaysPrepared = spell.alwaysPrepared === true
-                                const isAtWill = usesMax === undefined && !isAlwaysPrepared
-                                const hasTracker = usesMax !== undefined
-                                const isSpent = usesLeft === 0
-                                const isOpen = expandedInnate === spell.key
-                                const accentClass = isSpent ? 'border-l-parchment-300' : isAlwaysPrepared ? 'border-l-indigo-400' : 'border-l-green-400'
-                                return (
-                                  <div key={spell.key} className={`rounded-lg border-l-[3px] border border-parchment-200 transition-colors ${isSpent ? 'opacity-50 bg-parchment-50' : 'bg-parchment-50 hover:bg-parchment-50/60'} ${accentClass}`}>
-                                    <button type="button" className="w-full text-left px-3 py-2"
-                                      onClick={() => setExpandedInnate(isOpen ? null : spell.key)}>
-                                      <div className="flex items-center gap-2">
-                                        <div className="flex-1 min-w-0">
-                                          <div className="flex items-center gap-1.5 flex-wrap">
-                                            <span className={`font-semibold text-sm ${isSpent ? 'line-through text-parchment-400' : 'text-parchment-900'}`}>{spell.name}</span>
-                                            <span className="text-xs bg-parchment-100 text-parchment-500 rounded px-1.5 py-0.5">{spell.source}</span>
-                                            {upcastBy > 0 && <span className="text-xs bg-parchment-100 text-parchment-500 rounded px-1.5 py-0.5">as {ordinals[spell.castLevel!]} level</span>}
-                                            {isAlwaysPrepared && <span className="text-xs bg-indigo-50 text-indigo-700 border border-indigo-200 rounded px-1.5 py-0.5">Always Prepared</span>}
-                                            {isAtWill && <span className="text-xs bg-green-50 text-green-700 border border-green-200 rounded px-1.5 py-0.5">At Will</span>}
-                                            {hasTracker && <span className={`text-xs rounded px-1.5 py-0.5 border ${isSpent ? 'bg-red-50 text-red-400 border-red-200' : 'bg-blue-50 text-blue-700 border-blue-200'}`}>{usesLeft}/{usesMax} / LR</span>}
-                                            {def?.savingThrow && (() => {
-                                              const dc = totalSpellDC(spellClassSlug ?? 'wizard')
-                                              return <span className="text-xs bg-violet-50 text-violet-700 border border-violet-200 rounded px-1.5 py-0.5 font-semibold">{def.savingThrow.ability.toUpperCase()} save · DC {dc}</span>
-                                            })()}
-                                            {def?.attackRoll && (() => {
-                                              const atk = totalSpellAtk(spellClassSlug ?? 'wizard')
-                                              return <span className="text-xs bg-violet-50 text-violet-700 border border-violet-200 rounded px-1.5 py-0.5 font-semibold">{atk >= 0 ? '+' : ''}{atk} to hit</span>
-                                            })()}
-                                            {dmg && <span className="text-xs font-mono bg-red-50 text-red-700 border border-red-200 rounded px-1.5 py-0.5">{dmg.dice}{dmg.type ? ` ${dmg.type}` : ''}</span>}
-                                          </div>
-                                          {def && <div className="text-xs text-parchment-400 mt-0.5">{def.castingTime} · {def.range} · {def.duration}</div>}
-                                        </div>
-                                        <span className="text-parchment-300 text-xs shrink-0">{isOpen ? '▲' : '▼'}</span>
-                                      </div>
-                                    </button>
-                                    {isOpen && (
-                                      <div className="px-3 pb-3 border-t border-parchment-100 pt-2.5 space-y-2">
-                                        {def && (
-                                          <SpellStatBlock
-                                            spell={def}
-                                            saveDc={def.savingThrow ? totalSpellDC(spellClassSlug ?? 'wizard') : undefined}
-                                            attackBonus={def.attackRoll ? totalSpellAtk(spellClassSlug ?? 'wizard') : undefined}
-                                          />
-                                        )}
-                                        {def?.description && (
-                                          <p className="text-sm text-parchment-700 leading-relaxed whitespace-pre-line">{def.description}</p>
-                                        )}
-                                        {hasTracker && (
-                                          <div className="flex gap-1.5 pt-1">
-                                            <button className="text-xs px-3 py-1.5 rounded border bg-blue-50 border-blue-300 text-blue-700 hover:bg-blue-100 disabled:opacity-40 transition-colors font-semibold" disabled={isSpent}
-                                              onClick={() => patch({ freeSpellUses: { ...char.freeSpellUses, [spell.key]: (char.freeSpellUses?.[spell.key] ?? 0) + 1 } })}
-                                            >Use Free ({usesLeft}/{usesMax} LR)</button>
-                                            {(char.freeSpellUses?.[spell.key] ?? 0) > 0 && (
-                                              <button className="text-xs px-2.5 py-1.5 rounded border border-parchment-200 text-parchment-400 hover:text-blue-600 hover:border-blue-300 transition-colors"
-                                                onClick={() => patch({ freeSpellUses: { ...char.freeSpellUses, [spell.key]: Math.max(0, (char.freeSpellUses?.[spell.key] ?? 0) - 1) } })}
-                                              >Restore</button>
-                                            )}
-                                          </div>
-                                        )}
-                                      </div>
-                                    )}
-                                  </div>
-                                )
-                              })}
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* ── Spell Library toggle button ── */}
-                <button
-                  type="button"
-                  onClick={() => { setShowSpellLibrary(v => !v); setBrowserSelectedSpell(null) }}
-                  className={`w-full py-2 rounded-lg border text-sm font-semibold transition-colors ${
-                    showSpellLibrary
-                      ? 'bg-dungeon-900 border-dungeon-900 text-parchment-100'
-                      : 'bg-parchment-50 border-parchment-300 text-parchment-600 hover:border-parchment-500 hover:text-parchment-900'
-                  }`}
-                >
-                  {showSpellLibrary ? '▲ Close Spell Library' : `▼ ${isPrepared ? 'Prepare Spells' : 'Learn Spells'}`}
-                </button>
-
-                {/* ── Spell Library (available to learn/prepare) ── */}
-                {showSpellLibrary && (() => {
-                  const availLevels = [1,2,3,4,5,6,7,8,9].filter(l => availableSpells.some(s => s.level === l))
-                  const activeLib = spellBrowserLevel !== null && availLevels.includes(spellBrowserLevel)
-                    ? spellBrowserLevel
-                    : availLevels[0] ?? 0
-                  const libTabSpells = availableSpells.filter(s => s.level === activeLib)
-                  const libFiltered = spellBrowserSearch
-                    ? libTabSpells.filter(s => s.name.toLowerCase().includes(spellBrowserSearch.toLowerCase()) || s.school.toLowerCase().includes(spellBrowserSearch.toLowerCase()))
-                    : libTabSpells
-                  return (
-                    <div className="card">
-                      <div className="flex items-center justify-between mb-3">
-                        <h2 className="text-sm font-bold text-parchment-700 uppercase tracking-wider">Spell Library</h2>
-                        <span className="text-xs text-parchment-400">Click to expand · add to your spells</span>
-                      </div>
-                      {/* Level tabs */}
-                      <div className="flex gap-1.5 flex-wrap mb-3">
-                        {availLevels.map(lvl => {
-                          const isActive = lvl === activeLib
-                          return (
-                            <button key={lvl} type="button"
-                              onClick={() => { setSpellBrowserLevel(lvl); setBrowserSelectedSpell(null) }}
-                              className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors border ${
-                                isActive
-                                  ? 'bg-dungeon-900 text-parchment-100 border-dungeon-900'
-                                  : 'border-parchment-200 text-parchment-600 hover:border-parchment-400'
-                              }`}
-                            >{ordinals[lvl]}</button>
-                          )
-                        })}
-                        <input
-                          className="input text-sm py-1 ml-auto w-36"
-                          placeholder="Search…"
-                          value={spellBrowserSearch}
-                          onChange={e => { setSpellBrowserSearch(e.target.value); setBrowserSelectedSpell(null) }}
-                        />
-                      </div>
-                      <div className="text-xs text-parchment-400 mb-2">{libTabSpells.length} spells available at this level</div>
-                      {/* Spell list */}
-                      <div className="space-y-1 max-h-[30rem] overflow-y-auto pr-1">
-                        {libFiltered.map(s => {
-                          const rawDmg = s.damage ?? null
-                          const libDmgStyle = rawDmg?.type ? (DAMAGE_TYPE_STYLE[rawDmg.type] ?? DAMAGE_TYPE_STYLE.force) : null
-                          const libAoE = extractAoE(s.range)
-                          const libUpcast = (s.level > 0 && s.higherLevels) ? parseUpcastScaling(s.higherLevels) : null
-                          const isOpen = browserSelectedSpell === s.slug
-                          return (
-                            <div key={s.slug}
-                              ref={isOpen ? (el) => { if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' }) } : undefined}
-                              style={{ borderLeftColor: isOpen ? '#8b5cf6' : schoolBorderColor(s.school) }}
-                              className={`rounded-lg border-l-[3px] border ${isOpen ? 'border-violet-200 bg-violet-50' : 'border-parchment-100 bg-parchment-50 hover:bg-parchment-50/50'} transition-colors`}
-                            >
-                              <button type="button" className="w-full text-left px-3 py-2.5"
-                                onClick={() => setBrowserSelectedSpell(isOpen ? null : s.slug)}>
-                                <div className="flex items-start gap-2">
-                                  <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-1.5 flex-wrap">
-                                      <span className={`font-semibold text-sm ${isOpen ? 'text-violet-800' : 'text-parchment-900'}`}>{s.name}</span>
-                                      {s.concentration && <span className="text-xs bg-amber-100 text-amber-800 border border-amber-400 rounded px-1.5 py-0.5 font-semibold">Conc.</span>}
-                                      {s.ritual && <span className="text-xs bg-blue-50 text-blue-600 border border-blue-200 rounded px-1.5 py-0.5">Ritual</span>}
-                                      {s.savingThrow && (() => {
-                                        const dc = totalSpellDC(spellClassSlug)
-                                        return <span className="text-xs bg-violet-50 text-violet-700 border border-violet-200 rounded px-1.5 py-0.5 font-semibold">{s.savingThrow.ability.toUpperCase()} save · DC {dc}</span>
-                                      })()}
-                                      {s.attackRoll && (() => {
-                                        const atk = totalSpellAtk(spellClassSlug)
-                                        return <span className="text-xs bg-violet-50 text-violet-700 border border-violet-200 rounded px-1.5 py-0.5 font-semibold">{atk >= 0 ? '+' : ''}{atk} to hit</span>
-                                      })()}
-                                      {rawDmg && (
-                                        <span className={`text-xs px-1.5 py-0.5 rounded border ${libDmgStyle ? `${libDmgStyle.bg} ${libDmgStyle.text} ${libDmgStyle.border}` : 'bg-red-100 text-red-800 border-red-300'}`}>
-                                          {rawDmg.dice}{rawDmg.type ? ` ${rawDmg.type}` : ''}
-                                        </span>
-                                      )}
-                                      {libAoE && rawDmg && (
-                                        <span className="text-xs bg-parchment-100 text-parchment-600 border border-parchment-300 rounded px-1.5 py-0.5">{libAoE}</span>
-                                      )}
-                                      {libUpcast && (
-                                        <span className="text-xs bg-violet-50 text-violet-700 border border-violet-200 rounded px-1.5 py-0.5">↑+{libUpcast.dice}/lvl</span>
-                                      )}
-                                    </div>
-                                    <div className="text-xs text-parchment-400 mt-0.5">{s.castingTime} · {s.range} · {s.duration} · <span className="italic">{s.school}</span></div>
-                                  </div>
-                                  <span className="text-parchment-300 text-xs shrink-0 mt-0.5">{isOpen ? '▲' : '▼'}</span>
-                                </div>
-                              </button>
-                              {isOpen && (
-                                <div className="px-3 pb-3 border-t border-violet-100 pt-2.5 space-y-2">
-                                  <SpellStatBlock
-                                    spell={s}
-                                    saveDc={s.savingThrow ? totalSpellDC(spellClassSlug) : undefined}
-                                    attackBonus={s.attackRoll ? totalSpellAtk(spellClassSlug) : undefined}
-                                  />
-                                  {s.description && (
-                                    <p className="text-sm text-parchment-700 leading-relaxed whitespace-pre-line">
-                                      {s.description}
-                                    </p>
-                                  )}
-                                  {s.higherLevels && (() => {
-                                    const slotOrdinals = ['1st','2nd','3rd','4th','5th','6th','7th','8th','9th']
-                                    const availSlots = [1,2,3,4,5,6,7,8,9].filter(lvl => {
-                                      if (lvl <= s.level) return false
-                                      const max = multiclassMaxes ? (multiclassMaxes[String(lvl)] ?? 0) : (char.spellSlots[String(lvl)]?.max ?? 0)
-                                      return max > 0
-                                    })
-                                    const showTable = libUpcast && rawDmg && availSlots.length > 0
-                                    return (
-                                      <div className="border-t border-violet-100 pt-2 space-y-2">
-                                        <div className="text-xs font-semibold text-parchment-700 uppercase tracking-wide">At Higher Levels</div>
-                                        {showTable && (
-                                          <div className="flex flex-wrap gap-1.5">
-                                            <div className="flex flex-col items-center px-2 py-1 rounded border border-parchment-200 bg-parchment-50 text-xs">
-                                              <span className="text-parchment-400">{slotOrdinals[s.level - 1]}</span>
-                                              <span className="font-semibold text-parchment-700">{rawDmg!.dice}{rawDmg!.type ? ` ${rawDmg!.type}` : ''}</span>
-                                            </div>
-                                            {availSlots.map(lvl => {
-                                              const total = computeUpcastDamage(rawDmg!.dice, libUpcast!.dice, lvl - s.level)
-                                              return (
-                                                <div key={lvl} className="flex flex-col items-center px-2 py-1 rounded border border-violet-200 bg-violet-50 text-xs">
-                                                  <span className="text-violet-400">{slotOrdinals[lvl - 1]}</span>
-                                                  <span className="font-semibold text-violet-800">{total ?? `+${libUpcast!.dice}`}{rawDmg!.type ? ` ${rawDmg!.type}` : ''}</span>
-                                                </div>
-                                              )
-                                            })}
-                                          </div>
-                                        )}
-                                        <p className="text-xs italic text-parchment-500 whitespace-pre-line">{cleanHigherLevels(s.higherLevels)}</p>
-                                      </div>
-                                    )
-                                  })()}
-                                  <div className="pt-1 flex items-center gap-3 flex-wrap">
-                                    {isSpellbookCaster ? (
-                                      <>
-                                        <button type="button"
-                                          className="px-4 py-1.5 rounded font-semibold text-sm transition-colors bg-amber-600 text-white hover:bg-amber-700"
-                                          onClick={() => {
-                                            patch({ spells: [...char.spells, { spellSlug: s.slug, name: s.name, classSlug: primarySlug, prepared: false, isHomebrew: s.source.site === 'homebrew' }] })
-                                            setBrowserSelectedSpell(null)
-                                          }}
-                                        >Add to Spellbook</button>
-                                        <button type="button"
-                                          disabled={atPrepCap}
-                                          className="px-4 py-1.5 rounded font-semibold text-sm transition-colors bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-40 disabled:cursor-not-allowed"
-                                          onClick={() => {
-                                            patch({ spells: [...char.spells, { spellSlug: s.slug, name: s.name, classSlug: primarySlug, prepared: true, isHomebrew: s.source.site === 'homebrew' }] })
-                                            setBrowserSelectedSpell(null)
-                                          }}
-                                        >Prepare Directly</button>
-                                        {atPrepCap && <span className="text-xs text-amber-600">Prep limit reached ({prepLimit})</span>}
-                                      </>
-                                    ) : (
-                                      <>
-                                        <button type="button"
-                                          disabled={atPrepCap}
-                                          className="px-4 py-1.5 rounded font-semibold text-sm transition-colors bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-40 disabled:cursor-not-allowed"
-                                          onClick={() => {
-                                            patch({ spells: [...char.spells, { spellSlug: s.slug, name: s.name, classSlug: primarySlug, prepared: true, isHomebrew: s.source.site === 'homebrew' }] })
-                                            setBrowserSelectedSpell(null)
-                                          }}
-                                        >{isPrepared ? 'Prepare' : 'Learn'}</button>
-                                        {atPrepCap && <span className="text-xs text-amber-600">Prep limit reached ({prepLimit})</span>}
-                                      </>
-                                    )}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          )
-                        })}
-                        {libFiltered.length === 0 && (
-                          <p className="text-sm text-parchment-400 text-center py-8">
-                            {libTabSpells.length === 0 ? 'All spells at this level have been added.' : `No spells match "${spellBrowserSearch}"`}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  )
-                })()}
               </>
             )
           })() : (
@@ -3891,7 +3912,7 @@ export default function Sheet() {
       {tab === 'inventory' && (
         <div>
           {/* Top row: Currency + Attunement */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 items-start gap-3 mb-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5">
             {/* Coin purse — a merchant's ledger: gold-leaf rolling balance, coin buttons, wax-seal
                 Gain/Spend and a transaction log. The balance is one total, shown in gold. */}
             {(() => {
@@ -3928,7 +3949,7 @@ export default function Sheet() {
               const change = [purse.sp ? `${purse.sp} sp` : '', purse.cp ? `${purse.cp} cp` : ''].filter(Boolean).join(' · ')
               const recent = char.purseLog.slice(0, 5)
               return (
-              <div className="card p-4">
+              <div className={`card p-4 flex flex-col ${ledgerOpen ? '' : 'self-start'}`}>
                 {/* Ornamental header */}
                 <div className="flex items-center gap-2 mb-1">
                   <span className="h-px flex-1 bg-gradient-to-r from-transparent to-parchment-300" />
@@ -4010,8 +4031,9 @@ export default function Sheet() {
                   })}
                 </div>
 
-                {/* The ledger — collapsible; shows the latest entry when closed */}
-                <div className="mt-3 pt-2 border-t border-parchment-200">
+                {/* The ledger — collapsible; shows the latest entry when closed. Open, its ruled page
+                    stretches to the bottom of the card. */}
+                <div className="mt-3 pt-2 border-t border-parchment-200 flex-1 flex flex-col">
                   <div className="flex items-center gap-2">
                     <button type="button" onClick={() => setLedgerOpen(!ledgerOpen)} aria-expanded={ledgerOpen}
                       className="flex items-center gap-1.5 flex-1 min-w-0 text-left group">
@@ -4035,7 +4057,7 @@ export default function Sheet() {
                   </div>
                   {ledgerOpen && (
                     <>
-                      <div className="ledger-lines pl-2 mt-1 min-h-[44px]">
+                      <div className="ledger-lines pl-2 mt-1 min-h-[44px] flex-1">
                         {recent.length === 0 ? (
                           <p className="text-xs italic text-parchment-400 leading-[22px]">No entries yet.</p>
                         ) : recent.map(e => {
@@ -4065,7 +4087,7 @@ export default function Sheet() {
             })()}
 
             {/* Right column: Attunement, then an artificer's Infusions */}
-            <div className="space-y-3">
+            <div className="space-y-3 self-start">
             {/* Attunement */}
             <div className="card p-3">
               <div className="text-xs font-bold text-parchment-500 uppercase tracking-wider mb-2">Attunement</div>
@@ -4436,6 +4458,8 @@ export default function Sheet() {
               patch({ equipment: eq })
             }
 
+            // The open item's card; itemRow fills it in while the lists render, and the side panel shows it
+            let selectedItemCard: React.ReactNode = null
             const itemRow = ({ item, idx, badge, badgeColor, descriptionText, showAttune, consumable, potion }: {
               item: typeof char.equipment[0]; idx: number; badge?: string | null; badgeColor?: string; descriptionText?: string | null; showAttune?: boolean; consumable?: boolean
               potion?: ItemDef['potion']
@@ -4493,6 +4517,7 @@ export default function Sheet() {
 
               const finishDrink = () => {
                 if (!potion) return
+                offerUndo(`Drank ${item.name}`)
                 if (item.quantity <= 1) setExpandedInventoryItem(null)
                 resetDrink()
                 let hp = { ...char.hp }
@@ -4576,43 +4601,33 @@ export default function Sheet() {
                 >Drink {qtyLabel}</button>
               )
 
-              return (
-                <div
-                  key={idx}
-                  ref={isExpanded ? el => { if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' }) } : undefined}
-                  className={`rounded-lg overflow-hidden border-l-4 ${rarityAccent} transition-all ${
-                    isExpanded ? 'border border-parchment-300 shadow-sm' : 'border border-parchment-100 hover:border-parchment-300 hover:shadow-sm'
-                  } ${item.equipped ? 'bg-green-50/50' : ''}`}
-                >
-                  <button type="button" className="w-full text-left px-3 py-2.5 flex items-start gap-2.5"
-                    onClick={() => setExpandedInventoryItem(isExpanded ? null : idx)}>
-                    <div className="flex-1 min-w-0 space-y-0.5">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="font-semibold text-sm text-parchment-900 leading-snug">{item.name}</span>
-                        {infusionDef && (
-                          <span className="text-[10px] font-semibold rounded px-1.5 py-0.5 bg-teal-50 text-teal-700 border border-teal-200" title="Artificer infusion">⟡ {infusionDef.name}</span>
-                        )}
-                        {item.attuned && <span className="text-[11px] text-indigo-500 shrink-0">✦</span>}
-                        {item.quantity > 1 && (
-                          <span className="text-[11px] bg-parchment-100 text-parchment-500 px-1.5 py-0.5 rounded-full font-medium shrink-0">×{item.quantity}</span>
-                        )}
-                        {item.chargesMax !== undefined && (
-                          <span className="text-[11px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded-full font-medium shrink-0">{item.charges ?? item.chargesMax}/{item.chargesMax}</span>
-                        )}
+              // The open item as a card, its header washed with the rarity's colour
+              const card = !isExpanded ? null : (() => {
+                const hex = ({ uncommon: '#22c55e', rare: '#3b82f6', 'very rare': '#8b5cf6', legendary: '#f59e0b', artifact: '#f97316' } as Record<string, string>)[rarity] ?? '#b08d57'
+                const kind = def?.type || (ws ? 'Weapon' : as_ ? (as_.type === 'shield' ? 'Shield' : 'Armor') : 'Gear')
+                return (
+                  <article key={`card-${idx}`} className="spell-card-in rounded-xl border bg-parchment-50 shadow-sm overflow-hidden" style={{ borderColor: `${hex}88` }}>
+                    <header className="px-4 pt-4 pb-3" style={{ background: `linear-gradient(135deg, ${hex}38, ${hex}10 55%, transparent 85%)` }}>
+                      <div className="flex items-start gap-2">
+                        <div className="flex-1 min-w-0">
+                          <h3 className="text-xl font-bold text-parchment-900 leading-tight">{item.name}</h3>
+                          <p className="text-xs italic text-parchment-600 mt-0.5 first-letter:uppercase">
+                            {[rarity || null, kind.toLowerCase()].filter(Boolean).join(' ')}{needsAttunement ? ' · requires attunement' : ''}
+                          </p>
+                        </div>
+                        <button type="button" onClick={() => setExpandedInventoryItem(null)} aria-label="Close" title="Close"
+                          className="w-7 h-7 -mr-1 -mt-1 rounded-full text-sm text-parchment-500 hover:bg-parchment-100 hover:text-parchment-900 shrink-0">✕</button>
                       </div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        {rarity && <span className={`text-[10px] font-bold uppercase tracking-wide ${rarityTextClass}`}>{rarity.charAt(0).toUpperCase() + rarity.slice(1)}</span>}
-                        {item.equipped && <span className="text-[10px] font-bold text-green-600">● Equipped</span>}
-                      </div>
-                    </div>
-                    {badge && (
-                      <span className={`text-xs font-bold rounded-md px-2 py-1 shrink-0 self-start mt-0.5 ${badgeColor ?? 'bg-parchment-100 text-parchment-600'}`}>{badge}</span>
-                    )}
-                    <span className="text-parchment-300 text-[10px] shrink-0 self-center">{isExpanded ? '▲' : '▼'}</span>
-                  </button>
-
-                  {isExpanded && (
-                    <div className="px-3 pb-3 border-t border-parchment-100 pt-2.5 space-y-2.5">
+                      {(item.equipped || item.attuned || infusionDef || item.quantity > 1) && (
+                        <div className="flex flex-wrap gap-1 mt-2.5">
+                          {item.equipped && <span className="text-[11px] font-semibold rounded-full px-2 py-0.5 border bg-green-50 border-green-300 text-green-700">● Equipped</span>}
+                          {item.attuned && <span className="text-[11px] font-semibold rounded-full px-2 py-0.5 border bg-indigo-50 border-indigo-300 text-indigo-700">✦ Attuned</span>}
+                          {infusionDef && <span className="text-[11px] font-semibold rounded-full px-2 py-0.5 border bg-teal-50 border-teal-200 text-teal-700">⟡ {infusionDef.name}</span>}
+                          {item.quantity > 1 && <span className="text-[11px] font-semibold rounded-full px-2 py-0.5 border bg-parchment-100 border-parchment-300 text-parchment-700">×{item.quantity}</span>}
+                        </div>
+                      )}
+                    </header>
+                    <div className="px-4 py-3 space-y-2.5 border-t border-parchment-200">
                       {ws && (
                         (() => {
                           const pw = potionWeaponMods(item.name)
@@ -4653,6 +4668,7 @@ export default function Sheet() {
                           <button type="button"
                             className="px-2.5 py-1 rounded border text-xs font-semibold transition-colors bg-amber-500 text-white border-amber-500 hover:bg-amber-600 hover:border-amber-600"
                             onClick={() => {
+                              offerUndo(`Used ${item.name}`)
                               if (item.quantity <= 1) {
                                 patch({ equipment: char.equipment.filter((_, i) => i !== idx) })
                                 setExpandedInventoryItem(null)
@@ -4789,7 +4805,7 @@ export default function Sheet() {
                             onClick={() => { const eq=[...char.equipment]; eq[idx]={...eq[idx],quantity:item.quantity+1}; patch({equipment:eq}) }}>+</button>
                         </div>
                         <button type="button" className="text-xs text-parchment-300 hover:text-red-500 transition-colors"
-                          onClick={() => { patch({ equipment: char.equipment.filter((_,i)=>i!==idx) }); setExpandedInventoryItem(null) }}>✕ Remove</button>
+                          onClick={() => { offerUndo(`Removed ${item.name}`); patch({ equipment: char.equipment.filter((_,i)=>i!==idx) }); setExpandedInventoryItem(null) }}>✕ Remove</button>
                       </div>
                       <input className="input text-xs py-1 w-full" placeholder="Notes…" value={item.notes}
                         onChange={e => { const eq=[...char.equipment]; eq[idx]={...eq[idx],notes:e.target.value}; patch({equipment:eq}) }} />
@@ -4818,8 +4834,51 @@ export default function Sheet() {
                           onClick={() => { const eq=[...char.equipment]; eq[idx]={...eq[idx],chargesMax:1,charges:1}; patch({equipment:eq}) }}>＋ Add charges</button>
                       )}
                     </div>
-                  )}
+                  </article>
+                )
+              })()
+              if (card) selectedItemCard = card
+
+              return (
+                <Fragment key={idx}>
+                <div
+                  data-item-idx={idx}
+                  ref={isExpanded ? el => { if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' }) } : undefined}
+                  className={`rounded-lg overflow-hidden border-l-4 ${rarityAccent} transition-all ${
+                    isExpanded ? 'border border-parchment-300 shadow-sm' : 'border border-parchment-100 hover:border-parchment-300 hover:shadow-sm'
+                  } ${item.equipped ? 'bg-green-50/50' : ''}`}
+                >
+                  {/* One line: name and tags on the left, the item's stats or rarity on the right */}
+                  <button type="button" className="w-full text-left px-3 py-1.5 flex items-center gap-2"
+                    onClick={() => setExpandedInventoryItem(isExpanded ? null : idx)}>
+                    <div className="flex-1 min-w-0 flex items-center gap-1.5 flex-wrap">
+                        <span className="font-semibold text-sm text-parchment-900 leading-snug">{item.name}</span>
+                        {infusionDef && (
+                          <span className="text-[10px] font-semibold rounded px-1.5 py-0.5 bg-teal-50 text-teal-700 border border-teal-200" title="Artificer infusion">⟡ {infusionDef.name}</span>
+                        )}
+                        {item.attuned && <span className="text-[11px] text-indigo-500 shrink-0">✦</span>}
+                        {item.quantity > 1 && (
+                          <span className="text-[11px] bg-parchment-100 text-parchment-500 px-1.5 py-0.5 rounded-full font-medium shrink-0">×{item.quantity}</span>
+                        )}
+                        {item.chargesMax !== undefined && (
+                          <span className="text-[11px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded-full font-medium shrink-0">{item.charges ?? item.chargesMax}/{item.chargesMax}</span>
+                        )}
+                        {item.equipped && <span className="text-[10px] font-bold text-green-600 shrink-0">● Equipped</span>}
+                        {/* Rarity once: as the badge on the right for magic items, here when the badge shows stats */}
+                        {rarity && rarity !== 'common' && badge?.toLowerCase() !== rarity && (
+                          <span className={`text-[10px] font-bold uppercase tracking-wide shrink-0 ${rarityTextClass}`}>{rarity}</span>
+                        )}
+                    </div>
+                    {badge && (
+                      <span className={`text-xs font-bold rounded-md px-2 py-0.5 shrink-0 ${badgeColor ?? 'bg-parchment-100 text-parchment-600'}`}>{badge}</span>
+                    )}
+                    <span className="text-parchment-300 text-[10px] shrink-0">{isExpanded ? '▲' : '▼'}</span>
+                  </button>
+
                 </div>
+                {/* Narrow screens open the item under its row; wide ones show it beside the list */}
+                {card && <div className="lg:hidden mt-1.5 mb-2">{card}</div>}
+                </Fragment>
               )
             }
 
@@ -4894,10 +4953,10 @@ export default function Sheet() {
 
             return (
               <div className="space-y-4">
-                <div className="card">
-                {/* ── Loadout ── */}
+                {/* ── Loadout ── (only when something is equipped) */}
                 {hasLoadout && (
-                  <div className="mb-5 pb-4 border-b border-parchment-200">
+                <div className="card">
+                  <div>
                     <div className="text-[10px] font-bold text-parchment-400 uppercase tracking-widest mb-2">Loadout</div>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
 
@@ -5149,12 +5208,17 @@ export default function Sheet() {
                       )
                     })()}
                   </div>
-                )}
-
-                </div>{/* end loadout card */}
+                </div>
+                )}{/* end loadout card */}
 
                 {/* ── Item Sections ── */}
                 {(() => {
+                  // The search box narrows every section to the items whose name matches
+                  const q = inventorySearch.trim().toLowerCase()
+                  const shown = q
+                    ? Object.fromEntries(Object.entries(grouped).map(([cat, list]) => [cat, list.filter(({ item }) => item.name.toLowerCase().includes(q))])) as typeof grouped
+                    : grouped
+                  const matchCount = Object.values(shown).reduce((n, list) => n + list.length, 0)
                   const RARITY_BADGE: Record<string, string> = {
                     common:      'bg-parchment-100 text-parchment-600',
                     uncommon:    'bg-green-100 text-green-700',
@@ -5206,15 +5270,15 @@ export default function Sheet() {
                   const secLabel = (cat: ItemCat, label: string) => (
                     <div className="flex items-center gap-2 mb-3">
                       <span className="text-xs font-bold text-parchment-500 uppercase tracking-widest">{label}</span>
-                      {grouped[cat].length > 0 && (
-                        <span className="text-[10px] font-bold bg-parchment-100 text-parchment-500 px-1.5 py-0.5 rounded-full">{grouped[cat].length}</span>
+                      {shown[cat].length > 0 && (
+                        <span className="text-[10px] font-bold bg-parchment-100 text-parchment-500 px-1.5 py-0.5 rounded-full">{shown[cat].length}</span>
                       )}
                       <div className="flex-1 h-px bg-parchment-100" />
                     </div>
                   )
 
                   const catKey = (cat: ItemCat) => cat === 'gear' ? 'add-gear-browse' : `add-${cat}`
-                  const catVisible = (cat: ItemCat) => grouped[cat].length > 0 || addPanel === catKey(cat)
+                  const catVisible = (cat: ItemCat) => shown[cat].length > 0 || addPanel === catKey(cat)
 
                   const WORN_CATS:   ItemCat[] = ['armor', 'ring', 'wondrous']
                   const HELD_CATS:   ItemCat[] = ['weapon', 'rod', 'staff', 'wand', 'scroll']
@@ -5242,8 +5306,15 @@ export default function Sheet() {
                     </div>
                   )
 
-                  return (
+                  // Build the lists first: rendering them fills in selectedItemCard for the side panel
+                  const sections = (
                     <div className="space-y-4">
+                      <div className="flex items-center gap-3">
+                        <input className="input text-sm py-1.5 max-w-xs" placeholder="Search your items…" aria-label="Search your items"
+                          value={inventorySearch} onChange={e => setInventorySearch(e.target.value)} />
+                        {q && <span className="text-xs text-parchment-500">{matchCount} of {char.equipment.length} items</span>}
+                        {q && <button type="button" onClick={() => setInventorySearch('')} className="text-xs text-parchment-500 hover:text-parchment-800 underline">Clear</button>}
+                      </div>
 
                       {/* ── Worn ── */}
                       <div className="card">
@@ -5317,8 +5388,8 @@ export default function Sheet() {
                                   </div>
                                 )
                               })()}
-                              <div className="space-y-2">
-                                {grouped.armor.map(({ item, idx }) => {
+                              <div className="space-y-1.5">
+                                {shown.armor.map(({ item, idx }) => {
                                   const as_ = resolveArmor(item, content.items)!
                                   const dex = abilityModFor(effectiveChar, 'dex')
                                   const mb = magicBonus(item, artificerLevel)
@@ -5338,8 +5409,8 @@ export default function Sheet() {
                             <div className="py-3 first:pt-0 last:pb-0">
                               {secLabel('ring', 'Ring')}
                               {addPanel === 'add-ring' && magicPicker(it => it.type === 'Ring')}
-                              <div className="mt-1 space-y-2">
-                                {grouped.ring.map(({ item, idx }) => {
+                              <div className="mt-1 space-y-1.5">
+                                {shown.ring.map(({ item, idx }) => {
                                   const def = content.items.find(i => i.slug === item.itemSlug && i.name)
                                   const rb = rarityBadge(def?.rarity)
                                   return itemRow({ item, idx, badge: rb.badge, badgeColor: rb.badgeColor, descriptionText: def?.description || item.notes || null, showAttune: def?.attunement })
@@ -5355,8 +5426,8 @@ export default function Sheet() {
                                 const n = it.name.toLowerCase()
                                 return it.type === 'Wondrous Item' && !/^rod\b/.test(n) && !/^scroll\b/.test(n) && !/^staff\b/.test(n) && !/^wand\b/.test(n) && !it.weaponStats && !it.armorStats
                               })}
-                              <div className="mt-1 space-y-2">
-                                {grouped.wondrous.map(({ item, idx }) => {
+                              <div className="mt-1 space-y-1.5">
+                                {shown.wondrous.map(({ item, idx }) => {
                                   const def = content.items.find(i => i.slug === item.itemSlug && i.name)
                                   const rb = rarityBadge(def?.rarity)
                                   return itemRow({ item, idx, badge: rb.badge, badgeColor: rb.badgeColor, descriptionText: def?.description || item.notes || null, showAttune: def?.attunement })
@@ -5437,8 +5508,8 @@ export default function Sheet() {
                                   </div>
                                 )
                               })()}
-                              <div className="space-y-2">
-                                {grouped.weapon.map(({ item, idx }) => {
+                              <div className="space-y-1.5">
+                                {shown.weapon.map(({ item, idx }) => {
                                   const ws = resolveWeapon(item, content.items)!
                                   const bonus = magicBonus(item, artificerLevel)
                                   const pw = potionWeaponMods(item.name)
@@ -5455,8 +5526,8 @@ export default function Sheet() {
                             <div className="py-3 first:pt-0 last:pb-0">
                               {secLabel('rod', 'Rod')}
                               {addPanel === 'add-rod' && magicPicker(it => /^rod\b/i.test(it.name))}
-                              <div className="mt-1 space-y-2">
-                                {grouped.rod.map(({ item, idx }) => {
+                              <div className="mt-1 space-y-1.5">
+                                {shown.rod.map(({ item, idx }) => {
                                   const def = content.items.find(i => i.slug === item.itemSlug && i.name)
                                   const rb = rarityBadge(def?.rarity)
                                   return itemRow({ item, idx, badge: rb.badge, badgeColor: rb.badgeColor, descriptionText: def?.description || item.notes || null, showAttune: def?.attunement })
@@ -5469,8 +5540,8 @@ export default function Sheet() {
                             <div className="py-3 first:pt-0 last:pb-0">
                               {secLabel('staff', 'Staff')}
                               {addPanel === 'add-staff' && magicPicker(it => /^staff\b/i.test(it.name))}
-                              <div className="mt-1 space-y-2">
-                                {grouped.staff.map(({ item, idx }) => {
+                              <div className="mt-1 space-y-1.5">
+                                {shown.staff.map(({ item, idx }) => {
                                   const def = content.items.find(i => i.slug === item.itemSlug && i.name)
                                   const rb = rarityBadge(def?.rarity)
                                   return itemRow({ item, idx, badge: rb.badge, badgeColor: rb.badgeColor, descriptionText: def?.description || item.notes || null, showAttune: def?.attunement })
@@ -5483,8 +5554,8 @@ export default function Sheet() {
                             <div className="py-3 first:pt-0 last:pb-0">
                               {secLabel('wand', 'Wand')}
                               {addPanel === 'add-wand' && magicPicker(it => /^wand\b/i.test(it.name))}
-                              <div className="mt-1 space-y-2">
-                                {grouped.wand.map(({ item, idx }) => {
+                              <div className="mt-1 space-y-1.5">
+                                {shown.wand.map(({ item, idx }) => {
                                   const def = content.items.find(i => i.slug === item.itemSlug && i.name)
                                   const rb = rarityBadge(def?.rarity)
                                   return itemRow({ item, idx, badge: rb.badge, badgeColor: rb.badgeColor, descriptionText: def?.description || item.notes || null, showAttune: def?.attunement })
@@ -5497,8 +5568,8 @@ export default function Sheet() {
                             <div className="py-3 first:pt-0 last:pb-0">
                               {secLabel('scroll', 'Scroll')}
                               {addPanel === 'add-scroll' && magicPicker(it => /^scroll\b/i.test(it.name))}
-                              <div className="mt-1 space-y-2">
-                                {grouped.scroll.map(({ item, idx }) => {
+                              <div className="mt-1 space-y-1.5">
+                                {shown.scroll.map(({ item, idx }) => {
                                   const def = content.items.find(i => i.slug === item.itemSlug && i.name)
                                   const rb = rarityBadge(def?.rarity)
                                   return itemRow({ item, idx, badge: rb.badge, badgeColor: rb.badgeColor, descriptionText: def?.description || item.notes || null, showAttune: def?.attunement, consumable: true })
@@ -5545,8 +5616,8 @@ export default function Sheet() {
                             <div className="py-3 first:pt-0 last:pb-0">
                               {secLabel('potion', 'Potion')}
                               {addPanel === 'add-potion' && magicPicker(it => it.type === 'Potion')}
-                              <div className="mt-1 space-y-2">
-                                {grouped.potion.map(({ item, idx }) => {
+                              <div className="mt-1 space-y-1.5">
+                                {shown.potion.map(({ item, idx }) => {
                                   const def = content.items.find(i => i.slug === item.itemSlug && i.name)
                                   const rb = rarityBadge(def?.rarity)
                                   // Every potion gets Drink, even one without curated data
@@ -5590,8 +5661,8 @@ export default function Sheet() {
                                   </div>
                                 </div>
                               )}
-                              <div className="space-y-2">
-                                {grouped.gear.map(({ item, idx }) => {
+                              <div className="space-y-1.5">
+                                {shown.gear.map(({ item, idx }) => {
                                   const cd = CONSUMABLE_DATA[item.name]
                                   const descText = cd ? cd.text + (item.notes ? '\n\n' + item.notes : '') : (item.notes || null)
                                   return itemRow({ item, idx, badge: cd?.badge, badgeColor: cd?.badgeColor, descriptionText: descText, consumable: !!cd })
@@ -5606,6 +5677,19 @@ export default function Sheet() {
                         </div>
                       </div>
 
+                    </div>
+                  )
+                  return (
+                    <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_24rem] lg:gap-5 lg:items-start">
+                      {sections}
+                      <aside className="hidden lg:block sticky top-14 max-h-[calc(100vh-4.5rem)] overflow-y-auto rounded-xl [scrollbar-width:thin]">
+                        {selectedItemCard ?? (
+                          <div className="rounded-xl border-2 border-dashed border-parchment-300 px-6 py-10 text-center">
+                            <p className="text-sm font-semibold text-parchment-600">Choose an item</p>
+                            <p className="text-xs text-parchment-400 mt-0.5">Its card opens here: equip, attune, drink or use it.</p>
+                          </div>
+                        )}
+                      </aside>
                     </div>
                   )
                 })()}
@@ -5809,7 +5893,8 @@ export default function Sheet() {
                 const classFeatures = (opts?.features ?? []).filter(f => f.level === lvl).map(f => f.name)
                 const isAsiLevel = asiLevels.includes(lvl)
                 const isSubclassLevel = cc.subclassSlug && lvl === subclassAtLevel
-                const subclassDef = isSubclassLevel ? opts?.subclasses.find(s => s.slug === cc.subclassSlug) : null
+                // Subclass features come at several levels (Artillerist: 3, 5, 9, 15), not only the first
+                const subclassDef = cc.subclassSlug ? opts?.subclasses.find(s => s.slug === cc.subclassSlug) : null
                 const subclassFeatureNames = subclassDef?.features?.filter(f => f.level === lvl).map(f => f.name) ?? []
                 const isFightingStyleLevel = classFeatures.some(f => f.toLowerCase().includes('fighting style'))
                 const expertiseLevelIdx = expertiseLevels.indexOf(lvl)
@@ -6000,9 +6085,9 @@ export default function Sheet() {
                       .map(t => t.slice(0, -1))
                   if (traitList.length === 0) return null
                   return (
-                    <div className="space-y-2 mb-3">
-                      {traitList.map(t => (
-                        <div key={t} className="p-2 rounded border border-parchment-100 text-sm">{t}</div>
+                    <div className="space-y-1.5 mb-3">
+                      {traitList.map((t, i) => (
+                        <div key={t} className="px-2.5 py-1.5 rounded border border-parchment-100">{featureText(`race-trait-${i}`, t)}</div>
                       ))}
                     </div>
                   )
@@ -6021,9 +6106,9 @@ export default function Sheet() {
                       </div>
                     )}
                     {featSubraceOpts.traits.length > 0 && (
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                        {featSubraceOpts.traits.map(t => (
-                          <div key={t} className="p-2 rounded border border-amber-200 bg-amber-50 text-sm">{t}</div>
+                      <div className="space-y-1.5">
+                        {featSubraceOpts.traits.map((t, i) => (
+                          <div key={t} className="px-2.5 py-1.5 rounded border border-amber-200 bg-amber-50">{featureText(`subrace-trait-${i}`, t)}</div>
                         ))}
                       </div>
                     )}
@@ -6063,6 +6148,256 @@ export default function Sheet() {
             const subclassEntry = cc.subclassSlug
               ? classOptsDef?.subclasses.find(s => s.slug === cc.subclassSlug)
               : null
+            const renderSubclassFeature = (f: { level: number; name: string; description?: string }) => (
+              <div key={`sub-${f.level}-${f.name}`} id={featureAnchor(cc.classSlug, f)} className="mb-3 p-3 rounded border border-indigo-100 bg-indigo-50/40">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-xs bg-indigo-100 text-indigo-600 rounded px-1.5 py-0.5 shrink-0">Lvl {f.level}</span>
+                  <span className="font-medium text-indigo-900">{f.name}</span>
+                  <span className="text-[10px] text-indigo-500">{subclassEntry!.name}</span>
+                </div>
+                {featureTrackers(featureAnchor(cc.classSlug, f), f.name)}
+                {f.name === 'Eldritch Cannon' ? (
+                  (() => {
+                    const artLevel = cc.level
+                    const cannonMaxHp = artLevel * 5
+                    const activeCannons = char.summons.filter(s => s.templateKey === 'eldritch-cannon')
+                    const cannonCount = activeCannons.length
+                    const maxCannons = artLevel >= 15 ? 2 : 1
+                    const hasActiveCannon = cannonCount > 0
+                    const atCannonCap = cannonCount >= maxCannons
+                    const intMod = abilityModFor(effectiveChar, 'int')
+                    const dc = spellSaveDC(effectiveChar, 'artificer', content) + itemBonuses.spellDCBonus
+                    const atkBonus = spellAttackBonus(effectiveChar, 'artificer', content) + itemBonuses.spellAttackBonus
+                    // Same counter as the Resources card's Eldritch Cannon (1 free creation per long rest)
+                    const freeUsed = (char.classResources['eldritch-cannon'] ?? 1) < 1
+
+                    const CANNON_TYPES = [
+                      {
+                        key: 'flamethrower', label: 'Flamethrower', color: 'text-orange-700',
+                        border: 'border-orange-200 hover:border-orange-400', bg: 'bg-orange-50 hover:bg-orange-100',
+                        summary: `15 ft cone · DEX save DC ${dc} · 2d8 fire`,
+                        attacks: [] as Summon['attacks'],
+                        abilities: [{ name: 'Flamethrower', description: `15 ft cone — DEX save DC ${dc} or 2d8 fire, half on success. Ignites flammable objects.` }],
+                      },
+                      {
+                        key: 'force-ballista', label: 'Force Ballista', color: 'text-blue-700',
+                        border: 'border-blue-200 hover:border-blue-400', bg: 'bg-blue-50 hover:bg-blue-100',
+                        summary: `Ranged spell atk · 120 ft · 2d8 force · push 5 ft`,
+                        attacks: [{ name: 'Force Ballista', toHit: atkBonus, damage: '2d8', damageType: 'force', range: '120 ft', notes: 'Pushes target 5 ft on hit' }] as Summon['attacks'],
+                        abilities: [],
+                      },
+                      {
+                        key: 'protector', label: 'Protector', color: 'text-green-700',
+                        border: 'border-green-200 hover:border-green-400', bg: 'bg-green-50 hover:bg-green-100',
+                        summary: `Aura 10 ft · 1d8${intMod >= 0 ? `+${intMod}` : intMod} temp HP`,
+                        attacks: [] as Summon['attacks'],
+                        abilities: [{ name: 'Protector', description: `Aura 10 ft — grants 1d8${intMod >= 0 ? `+${intMod}` : intMod} temp HP to cannon and chosen creatures within 10 ft.` }],
+                      },
+                    ]
+
+                    const summonCannon = (typeKey: string) => {
+                      const ct = CANNON_TYPES.find(t => t.key === typeKey)!
+                      const cannon: Summon = {
+                        id: Math.random().toString(36).slice(2, 10),
+                        name: `Eldritch Cannon — ${ct.label}`,
+                        templateKey: 'eldritch-cannon',
+                        hp: { current: cannonMaxHp, max: cannonMaxHp },
+                        ac: 18, speed: 15,
+                        saveProficiencies: [],
+                        immunities: ['poison', 'psychic'],
+                        resistances: [],
+                        attacks: ct.attacks,
+                        abilities: [
+                          ...ct.abilities,
+                          { name: 'Mending', description: 'Casting Mending on the cannon restores 2d6 HP.' },
+                          ...(artLevel >= 9 ? [{ name: 'Explosive Cannon', description: `Action to detonate (60 ft) — 3d8 force, DC ${dc} DEX save for half.` }] : []),
+                        ],
+                        notes: `Artificer level ${artLevel}. Bonus action to activate (60 ft). ${freeUsed ? 'Spell slot expended.' : 'Free creation used.'}`,
+                      }
+                      patch({
+                        summons: [...char.summons, cannon],
+                        classResources: { ...char.classResources, 'eldritch-cannon': 0 },
+                      })
+                      setTab('summons')
+                    }
+
+                    return (
+                      <>
+                        {/* Free creation indicator */}
+                        <div className={`flex items-center gap-2 p-2 rounded border text-xs mb-3 ${freeUsed ? 'bg-amber-50 border-amber-200' : 'bg-green-50 border-green-200'}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${freeUsed ? 'bg-amber-400' : 'bg-green-500'}`} />
+                          <span className={`font-medium ${freeUsed ? 'text-amber-700' : 'text-green-700'}`}>
+                            {freeUsed ? 'Free creation used — must expend a spell slot to summon again' : 'Free creation available (1 / long rest)'}
+                          </span>
+                          <button type="button"
+                            className="ml-auto text-[10px] underline opacity-60 hover:opacity-100 transition-opacity"
+                            onClick={() => patch({ classResources: { ...char.classResources, 'eldritch-cannon': freeUsed ? 1 : 0 } })}>
+                            {freeUsed ? 'Restore' : 'Mark used'}
+                          </button>
+                        </div>
+
+                        {/* Active cannons summary */}
+                        {hasActiveCannon && (
+                          <div className="flex items-center gap-3 p-3 rounded border border-indigo-200 bg-indigo-50 mb-3">
+                            <div className="flex-1 text-xs text-indigo-700 space-y-0.5">
+                              {activeCannons.map(c => (
+                                <div key={c.id} className="flex items-center gap-1.5">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0" />
+                                  <span>{c.name}</span>
+                                  <span className="text-indigo-400">— {c.hp.current}/{c.hp.max} HP</span>
+                                </div>
+                              ))}
+                            </div>
+                            <button type="button" onClick={() => setTab('summons')}
+                              className="shrink-0 text-xs bg-indigo-600 text-white rounded px-3 py-1.5 hover:bg-indigo-700 font-semibold transition-colors">
+                              View in Summons →
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Type picker — shown when under the cap */}
+                        {!atCannonCap && (
+                          <>
+                            <div className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-1.5">
+                              {hasActiveCannon ? 'Summon second cannon' : 'Choose type to summon'} — HP {cannonMaxHp} · AC 18 · Speed 15 ft
+                              {artLevel >= 15 && <span className="ml-2 text-amber-500">Fortified Position: {cannonCount}/{maxCannons} active</span>}
+                            </div>
+                            <div className="grid grid-cols-3 gap-2 mb-3">
+                              {CANNON_TYPES.map(ct => (
+                                <button key={ct.key} type="button" onClick={() => summonCannon(ct.key)}
+                                  className={`p-2.5 rounded border text-left transition-colors ${ct.border} ${ct.bg}`}>
+                                  <div className={`text-xs font-bold ${ct.color}`}>{ct.label}</div>
+                                  <div className="text-[10px] text-parchment-500 mt-0.5 leading-tight">{ct.summary}</div>
+                                </button>
+                              ))}
+                            </div>
+                          </>
+                        )}
+
+                        {atCannonCap && artLevel >= 15 && (
+                          <p className="text-xs text-indigo-500 italic mb-3">Both cannons active (Fortified Position cap reached).</p>
+                        )}
+                      </>
+                    )
+                  })()
+                ) : f.name === 'Wildfire Spirit' ? (
+                  (() => {
+                    const druidLevel = cc.level
+                    const spiritMaxHp = 5 * druidLevel
+                    const wisMod = abilityModFor(effectiveChar, 'wis')
+                    const wisStr = wisMod >= 0 ? `+${wisMod}` : `${wisMod}`
+                    const dc = spellSaveDC(effectiveChar, 'druid', content) + itemBonuses.spellDCBonus
+                    const atkBonus = spellAttackBonus(effectiveChar, 'druid', content) + itemBonuses.spellAttackBonus
+                    const activeSpirits = char.summons.filter(s => s.templateKey === 'wildfire-spirit')
+                    const hasActiveSpirit = activeSpirits.length > 0
+                    const wildShapeLeft = char.classResources['wild-shape'] ?? 2
+
+                    const summonSpirit = () => {
+                      const spirit: Summon = {
+                        id: Math.random().toString(36).slice(2, 10),
+                        name: 'Wildfire Spirit',
+                        templateKey: 'wildfire-spirit',
+                        hp: { current: spiritMaxHp, max: spiritMaxHp },
+                        ac: 13, speed: 30,
+                        abilityScores: { str: 10, dex: 14, con: 14, int: 13, wis: 15, cha: 11 },
+                        saveProficiencies: [],
+                        immunities: ['fire'],
+                        resistances: [],
+                        attacks: [
+                          { name: 'Flame Seed', toHit: atkBonus, damage: `1d6${wisStr}`, damageType: 'fire', range: '30 ft', notes: 'Ranged spell attack' },
+                        ],
+                        abilities: [
+                          { name: 'Fiery Teleportation', description: `Bonus action — teleport the spirit and up to 5 willing creatures within 5 ft to unoccupied spaces within 15 ft. Each creature within 10 ft of the space the spirit left makes a DEX save (DC ${dc}) or takes 1d6${wisStr} fire damage.` },
+                          { name: 'Summon', description: 'Bonus action to command its action. Lasts 1 hour, until it drops to 0 HP, or until you summon again. Can\'t be charmed or frightened.' },
+                        ],
+                        notes: `Druid level ${druidLevel}. Costs 1 Wild Shape charge to summon. Flies 30 ft (hover). Immune to fire.`,
+                      }
+                      patch({
+                        summons: [...char.summons.filter(s => s.templateKey !== 'wildfire-spirit'), spirit],
+                        classResources: { ...char.classResources, 'wild-shape': Math.max(0, wildShapeLeft - 1) },
+                      })
+                      setTab('summons')
+                    }
+
+                    return (
+                      <>
+                        {f.description && featureText(featureAnchor(cc.classSlug, f), f.description, 'mb-3')}
+
+                        {/* Wild Shape charge indicator */}
+                        <div className={`flex items-center gap-2 p-2 rounded border text-xs mb-3 ${wildShapeLeft > 0 ? 'bg-green-50 border-green-200' : 'bg-amber-50 border-amber-200'}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${wildShapeLeft > 0 ? 'bg-green-500' : 'bg-amber-400'}`} />
+                          <span className={`font-medium ${wildShapeLeft > 0 ? 'text-green-700' : 'text-amber-700'}`}>
+                            {wildShapeLeft > 0 ? `Wild Shape charges: ${wildShapeLeft}` : 'No Wild Shape charges — short rest to recharge'}
+                          </span>
+                        </div>
+
+                        {/* Active spirit summary */}
+                        {hasActiveSpirit && (
+                          <div className="flex items-center gap-3 p-3 rounded border border-indigo-200 bg-indigo-50 mb-3">
+                            <div className="flex-1 text-xs text-indigo-700 space-y-0.5">
+                              {activeSpirits.map(s => (
+                                <div key={s.id} className="flex items-center gap-1.5">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0" />
+                                  <span>{s.name}</span>
+                                  <span className="text-indigo-400">— {s.hp.current}/{s.hp.max} HP</span>
+                                </div>
+                              ))}
+                            </div>
+                            <button type="button" onClick={() => setTab('summons')}
+                              className="shrink-0 text-xs bg-indigo-600 text-white rounded px-3 py-1.5 hover:bg-indigo-700 font-semibold transition-colors">
+                              View in Summons →
+                            </button>
+                          </div>
+                        )}
+
+                        <div className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-1.5">
+                          {hasActiveSpirit ? 'Resummon' : 'Summon'} — HP {spiritMaxHp} · AC 13 · Speed 30 ft (fly)
+                        </div>
+                        <button type="button" onClick={summonSpirit}
+                          className="w-full p-2.5 rounded border text-left transition-colors border-orange-200 hover:border-orange-400 bg-orange-50 hover:bg-orange-100 mb-3">
+                          <div className="text-xs font-bold text-orange-700">Summon Wildfire Spirit</div>
+                          <div className="text-[10px] text-parchment-500 mt-0.5 leading-tight">
+                            Flame Seed: ranged spell atk {atkBonus >= 0 ? `+${atkBonus}` : atkBonus} · 1d6{wisStr} fire · 30 ft. Fiery Teleportation: DC {dc} DEX or 1d6{wisStr} fire.
+                          </div>
+                        </button>
+                      </>
+                    )
+                  })()
+                ) : (
+                  f.description && featureText(featureAnchor(cc.classSlug, f), f.description)
+                )}
+              </div>
+            )
+            const renderClassFeature = (f: { level: number; name: string; description?: string }) => {
+              const isFightingStyle = f.name === 'Fighting Style'
+              return (
+                <div key={`${f.level}-${f.name}`} id={featureAnchor(cc.classSlug, f)} className="mb-3 p-3 rounded border border-parchment-100">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs bg-parchment-200 text-parchment-700 rounded px-1.5 py-0.5 shrink-0">Lvl {f.level}</span>
+                    <span className="font-medium">{f.name}</span>
+                  </div>
+                  {featureTrackers(featureAnchor(cc.classSlug, f), f.name)}
+                  {f.description && featureText(featureAnchor(cc.classSlug, f), f.description, 'mt-1')}
+                  {isFightingStyle && chosenStyle && (
+                    <div className="mt-2 pl-3 border-l-2 border-amber-300">
+                      <div className="text-sm font-medium text-amber-700">Chosen: {chosenStyle.name}</div>
+                      <div className="text-xs text-parchment-500 mt-0.5">{chosenStyle.description}</div>
+                    </div>
+                  )}
+                </div>
+              )
+            }
+            // One list in level order, class and subclass features together. Features with uses to
+            // track or something to summon come first.
+            const featureList = [
+              ...features.map(f => ({ f, sub: false })),
+              ...(subclassEntry?.features ?? []).filter(f => f.level <= cc.level).map(f => ({ f, sub: true })),
+            ].sort((x, y) => x.f.level - y.f.level || Number(x.sub) - Number(y.sub))
+            const inUse = (f: { level: number; name: string }) =>
+              resourcesAt(featureAnchor(cc.classSlug, f)).length > 0 || f.name === 'Eldritch Cannon' || f.name === 'Wildfire Spirit'
+            const pinned = featureList.filter(x => inUse(x.f))
+            const others = featureList.filter(x => !inUse(x.f))
+            const renderFeature = (x: (typeof featureList)[number]) => x.sub ? renderSubclassFeature(x.f) : renderClassFeature(x.f)
             return (
               <div key={cc.classSlug} className="card">
                 <div className="flex items-center gap-2 mb-3 flex-wrap">
@@ -6074,11 +6409,16 @@ export default function Sheet() {
                   {subclassEntry && (
                     <span className="text-xs bg-indigo-100 text-indigo-700 rounded px-2 py-0.5">{subclassEntry.name}</span>
                   )}
+                  <button type="button" onClick={() => { setAllFeaturesOpen(o => !o); setOpenFeatures(new Set()) }}
+                    className="ml-auto text-xs rounded-full px-2.5 py-0.5 border border-parchment-200 text-parchment-500 hover:border-parchment-500 hover:text-parchment-800 transition-colors"
+                  >{allFeaturesOpen ? 'Shorten text' : 'Show all text'}</button>
                 </div>
 
-                {/* Class summary: primary ability, saves, proficiencies */}
+                {/* Class basics: reference you rarely need mid-game, so folded away */}
                 {classOptsDef && (
-                  <div className="mb-3 p-3 rounded border border-parchment-100 bg-parchment-50 text-xs text-parchment-600 space-y-1">
+                  <details className="mb-3 rounded border border-parchment-100 bg-parchment-50 text-xs text-parchment-600">
+                    <summary className="cursor-pointer select-none px-3 py-2 font-semibold text-parchment-700">Class basics: primary ability, saving throws, proficiencies</summary>
+                    <div className="px-3 pb-3 space-y-1">
                     <div><span className="font-semibold text-parchment-700">Primary Ability:</span> {classOptsDef.primaryAbility}</div>
                     <div><span className="font-semibold text-parchment-700">Saving Throws:</span> {classOptsDef.savingThrows.join(', ')}</div>
                     <div><span className="font-semibold text-parchment-700">Armor:</span> {classOptsDef.armorTraining}</div>
@@ -6087,7 +6427,8 @@ export default function Sheet() {
                       <div><span className="font-semibold text-parchment-700">Tools:</span> {classOptsDef.toolProficiency}</div>
                     )}
                     <div><span className="font-semibold text-parchment-700">Skills:</span> Choose {classOptsDef.numSkillChoices} from {classOptsDef.skillChoices.join(', ')}</div>
-                  </div>
+                    </div>
+                  </details>
                 )}
 
                 {subclassEntry?.description && (
@@ -6108,244 +6449,14 @@ export default function Sheet() {
                     </div>
                   )
                 })()}
-                {subclassEntry?.features && subclassEntry.features.filter(f => f.level <= cc.level).map(f => (
-                  <div key={`sub-${f.level}-${f.name}`} id={featureAnchor(cc.classSlug, f)} className="mb-3 p-3 rounded border border-indigo-100 bg-indigo-50/40">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs bg-indigo-100 text-indigo-600 rounded px-1.5 py-0.5 shrink-0">Lvl {f.level}</span>
-                      <span className="font-medium text-indigo-900">{f.name}</span>
-                    </div>
-                    {featureTrackers(featureAnchor(cc.classSlug, f), f.name)}
-                    {f.name === 'Eldritch Cannon' ? (
-                      (() => {
-                        const artLevel = cc.level
-                        const cannonMaxHp = artLevel * 5
-                        const activeCannons = char.summons.filter(s => s.templateKey === 'eldritch-cannon')
-                        const cannonCount = activeCannons.length
-                        const maxCannons = artLevel >= 15 ? 2 : 1
-                        const hasActiveCannon = cannonCount > 0
-                        const atCannonCap = cannonCount >= maxCannons
-                        const intMod = abilityModFor(effectiveChar, 'int')
-                        const dc = spellSaveDC(effectiveChar, 'artificer', content) + itemBonuses.spellDCBonus
-                        const atkBonus = spellAttackBonus(effectiveChar, 'artificer', content) + itemBonuses.spellAttackBonus
-                        // Same counter as the Resources card's Eldritch Cannon (1 free creation per long rest)
-                        const freeUsed = (char.classResources['eldritch-cannon'] ?? 1) < 1
-
-                        const CANNON_TYPES = [
-                          {
-                            key: 'flamethrower', label: 'Flamethrower', color: 'text-orange-700',
-                            border: 'border-orange-200 hover:border-orange-400', bg: 'bg-orange-50 hover:bg-orange-100',
-                            summary: `15 ft cone · DEX save DC ${dc} · 2d8 fire`,
-                            attacks: [] as Summon['attacks'],
-                            abilities: [{ name: 'Flamethrower', description: `15 ft cone — DEX save DC ${dc} or 2d8 fire, half on success. Ignites flammable objects.` }],
-                          },
-                          {
-                            key: 'force-ballista', label: 'Force Ballista', color: 'text-blue-700',
-                            border: 'border-blue-200 hover:border-blue-400', bg: 'bg-blue-50 hover:bg-blue-100',
-                            summary: `Ranged spell atk · 120 ft · 2d8 force · push 5 ft`,
-                            attacks: [{ name: 'Force Ballista', toHit: atkBonus, damage: '2d8', damageType: 'force', range: '120 ft', notes: 'Pushes target 5 ft on hit' }] as Summon['attacks'],
-                            abilities: [],
-                          },
-                          {
-                            key: 'protector', label: 'Protector', color: 'text-green-700',
-                            border: 'border-green-200 hover:border-green-400', bg: 'bg-green-50 hover:bg-green-100',
-                            summary: `Aura 10 ft · 1d8${intMod >= 0 ? `+${intMod}` : intMod} temp HP`,
-                            attacks: [] as Summon['attacks'],
-                            abilities: [{ name: 'Protector', description: `Aura 10 ft — grants 1d8${intMod >= 0 ? `+${intMod}` : intMod} temp HP to cannon and chosen creatures within 10 ft.` }],
-                          },
-                        ]
-
-                        const summonCannon = (typeKey: string) => {
-                          const ct = CANNON_TYPES.find(t => t.key === typeKey)!
-                          const cannon: Summon = {
-                            id: Math.random().toString(36).slice(2, 10),
-                            name: `Eldritch Cannon — ${ct.label}`,
-                            templateKey: 'eldritch-cannon',
-                            hp: { current: cannonMaxHp, max: cannonMaxHp },
-                            ac: 18, speed: 15,
-                            saveProficiencies: [],
-                            immunities: ['poison', 'psychic'],
-                            resistances: [],
-                            attacks: ct.attacks,
-                            abilities: [
-                              ...ct.abilities,
-                              { name: 'Mending', description: 'Casting Mending on the cannon restores 2d6 HP.' },
-                              ...(artLevel >= 9 ? [{ name: 'Explosive Cannon', description: `Action to detonate (60 ft) — 3d8 force, DC ${dc} DEX save for half.` }] : []),
-                            ],
-                            notes: `Artificer level ${artLevel}. Bonus action to activate (60 ft). ${freeUsed ? 'Spell slot expended.' : 'Free creation used.'}`,
-                          }
-                          patch({
-                            summons: [...char.summons, cannon],
-                            classResources: { ...char.classResources, 'eldritch-cannon': 0 },
-                          })
-                          setTab('summons')
-                        }
-
-                        return (
-                          <>
-                            {/* Free creation indicator */}
-                            <div className={`flex items-center gap-2 p-2 rounded border text-xs mb-3 ${freeUsed ? 'bg-amber-50 border-amber-200' : 'bg-green-50 border-green-200'}`}>
-                              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${freeUsed ? 'bg-amber-400' : 'bg-green-500'}`} />
-                              <span className={`font-medium ${freeUsed ? 'text-amber-700' : 'text-green-700'}`}>
-                                {freeUsed ? 'Free creation used — must expend a spell slot to summon again' : 'Free creation available (1 / long rest)'}
-                              </span>
-                              <button type="button"
-                                className="ml-auto text-[10px] underline opacity-60 hover:opacity-100 transition-opacity"
-                                onClick={() => patch({ classResources: { ...char.classResources, 'eldritch-cannon': freeUsed ? 1 : 0 } })}>
-                                {freeUsed ? 'Restore' : 'Mark used'}
-                              </button>
-                            </div>
-
-                            {/* Active cannons summary */}
-                            {hasActiveCannon && (
-                              <div className="flex items-center gap-3 p-3 rounded border border-indigo-200 bg-indigo-50 mb-3">
-                                <div className="flex-1 text-xs text-indigo-700 space-y-0.5">
-                                  {activeCannons.map(c => (
-                                    <div key={c.id} className="flex items-center gap-1.5">
-                                      <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0" />
-                                      <span>{c.name}</span>
-                                      <span className="text-indigo-400">— {c.hp.current}/{c.hp.max} HP</span>
-                                    </div>
-                                  ))}
-                                </div>
-                                <button type="button" onClick={() => setTab('summons')}
-                                  className="shrink-0 text-xs bg-indigo-600 text-white rounded px-3 py-1.5 hover:bg-indigo-700 font-semibold transition-colors">
-                                  View in Summons →
-                                </button>
-                              </div>
-                            )}
-
-                            {/* Type picker — shown when under the cap */}
-                            {!atCannonCap && (
-                              <>
-                                <div className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-1.5">
-                                  {hasActiveCannon ? 'Summon second cannon' : 'Choose type to summon'} — HP {cannonMaxHp} · AC 18 · Speed 15 ft
-                                  {artLevel >= 15 && <span className="ml-2 text-amber-500">Fortified Position: {cannonCount}/{maxCannons} active</span>}
-                                </div>
-                                <div className="grid grid-cols-3 gap-2 mb-3">
-                                  {CANNON_TYPES.map(ct => (
-                                    <button key={ct.key} type="button" onClick={() => summonCannon(ct.key)}
-                                      className={`p-2.5 rounded border text-left transition-colors ${ct.border} ${ct.bg}`}>
-                                      <div className={`text-xs font-bold ${ct.color}`}>{ct.label}</div>
-                                      <div className="text-[10px] text-parchment-500 mt-0.5 leading-tight">{ct.summary}</div>
-                                    </button>
-                                  ))}
-                                </div>
-                              </>
-                            )}
-
-                            {atCannonCap && artLevel >= 15 && (
-                              <p className="text-xs text-indigo-500 italic mb-3">Both cannons active (Fortified Position cap reached).</p>
-                            )}
-                          </>
-                        )
-                      })()
-                    ) : f.name === 'Wildfire Spirit' ? (
-                      (() => {
-                        const druidLevel = cc.level
-                        const spiritMaxHp = 5 * druidLevel
-                        const wisMod = abilityModFor(effectiveChar, 'wis')
-                        const wisStr = wisMod >= 0 ? `+${wisMod}` : `${wisMod}`
-                        const dc = spellSaveDC(effectiveChar, 'druid', content) + itemBonuses.spellDCBonus
-                        const atkBonus = spellAttackBonus(effectiveChar, 'druid', content) + itemBonuses.spellAttackBonus
-                        const activeSpirits = char.summons.filter(s => s.templateKey === 'wildfire-spirit')
-                        const hasActiveSpirit = activeSpirits.length > 0
-                        const wildShapeLeft = char.classResources['wild-shape'] ?? 2
-
-                        const summonSpirit = () => {
-                          const spirit: Summon = {
-                            id: Math.random().toString(36).slice(2, 10),
-                            name: 'Wildfire Spirit',
-                            templateKey: 'wildfire-spirit',
-                            hp: { current: spiritMaxHp, max: spiritMaxHp },
-                            ac: 13, speed: 30,
-                            abilityScores: { str: 10, dex: 14, con: 14, int: 13, wis: 15, cha: 11 },
-                            saveProficiencies: [],
-                            immunities: ['fire'],
-                            resistances: [],
-                            attacks: [
-                              { name: 'Flame Seed', toHit: atkBonus, damage: `1d6${wisStr}`, damageType: 'fire', range: '30 ft', notes: 'Ranged spell attack' },
-                            ],
-                            abilities: [
-                              { name: 'Fiery Teleportation', description: `Bonus action — teleport the spirit and up to 5 willing creatures within 5 ft to unoccupied spaces within 15 ft. Each creature within 10 ft of the space the spirit left makes a DEX save (DC ${dc}) or takes 1d6${wisStr} fire damage.` },
-                              { name: 'Summon', description: 'Bonus action to command its action. Lasts 1 hour, until it drops to 0 HP, or until you summon again. Can\'t be charmed or frightened.' },
-                            ],
-                            notes: `Druid level ${druidLevel}. Costs 1 Wild Shape charge to summon. Flies 30 ft (hover). Immune to fire.`,
-                          }
-                          patch({
-                            summons: [...char.summons.filter(s => s.templateKey !== 'wildfire-spirit'), spirit],
-                            classResources: { ...char.classResources, 'wild-shape': Math.max(0, wildShapeLeft - 1) },
-                          })
-                          setTab('summons')
-                        }
-
-                        return (
-                          <>
-                            {f.description && <p className="text-sm text-parchment-600 mb-3">{f.description}</p>}
-
-                            {/* Wild Shape charge indicator */}
-                            <div className={`flex items-center gap-2 p-2 rounded border text-xs mb-3 ${wildShapeLeft > 0 ? 'bg-green-50 border-green-200' : 'bg-amber-50 border-amber-200'}`}>
-                              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${wildShapeLeft > 0 ? 'bg-green-500' : 'bg-amber-400'}`} />
-                              <span className={`font-medium ${wildShapeLeft > 0 ? 'text-green-700' : 'text-amber-700'}`}>
-                                {wildShapeLeft > 0 ? `Wild Shape charges: ${wildShapeLeft}` : 'No Wild Shape charges — short rest to recharge'}
-                              </span>
-                            </div>
-
-                            {/* Active spirit summary */}
-                            {hasActiveSpirit && (
-                              <div className="flex items-center gap-3 p-3 rounded border border-indigo-200 bg-indigo-50 mb-3">
-                                <div className="flex-1 text-xs text-indigo-700 space-y-0.5">
-                                  {activeSpirits.map(s => (
-                                    <div key={s.id} className="flex items-center gap-1.5">
-                                      <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0" />
-                                      <span>{s.name}</span>
-                                      <span className="text-indigo-400">— {s.hp.current}/{s.hp.max} HP</span>
-                                    </div>
-                                  ))}
-                                </div>
-                                <button type="button" onClick={() => setTab('summons')}
-                                  className="shrink-0 text-xs bg-indigo-600 text-white rounded px-3 py-1.5 hover:bg-indigo-700 font-semibold transition-colors">
-                                  View in Summons →
-                                </button>
-                              </div>
-                            )}
-
-                            <div className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-1.5">
-                              {hasActiveSpirit ? 'Resummon' : 'Summon'} — HP {spiritMaxHp} · AC 13 · Speed 30 ft (fly)
-                            </div>
-                            <button type="button" onClick={summonSpirit}
-                              className="w-full p-2.5 rounded border text-left transition-colors border-orange-200 hover:border-orange-400 bg-orange-50 hover:bg-orange-100 mb-3">
-                              <div className="text-xs font-bold text-orange-700">Summon Wildfire Spirit</div>
-                              <div className="text-[10px] text-parchment-500 mt-0.5 leading-tight">
-                                Flame Seed: ranged spell atk {atkBonus >= 0 ? `+${atkBonus}` : atkBonus} · 1d6{wisStr} fire · 30 ft. Fiery Teleportation: DC {dc} DEX or 1d6{wisStr} fire.
-                              </div>
-                            </button>
-                          </>
-                        )
-                      })()
-                    ) : (
-                      f.description && <p className="text-sm text-parchment-600">{f.description}</p>
-                    )}
-                  </div>
-                ))}
-                {features.map(f => {
-                  const isFightingStyle = f.name === 'Fighting Style'
-                  return (
-                    <div key={`${f.level}-${f.name}`} id={featureAnchor(cc.classSlug, f)} className="mb-3 p-3 rounded border border-parchment-100">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs bg-parchment-200 text-parchment-700 rounded px-1.5 py-0.5 shrink-0">Lvl {f.level}</span>
-                        <span className="font-medium">{f.name}</span>
-                      </div>
-                      {featureTrackers(featureAnchor(cc.classSlug, f), f.name)}
-                      {f.description && <p className="text-sm text-parchment-600 mt-1">{f.description}</p>}
-                      {isFightingStyle && chosenStyle && (
-                        <div className="mt-2 pl-3 border-l-2 border-amber-300">
-                          <div className="text-sm font-medium text-amber-700">Chosen: {chosenStyle.name}</div>
-                          <div className="text-xs text-parchment-500 mt-0.5">{chosenStyle.description}</div>
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
+                {pinned.length > 0 && (
+                  <div className="text-[10px] font-bold uppercase tracking-widest text-parchment-500 mb-1.5">Limited use</div>
+                )}
+                {pinned.map(renderFeature)}
+                {pinned.length > 0 && others.length > 0 && (
+                  <div className="text-[10px] font-bold uppercase tracking-widest text-parchment-500 mt-4 mb-1.5">All other features</div>
+                )}
+                {others.map(renderFeature)}
 
                 {/* Rogue: Sneak Attack */}
                 {cc.classSlug === 'rogue' && sneakDice > 0 && (
@@ -6854,27 +6965,30 @@ export default function Sheet() {
                         </div>
                       </div>
 
-                      {/* Progression table */}
-                      <table className="w-full text-xs border-collapse mb-3">
-                        <thead>
-                          <tr className="text-left border-b border-amber-200">
-                            <th className="pb-1 pr-3 font-semibold text-parchment-600">Artificer Level</th>
-                            <th className="pb-1 pr-3 font-semibold text-parchment-600">Infusions Known</th>
-                            <th className="pb-1 font-semibold text-parchment-600">Infused Items</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-amber-100">
-                          {PROGRESSION.map(row => (
-                            <tr key={row.level} className={cc.level >= row.level ? 'text-parchment-800' : 'text-parchment-300'}>
-                              <td className={`py-1 pr-3 font-medium ${cc.level === row.level || (cc.level > row.level && (PROGRESSION.find(r => r.level > cc.level)?.level ?? 99) > row.level) ? 'text-amber-700' : ''}`}>
-                                {row.level}{cc.level >= row.level && cc.level < (PROGRESSION.find(r => r.level > row.level)?.level ?? 99) ? ' ←' : ''}
-                              </td>
-                              <td className="py-1 pr-3">{row.known}</td>
-                              <td className="py-1">{row.active}</td>
+                      {/* Progression table: reference, so folded away */}
+                      <details className="mb-3">
+                        <summary className="text-xs font-semibold text-parchment-500 uppercase tracking-wide cursor-pointer hover:text-parchment-700">Infusions by artificer level ▼</summary>
+                        <table className="w-full text-xs border-collapse mt-2">
+                          <thead>
+                            <tr className="text-left border-b border-amber-200">
+                              <th className="pb-1 pr-3 font-semibold text-parchment-600">Artificer Level</th>
+                              <th className="pb-1 pr-3 font-semibold text-parchment-600">Infusions Known</th>
+                              <th className="pb-1 font-semibold text-parchment-600">Infused Items</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                          </thead>
+                          <tbody className="divide-y divide-amber-100">
+                            {PROGRESSION.map(row => (
+                              <tr key={row.level} className={cc.level >= row.level ? 'text-parchment-800' : 'text-parchment-300'}>
+                                <td className={`py-1 pr-3 font-medium ${cc.level === row.level || (cc.level > row.level && (PROGRESSION.find(r => r.level > cc.level)?.level ?? 99) > row.level) ? 'text-amber-700' : ''}`}>
+                                  {row.level}{cc.level >= row.level && cc.level < (PROGRESSION.find(r => r.level > row.level)?.level ?? 99) ? ' ←' : ''}
+                                </td>
+                                <td className="py-1 pr-3">{row.known}</td>
+                                <td className="py-1">{row.active}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </details>
 
                       {/* Known infusions list */}
                       <div className="border-t border-amber-100 pt-2 mb-3">
@@ -7034,7 +7148,7 @@ export default function Sheet() {
               fc.key === 'feat-l1' || fc.key.startsWith('feat-')
             )
             return (
-              <div className="card order-4">
+              <div id="feats-card" className="card order-4 scroll-mt-16">
                 <div className="flex items-center justify-between mb-3">
                   <h2 className="section-header mb-0">Feats</h2>
                   <button
@@ -7085,7 +7199,7 @@ export default function Sheet() {
                           type="button"
                           title="Remove feat"
                           className="ml-auto text-xs text-red-400 hover:text-red-600 transition-colors"
-                          onClick={() => patch({ featuresChosen: char.featuresChosen.filter(f => f.key !== fc.key) })}
+                          onClick={() => { offerUndo(`Removed ${content.feats.find(f => f.slug === fc.value)?.name ?? 'the feat'}`); patch({ featuresChosen: char.featuresChosen.filter(f => f.key !== fc.key) }) }}
                         >Remove</button>
                       </div>
 
@@ -7103,7 +7217,7 @@ export default function Sheet() {
                         <div className="flex flex-wrap gap-1 mt-2">
                           {allGranted.map(s => (
                             <span key={s.slug} className="text-xs bg-indigo-100 text-indigo-700 rounded px-1.5 py-0.5">
-                              🔮 {s.name}{s.usesPerLongRest ? ` (${s.usesPerLongRest}/LR)` : s.level === 0 ? ' (cantrip)' : ' (at will)'}
+                              {s.name}{s.usesPerLongRest ? ` (${s.usesPerLongRest}/LR)` : s.level === 0 ? ' (cantrip)' : ' (at will)'}
                             </span>
                           ))}
                         </div>
@@ -7115,7 +7229,7 @@ export default function Sheet() {
                           {effect.notes.map(n => <li key={n}>{n}</li>)}
                         </ul>
                       ) : featDef?.description ? (
-                        <p className="text-sm text-parchment-600 mt-2">{featDef.description}</p>
+                        featureText(`feat-${fc.key}`, featDef.description, 'mt-2')
                       ) : null}
                       {/* Expertise picker for feats that grant it */}
                       {effect?.grantedExpertise && (() => {
@@ -7180,7 +7294,7 @@ export default function Sheet() {
                 <h2 className="section-header">Background: {bg.name}</h2>
                 <div className="p-3 rounded border border-parchment-100">
                   <div className="font-medium">{bg.feature.name}</div>
-                  <p className="text-sm text-parchment-600 mt-1">{bg.feature.description}</p>
+                  {bg.feature.description && featureText('background-feature', bg.feature.description, 'mt-1')}
                 </div>
                 {(bg.skillProficiencies.length > 0 || bg.toolProficiencies.length > 0 || bg.languages > 0) && (
                   <div className="mt-2 flex gap-4 text-xs text-parchment-500">
@@ -7298,6 +7412,7 @@ export default function Sheet() {
         const activeSummon = activeSummonId ? char.summons.find(s => s.id === activeSummonId) : null
 
         const dismissSummon = (id: string) => {
+          offerUndo(`Dismissed ${char.summons.find(s => s.id === id)?.name ?? 'the summon'}`)
           patch({ summons: char.summons.filter(s => s.id !== id) })
           if (activeSummonId === id) setActiveSummonId(null)
         }
@@ -7757,6 +7872,104 @@ export default function Sheet() {
       )}
 
       {confirmDialog}
+      {findOpen && (() => {
+        // Everything on the sheet you might want to get to
+        type Hit = { key: string; label: string; kind: string; sub?: string; go: () => void }
+        const scrollTo = (selector: string) => window.setTimeout(() =>
+          document.querySelector(selector)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 80)
+        const hits: Hit[] = [
+          ...char.spells.map(sp => ({
+            key: `entry:${sp.spellSlug}`, label: sp.name, kind: 'Spell',
+            sub: (() => { const l = content.spells.find(d => d.slug === sp.spellSlug)?.level ?? 0; return l === 0 ? 'Cantrip' : `Level ${l}` })(),
+            go: () => { setTab('spells'); setSelectedSpellKey(`entry:${sp.spellSlug}`); scrollTo(`[data-spell-key="entry:${sp.spellSlug}"]`) },
+          })),
+          ...freeSpells.map(f => ({
+            key: `free:${f.key}`, label: f.name, kind: 'Spell', sub: f.source,
+            go: () => { setTab('spells'); setSelectedSpellKey(`free:${f.key}`); scrollTo(`[data-spell-key="free:${CSS.escape(f.key)}"]`) },
+          })),
+          ...char.equipment.map((e, idx) => ({
+            key: `item:${idx}`, label: e.name, kind: 'Item', sub: e.equipped ? 'Equipped' : undefined,
+            go: () => { setTab('inventory'); setInventorySearch(''); setExpandedInventoryItem(idx); scrollTo(`[data-item-idx="${idx}"]`) },
+          })),
+          ...char.classes.flatMap(cc => {
+            const opts = CLASS_OPTIONS[cc.classSlug]
+            const sub = opts?.subclasses.find(sc => sc.slug === cc.subclassSlug)
+            const clsName = content.classes.find(c => c.slug === cc.classSlug)?.name ?? cc.classSlug
+            return [...(opts?.features ?? content.classes.find(c => c.slug === cc.classSlug)?.features ?? []).map(f => ({ f, from: clsName })),
+                    ...(sub?.features ?? []).map(f => ({ f, from: sub!.name }))]
+              .filter(({ f }) => f.level <= cc.level)
+              .map(({ f, from }) => ({
+                key: `feature:${featureAnchor(cc.classSlug, f)}`, label: f.name, kind: 'Feature', sub: `${from} ${f.level}`,
+                go: () => jumpToFeature(featureAnchor(cc.classSlug, f)),
+              }))
+          }),
+          ...featSlugs.map(slug => ({
+            key: `feat:${slug}`, label: content.feats.find(f => f.slug === slug)?.name ?? slug, kind: 'Feat',
+            go: () => { setTab('features'); scrollTo('#feats-card') },
+          })),
+          ...TABS.map(t => ({ key: `tab:${t.key}`, label: t.label, kind: 'Tab', go: () => selectTab(t.key) })),
+        ]
+        const q = findQuery.trim().toLowerCase()
+        const results = (q
+          ? hits.filter(h => h.label.toLowerCase().includes(q))
+              .sort((a, b) => Number(!a.label.toLowerCase().startsWith(q)) - Number(!b.label.toLowerCase().startsWith(q)) || a.label.localeCompare(b.label))
+          : hits.filter(h => h.kind === 'Tab')
+        ).filter((h, i, all) => all.findIndex(x => x.key === h.key) === i).slice(0, 12)
+        const active = Math.min(findIndex, Math.max(0, results.length - 1))
+        const choose = (h: Hit) => { setFindOpen(false); h.go() }
+        const KIND_STYLE: Record<string, string> = {
+          Spell: 'bg-violet-100 text-violet-700', Item: 'bg-amber-100 text-amber-700',
+          Feature: 'bg-indigo-100 text-indigo-700', Feat: 'bg-green-100 text-green-700', Tab: 'bg-parchment-200 text-parchment-700',
+        }
+        return (
+          <div className="fixed inset-0 z-50 bg-black/40 flex items-start justify-center px-4 pt-24" onMouseDown={() => setFindOpen(false)}>
+            <div role="dialog" aria-label="Find on this sheet" onMouseDown={e => e.stopPropagation()}
+              className="spell-card-in w-full max-w-lg rounded-xl border border-parchment-300 bg-parchment-50 shadow-2xl overflow-hidden">
+              <div className="flex items-center gap-2 px-4 border-b border-parchment-200">
+                <SearchIcon className="w-5 h-5 text-parchment-400 shrink-0" />
+                <input autoFocus value={findQuery} placeholder="Find a spell, item, feature or feat…" aria-label="Find"
+                  onChange={e => { setFindQuery(e.target.value); setFindIndex(0) }}
+                  onKeyDown={e => {
+                    if (e.key === 'Escape') setFindOpen(false)
+                    else if (e.key === 'ArrowDown') { e.preventDefault(); setFindIndex(Math.min(results.length - 1, active + 1)) }
+                    else if (e.key === 'ArrowUp') { e.preventDefault(); setFindIndex(Math.max(0, active - 1)) }
+                    else if (e.key === 'Enter' && results[active]) choose(results[active])
+                  }}
+                  className="flex-1 bg-transparent py-3 text-base outline-none placeholder:text-parchment-400" />
+                <kbd className="text-[10px] text-parchment-400 border border-parchment-300 rounded px-1.5 py-0.5">Esc</kbd>
+              </div>
+              <ul className="max-h-80 overflow-y-auto py-1">
+                {results.length === 0 && <li className="px-4 py-3 text-sm text-parchment-400">Nothing on this sheet matches “{findQuery}”.</li>}
+                {results.map((h, i) => (
+                  <li key={h.key}>
+                    <button type="button" onClick={() => choose(h)} onMouseEnter={() => setFindIndex(i)}
+                      className={`w-full text-left px-4 py-2 flex items-center gap-3 ${i === active ? 'bg-parchment-100' : ''}`}>
+                      <span className={`text-[10px] font-bold uppercase tracking-wide rounded px-1.5 py-0.5 w-16 text-center shrink-0 ${KIND_STYLE[h.kind]}`}>{h.kind}</span>
+                      <span className="flex-1 min-w-0 truncate text-sm font-semibold text-parchment-900">{h.label}</span>
+                      {h.sub && <span className="text-xs text-parchment-500 shrink-0">{h.sub}</span>}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              <div className="px-4 py-1.5 border-t border-parchment-200 text-[10px] text-parchment-400 flex gap-3">
+                <span>↑↓ to move</span><span>Enter to open</span>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+      {undo && (
+        <div className="fixed inset-x-0 bottom-5 z-40 flex justify-center px-4 pointer-events-none">
+          <div key={undo.id} role="status"
+            className="undo-toast pointer-events-auto flex items-center gap-3 rounded-full bg-dungeon-900 text-parchment-100 shadow-xl pl-4 pr-1.5 py-1.5 text-sm">
+            <span>{undo.message}</span>
+            <button type="button" onClick={() => { save(undo.before); setUndo(null) }}
+              className="rounded-full px-3 py-1 font-semibold bg-[rgb(var(--accent))] text-[rgb(var(--accent-fg))] hover:brightness-110">Undo</button>
+            <button type="button" onClick={() => setUndo(null)} aria-label="Dismiss"
+              className="w-7 h-7 rounded-full text-parchment-400 hover:text-parchment-100">✕</button>
+          </div>
+        </div>
+      )}
 
       {/* Concentration save after taking damage */}
       {concCheck && (
@@ -7816,6 +8029,7 @@ export default function Sheet() {
               <button
                 className="btn btn-primary text-sm"
                 onClick={() => {
+                  offerUndo('Long rest taken')
                   const resets: Record<string, number> = {}
                   longRestResourceKeys(classResources).forEach(k => {
                     const r = classResources.find(x => x.key === k)!
@@ -7961,6 +8175,7 @@ export default function Sheet() {
                   return spent > 0 && !(raw >= spent && raw <= hd * spent)
                 })}
                 onClick={() => {
+                  offerUndo('Short rest taken')
                   const conMod = abilityModFor(effectiveChar, 'con')
                   const totalHeal = Math.max(0, char.classes.reduce((sum, cc) => {
                     const spent = shortRestDice[cc.classSlug] ?? 0

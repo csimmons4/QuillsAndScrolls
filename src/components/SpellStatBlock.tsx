@@ -25,7 +25,8 @@ export function cleanHigherLevels(raw: string | undefined): string {
     .trim()
 }
 
-function levelLine(spell: SpellDef): string {
+/** "3rd-level evocation", "Evocation cantrip" */
+export function levelLine(spell: SpellDef): string {
   const school = spell.school || ''
   if (spell.level === 0) return `${school} cantrip`.trim()
   return `${ORDINAL[spell.level] ?? `${spell.level}th`}-level ${school.toLowerCase()}`.trim()

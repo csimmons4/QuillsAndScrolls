@@ -19,13 +19,14 @@ function NavBar() {
 
   return (
     <header className="app-header shadow-lg">
-      <div className="max-w-7xl mx-auto px-4 py-3 flex items-center gap-6">
-        <Link to="/" className="nav-brand text-xl font-bold tracking-wide">
+      <div className="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center gap-x-6 gap-y-2">
+        <Link to="/" className="nav-brand text-xl font-bold tracking-wide whitespace-nowrap">
           Quills &amp; Scrolls
         </Link>
-        <nav className="flex gap-5 text-sm ml-4">
+        {/* On a phone the links drop to their own row under the name */}
+        <nav className="flex gap-5 text-sm whitespace-nowrap sm:ml-4 order-last sm:order-none w-full sm:w-auto overflow-x-auto">
           <NavLink to="/" end className={linkClass}>Vault</NavLink>
-          <NavLink to="/lookup" className={linkClass}>Lookup</NavLink>
+          <NavLink to="/lookup" className={linkClass}>Compendium</NavLink>
           <NavLink to="/homebrew" className={linkClass}>Homebrew</NavLink>
           <NavLink to="/settings" className={linkClass}>Settings</NavLink>
         </nav>

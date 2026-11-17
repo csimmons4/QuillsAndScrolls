@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { listCharactersFromDisk, saveCharacterToDisk } from '../storage/charApi'
 import { useContent } from '../content/ContentProvider'
@@ -134,6 +134,36 @@ export default function LevelUp() {
   const navigate = useNavigate()
   const content = useContent()
   const [char, setChar] = useState<Character | null>(null)
+  // The step bar lists every section on the page (they come and go with the choices made) and
+  // highlights the one in view
+  const pageRef = useRef<HTMLDivElement>(null)
+  const [steps, setSteps] = useState<{ id: string; label: string }[]>([])
+  const [activeStep, setActiveStep] = useState<string | null>(null)
+  useEffect(() => {
+    const cards = [...(pageRef.current?.querySelectorAll<HTMLElement>(':scope > .card') ?? [])]
+      .filter(c => c.querySelector(':scope > h2.section-header'))
+    const next = cards.map((c, i) => {
+      c.id = `step-${i}`
+      c.style.scrollMarginTop = '4.5rem'
+      return { id: c.id, label: (c.querySelector(':scope > h2')!.textContent ?? '').replace(/\s*\(optional\)/, '').trim() }
+    })
+    if (JSON.stringify(next) !== JSON.stringify(steps)) setSteps(next)
+  })
+  useEffect(() => {
+    const onScroll = () => {
+      let current = steps[0]?.id ?? null
+      for (const st of steps) {
+        const el = document.getElementById(st.id)
+        if (el && el.getBoundingClientRect().top < 140) current = st.id
+      }
+      // Scrolled to the bottom: the last sections can't reach the top, so the last one is in view
+      if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2) current = steps[steps.length - 1]?.id ?? current
+      setActiveStep(current)
+    }
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [steps])
 
   useEffect(() => {
     if (!id) return
@@ -574,15 +604,80 @@ export default function LevelUp() {
     )
   }
 
+  // What still has to be chosen, each tied to the section it belongs to so the step bar can mark it
+  const featDefPicked = content.feats.find(f => f.slug === featSlug)
+  const needsFeatAbility = isAsiLevel && asiChoice === 'feat' && !!featDefPicked?.abilityScoreIncrease && !featAbilityPick(featDefPicked, featAbility)
+  type Need = { msg: string; step: string }
+  // Things the level-up can't be applied without
+  const blockerList = ([
+    !selectedClass ? { msg: 'Choose a class.', step: 'Class' } : null,
+    needsSubclass && !subclass ? { msg: 'Choose a subclass.', step: 'Choose Subclass' } : null,
+    isAsiLevel && asiChoice === 'feat' && !featDefPicked ? { msg: 'Choose a feat.', step: 'Ability Score Improvement' } : null,
+    needsFeatAbility ? { msg: `Choose which ability ${featDefPicked!.name} increases.`, step: 'Ability Score Improvement' } : null,
+    needsMulticlassSkill && !multiclassSkill ? { msg: 'Choose a multiclass skill.', step: 'Multiclass Skill' } : null,
+    // These are only offered at this exact level, so they can't be put off
+    needsFightingStyle && !fightingStyle ? { msg: 'Choose a fighting style.', step: 'Fighting Style' } : null,
+    needsPactBoon && !pactBoon ? { msg: 'Choose a pact boon.', step: 'Pact Boon' } : null,
+    needsFavoredEnemy && !favoredEnemy ? { msg: 'Choose a favored enemy.', step: 'Favored Enemy' } : null,
+    needsFavoredTerrain && !favoredTerrain ? { msg: 'Choose a favored terrain.', step: 'Natural Explorer' } : null,
+    needsHunterChoice && !hunterChoice ? { msg: 'Choose a Hunter feature.', step: 'Hunter Technique' } : null,
+    needsArcanum && !arcanumSpell ? { msg: 'Choose your Mystic Arcanum spell.', step: 'Mystic Arcanum' } : null,
+    maneuversToGain > maneuverChoices.length ? { msg: `Choose ${maneuversToGain - maneuverChoices.length} more maneuver${maneuversToGain - maneuverChoices.length !== 1 ? 's' : ''}.`, step: 'Battle Master' } : null,
+    runesToGain > runeChoices.length ? { msg: `Choose ${runesToGain - runeChoices.length} more rune${runesToGain - runeChoices.length !== 1 ? 's' : ''}.`, step: 'Rune Carver' } : null,
+    needsFourElements && disciplinesToGain > fourElementsChoices.length ? { msg: 'Choose your elemental disciplines.', step: 'Elemental Disciplines' } : null,
+  ] as (Need | null)[]).filter((x): x is Need => !!x)
+  // Picks that can still be made later (the next level-up or the sheet asks again)
+  const reminderList = ([
+    cantripsToGain > newCantrips.length ? { msg: `${cantripsToGain - newCantrips.length} cantrip${cantripsToGain - newCantrips.length !== 1 ? 's' : ''} not chosen`, step: 'New Cantrip' } : null,
+    spellsToLearn > newSpells.length ? { msg: `${spellsToLearn - newSpells.length} spell${spellsToLearn - newSpells.length !== 1 ? 's' : ''} not chosen`, step: isSpellbookClass ? 'Spellbook' : 'New Spells' } : null,
+    isExpertiseLevel && expertiseChoices.length < expertiseCount ? { msg: 'Expertise not chosen', step: 'Expertise' } : null,
+  ] as (Need | null)[]).filter((x): x is Need => !!x)
+  const shortStep = (label: string) => label
+    .replace(/^Ability Score Improvement or Feat$/, 'ASI / Feat')
+    .replace(/^New Class Features at Level \d+$/, 'New Features')
+    .replace(/^Multiclass Skill Proficiency$/, 'Multiclass Skill')
+    .replace(/^Choose /, '')
+    .split(' — ')[0]
+
   return (
-    <div className="max-w-2xl mx-auto">
+    <div ref={pageRef} className="max-w-4xl mx-auto">
       <div className="flex items-center gap-3 mb-6">
         <Link to={`/c/${char.id}`} className="btn-ghost text-sm">← Back to Sheet</Link>
         <h1 className="text-2xl font-bold text-parchment-800">Level Up: {char.name}</h1>
       </div>
 
-      <div className="text-sm text-parchment-500 mb-6">
+      <div className="text-sm text-parchment-500 mb-4">
         Currently Level {totalLvl} → Level {newTotalLevel} &bull; New Proficiency Bonus: +{pb}
+      </div>
+
+      {/* Steps: every section on this page, pinned at the top. A red dot still needs a choice before you
+          can apply; an amber one can wait. Apply works from here too. */}
+      <div className="sticky top-0 z-30 -mx-2 px-2 py-2 mb-4 bg-parchment-100 border-b border-parchment-200 flex items-center gap-3">
+        <ol className="flex-1 min-w-0 flex gap-1.5 overflow-x-auto [scrollbar-width:none]">
+          {steps.map((st, i) => {
+            const blocked = blockerList.some(b => st.label.startsWith(b.step))
+            const pending = !blocked && reminderList.some(r => st.label.startsWith(r.step))
+            const active = st.id === activeStep
+            return (
+              <li key={st.id} className="shrink-0">
+                <button type="button" onClick={() => document.getElementById(st.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                  aria-current={active ? 'step' : undefined}
+                  title={blocked ? blockerList.filter(b => st.label.startsWith(b.step)).map(b => b.msg).join(' ') : pending ? 'Can be chosen later' : undefined}
+                  className={`inline-flex items-center gap-1.5 whitespace-nowrap text-xs rounded-full px-2.5 py-1 border transition-colors ${
+                    active ? 'bg-parchment-700 border-parchment-700 text-parchment-50' : 'border-parchment-300 text-parchment-600 hover:border-parchment-500 hover:text-parchment-900'
+                  }`}>
+                  <span className="opacity-60">{i + 1}.</span>{shortStep(st.label)}
+                  {blocked && <span className="w-1.5 h-1.5 rounded-full bg-red-500" aria-label="needs a choice" />}
+                  {pending && <span className="w-1.5 h-1.5 rounded-full bg-amber-400" aria-label="can wait" />}
+                </button>
+              </li>
+            )
+          })}
+        </ol>
+        <button type="button" className="btn-primary text-sm px-3 py-1.5 shrink-0 disabled:opacity-50" disabled={blockerList.length > 0} onClick={finish}
+          title={blockerList.length ? blockerList.map(b => b.msg).join(' ') : 'Apply this level-up'}>
+          {blockerList.length ? `${blockerList.length} to choose` : 'Apply Level Up'}
+        </button>
       </div>
 
       {/* Class selection */}
@@ -1528,32 +1623,8 @@ export default function LevelUp() {
       )}
 
       {(() => {
-        const featDef = content.feats.find(f => f.slug === featSlug)
-        const needsFeatAbility = isAsiLevel && asiChoice === 'feat' && !!featDef?.abilityScoreIncrease && !featAbilityPick(featDef, featAbility)
-        // Things the level-up can't be applied without
-        const blockers = [
-          !selectedClass ? 'Choose a class.' : '',
-          needsSubclass && !subclass ? 'Choose a subclass.' : '',
-          isAsiLevel && asiChoice === 'feat' && !featDef ? 'Choose a feat.' : '',
-          needsFeatAbility ? `Choose which ability ${featDef!.name} increases.` : '',
-          needsMulticlassSkill && !multiclassSkill ? 'Choose a multiclass skill.' : '',
-          // These are only offered at this exact level, so they can't be put off
-          needsFightingStyle && !fightingStyle ? 'Choose a fighting style.' : '',
-          needsPactBoon && !pactBoon ? 'Choose a pact boon.' : '',
-          needsFavoredEnemy && !favoredEnemy ? 'Choose a favored enemy.' : '',
-          needsFavoredTerrain && !favoredTerrain ? 'Choose a favored terrain.' : '',
-          needsHunterChoice && !hunterChoice ? 'Choose a Hunter feature.' : '',
-          needsArcanum && !arcanumSpell ? 'Choose your Mystic Arcanum spell.' : '',
-          maneuversToGain > maneuverChoices.length ? `Choose ${maneuversToGain - maneuverChoices.length} more maneuver${maneuversToGain - maneuverChoices.length !== 1 ? 's' : ''}.` : '',
-          runesToGain > runeChoices.length ? `Choose ${runesToGain - runeChoices.length} more rune${runesToGain - runeChoices.length !== 1 ? 's' : ''}.` : '',
-          needsFourElements && disciplinesToGain > fourElementsChoices.length ? 'Choose your elemental disciplines.' : '',
-        ].filter(Boolean)
-        // Picks that can still be made later (the next level-up or the sheet asks again)
-        const reminders = [
-          cantripsToGain > newCantrips.length ? `${cantripsToGain - newCantrips.length} cantrip${cantripsToGain - newCantrips.length !== 1 ? 's' : ''} not chosen` : '',
-          spellsToLearn > newSpells.length ? `${spellsToLearn - newSpells.length} spell${spellsToLearn - newSpells.length !== 1 ? 's' : ''} not chosen` : '',
-          isExpertiseLevel && expertiseChoices.length < expertiseCount ? 'Expertise not chosen' : '',
-        ].filter(Boolean)
+        const blockers = blockerList.map(b => b.msg)
+        const reminders = reminderList.map(r => r.msg)
         return (
           <div className="mt-6">
             <div className="flex justify-end items-center gap-3">

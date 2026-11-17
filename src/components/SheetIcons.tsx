@@ -1,4 +1,4 @@
-// Line icons for the character sheet header. All draw in currentColor so the caller sets the tone.
+// Line icons for the character sheet (header, spell card). All draw in currentColor so the caller sets the tone.
 import type { ReactNode } from 'react'
 
 type IconProps = { className?: string }
@@ -38,4 +38,29 @@ export function CheckIcon({ className }: IconProps) {
 /** Export: an arrow down into a tray */
 export function ExportIcon({ className }: IconProps) {
   return <Line className={className}><path d="M12 3.5v11M7.5 10l4.5 4.5 4.5-4.5M4.5 16.5V20h15v-3.5" /></Line>
+}
+
+/** Spell range: a target */
+export function TargetIcon({ className }: IconProps) {
+  return <Line className={className}><circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="4" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3" /></Line>
+}
+
+/** Spell duration: a clock */
+export function ClockIcon({ className }: IconProps) {
+  return <Line className={className}><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" /></Line>
+}
+
+/** Spell components: a flask */
+export function FlaskIcon({ className }: IconProps) {
+  return <Line className={className}><path d="M9.5 3h5M10.5 3v6L5 18.5A1.7 1.7 0 0 0 6.5 21h11a1.7 1.7 0 0 0 1.5-2.5L13.5 9V3M7.5 15h9" /></Line>
+}
+
+/** An open book (the empty spell panel) */
+export function BookIcon({ className }: IconProps) {
+  return <Line className={className}><path d="M12 6.5C10 5 7 4.5 3.5 5v13c3.5-.5 6.5 0 8.5 1.5 2-1.5 5-2 8.5-1.5V5C17 4.5 14 5 12 6.5zM12 6.5v13" /></Line>
+}
+
+/** Quick find: a magnifying glass */
+export function SearchIcon({ className }: IconProps) {
+  return <Line className={className}><circle cx="10.5" cy="10.5" r="6.5" /><path d="M15.5 15.5L20 20" /></Line>
 }

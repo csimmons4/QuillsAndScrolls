@@ -649,12 +649,26 @@ export default function Creator() {
 
   return (
     <div className="max-w-4xl mx-auto">
-      {/* Progress bar */}
-      <div className="flex gap-1 mb-8">
-        {STEPS.map((s, i) => (
-          <div key={s} className={`flex-1 h-1.5 rounded-full ${i <= step ? 'bg-[rgb(var(--accent))]' : 'bg-parchment-200'}`} />
-        ))}
-      </div>
+      {/* Progress: each step is labelled, and a finished one can be clicked to go back to it.
+          Moving forward is always Next, so every step's choices get checked. */}
+      <ol className="flex gap-1 mb-8">
+        {STEPS.map((s, i) => {
+          const done = i < step
+          const current = i === step
+          return (
+            <li key={s} className="flex-1 min-w-0">
+              <button type="button" disabled={!done} onClick={() => { setErrors([]); setStep(i) }}
+                aria-current={current ? 'step' : undefined} title={done ? `Back to ${s}` : undefined}
+                className="group w-full text-left disabled:cursor-default">
+                <div className={`h-1.5 rounded-full transition-opacity ${i <= step ? 'bg-[rgb(var(--accent))]' : 'bg-parchment-200'} ${done ? 'group-hover:opacity-70' : ''}`} />
+                <div className={`hidden sm:block mt-1.5 text-[11px] truncate ${
+                  current ? 'font-bold text-parchment-800' : done ? 'text-parchment-600 group-hover:text-parchment-900 group-hover:underline' : 'text-parchment-400'
+                }`}>{i + 1}. {s}</div>
+              </button>
+            </li>
+          )
+        })}
+      </ol>
       <h1 className="text-2xl font-bold text-parchment-800 mb-1">{STEPS[step]}</h1>
       <p className="text-sm text-parchment-500 mb-6">Step {step + 1} of {STEPS.length}</p>
 
