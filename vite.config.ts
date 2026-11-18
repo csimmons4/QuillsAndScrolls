@@ -5,7 +5,7 @@ import fs from 'fs'
 
 // Phones and tablets on your Wi-Fi: only when switched on in Settings (kept in .local-settings.json,
 // read once at start-up). Otherwise the app listens on this computer alone.
-const dataDir = process.env.QS_DATA_DIR ? path.resolve(process.env.QS_DATA_DIR) : __dirname
+const dataDir = process.env.QS_DATA_DIR ? path.resolve(process.env.QS_DATA_DIR) : import.meta.dirname
 const lan = (() => {
   try { return !!JSON.parse(fs.readFileSync(path.join(dataDir, '.local-settings.json'), 'utf8')).lan } catch { return false }
 })()
@@ -16,7 +16,7 @@ export default defineConfig({
   define: { __QS_LAN__: JSON.stringify(lan) },
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './src'),
+      '@': path.resolve(import.meta.dirname, './src'),
     },
   },
   server: {
@@ -26,13 +26,15 @@ export default defineConfig({
     },
   },
   build: {
-    rollupOptions: {
+    rolldownOptions: {
       output: {
         // Libraries and the curated game data change rarely: separate files the browser can keep
-        manualChunks(id) {
-          if (id.includes('node_modules/react') || id.includes('node_modules/react-dom') || id.includes('node_modules/react-router') || id.includes('node_modules/scheduler')) return 'react'
-          if (id.includes('node_modules/zod')) return 'zod'
-          if (id.includes('/src/data/')) return 'game-data'
+        codeSplitting: {
+          groups: [
+            { name: 'react', test: /node_modules[\\/](react|react-dom|react-router|react-router-dom|scheduler)[\\/]/ },
+            { name: 'zod', test: /node_modules[\\/]zod[\\/]/ },
+            { name: 'game-data', test: /[\\/]src[\\/]data[\\/]/ },
+          ],
         },
       },
     },

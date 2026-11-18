@@ -6,22 +6,29 @@
 
 cd "$(dirname "$0")" || exit 1
 
-NODE_VERSION="v20.18.1"
+NODE_VERSION="v24.22.3"
 
-# ── 1. Make sure Node.js is available ────────────────────────────────────────
-if command -v node >/dev/null 2>&1; then
-  : # Node is already installed on this Mac — use it.
-elif [ -x ".runtime/node/bin/node" ]; then
-  # A private copy was installed on a previous run — use it.
+# Exit code 0 if the given node is 22.12 or newer (what the app's tools need)
+node_new_enough() {
+  "$1" -e "const [a,b]=process.versions.node.split('.').map(Number);process.exit(a>22||(a===22&&b>=12)?0:1)" 2>/dev/null
+}
+
+# ── 1. Make sure a recent enough Node.js is available ────────────────────────
+if command -v node >/dev/null 2>&1 && node_new_enough node; then
+  : # This Mac's own Node.js is recent enough — use it.
+elif [ -x ".runtime/node/bin/node" ] && [ "$(.runtime/node/bin/node -v)" = "$NODE_VERSION" ]; then
+  # The private copy from an earlier run is the right version — use it.
   export PATH="$PWD/.runtime/node/bin:$PATH"
 else
   echo ""
-  echo "Setting up Node.js (first time only, please wait a minute)..."
+  echo "Setting up Node.js (only needed once, please wait a minute)..."
   case "$(uname -m)" in
     arm64) NODE_ARCH="arm64" ;;   # Apple Silicon (M1/M2/M3...)
     *)     NODE_ARCH="x64"   ;;   # Intel
   esac
   URL="https://nodejs.org/dist/$NODE_VERSION/node-$NODE_VERSION-darwin-$NODE_ARCH.tar.gz"
+  # An older private copy is replaced
+  rm -rf .runtime/node ".runtime/node-$NODE_VERSION-darwin-$NODE_ARCH"
   mkdir -p .runtime
   if curl -fL "$URL" -o .runtime/node.tar.gz \
      && tar -xzf .runtime/node.tar.gz -C .runtime \
@@ -37,16 +44,19 @@ else
   fi
 fi
 
-# ── 2. Install the app files (first time only) ───────────────────────────────
-if [ ! -d node_modules ]; then
+# ── 2. Install the app files (first time, and again after an update) ────────
+# A copy of package-lock.json is kept after each install; if the current one differs,
+# the app's files changed (an update) and are installed again.
+if [ ! -d node_modules ] || ! node -e "const fs=require('fs');try{process.exit(fs.readFileSync('package-lock.json','utf8')===fs.readFileSync('node_modules/.qs-installed-lock','utf8')?0:1)}catch(e){process.exit(1)}" 2>/dev/null; then
   echo ""
-  echo "Installing app files (first time only, may take a minute)..."
+  echo "Installing app files (may take a minute)..."
   if ! npm install; then
     echo ""
     echo "Something went wrong installing the app files."
     read -n 1 -s -r -p "Press any key to close..."
     exit 1
   fi
+  node -e "require('fs').copyFileSync('package-lock.json','node_modules/.qs-installed-lock')"
 fi
 
 # ── 3. Start the app and open the browser ────────────────────────────────────
@@ -60,7 +70,8 @@ echo "Starting Quills & Scrolls..."
 npm run dev &
 
 echo "Waiting for the app to be ready..."
-until curl -s http://127.0.0.1:5173 > /dev/null && curl -s http://127.0.0.1:5174/api/characters > /dev/null; do
+# The app may listen on IPv6 localhost (::1) only, so ask for "localhost", which curl tries both ways
+until curl -s http://localhost:5173 > /dev/null && curl -s http://127.0.0.1:5174/api/characters > /dev/null; do
   sleep 1
 done
 
