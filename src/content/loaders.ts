@@ -214,8 +214,8 @@ export const ItemSchema = z.object({
   abilityCheckBonus: z.number().optional(),      // bonus to all ability checks (incl. skills)
   spellDCBonus: z.number().optional(),           // bonus to spell save DC
   spellAttackBonus: z.number().optional(),       // bonus to spell attack rolls
-  abilityScoreOverride: z.record(z.number()).optional(), // sets score to value when higher
-  abilityScoreBonus: z.record(z.number()).optional(),    // adds to score (capped at 20)
+  abilityScoreOverride: z.record(z.string(), z.number()).optional(), // sets score to value when higher
+  abilityScoreBonus: z.record(z.string(), z.number()).optional(),    // adds to score (capped at 20)
   grantedResistances: z.array(z.string()).optional(),
   grantedImmunities: z.array(z.string()).optional(),
   grantedConditionImmunities: z.array(z.string()).optional(),
@@ -243,7 +243,7 @@ export const ItemSchema = z.object({
     }).optional(),
     uses: z.number().optional(),               // limited uses; the effect ends when they're spent
     note: z.string().optional(),               // rules reminder shown while active
-    abilityOverride: z.record(z.number()).optional(), // sets the score while active, if higher
+    abilityOverride: z.record(z.string(), z.number()).optional(), // sets the score while active, if higher
     hpMaxMultiplier: z.number().optional(),    // Giant Size doubles max HP (and current HP when drunk)
     tempHp: z.number().optional(),             // temporary HP gained when drunk (Heroism)
     // Effects applied to the sheet while the potion is running (see potionEffects.ts)
@@ -289,7 +289,7 @@ const SubraceSchema = z.object({
   slug: z.string(),
   name: z.string(),
   traits: z.array(z.string()).default([]),
-  abilityBonuses: z.record(z.number()).optional(),
+  abilityBonuses: z.record(z.string(), z.number()).optional(),
   grantedCantrip: z.string().optional(),   // class slug (e.g. 'wizard' → pick one)
   grantedSpells: z.array(FeatSpellSchema).optional(),
   hpBonusPerLevel: z.number().optional(),  // e.g. Hill Dwarf's Dwarven Toughness
@@ -312,7 +312,7 @@ export const RaceSchema = z.object({
 
   // Enrichment fields (populated by overlay — scraped data lacks all of these):
   category: z.enum(['Common', 'Uncommon', 'Exotic']).optional(),
-  abilityBonuses: z.record(z.number()).optional(),
+  abilityBonuses: z.record(z.string(), z.number()).optional(),
   subraces: z.array(SubraceSchema).optional(),
   chooseAbilityBonuses: z.number().optional(),
   bonusSkills: z.number().optional(),
