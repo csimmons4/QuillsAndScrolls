@@ -44,7 +44,9 @@ There is **nothing to install by hand** — no Node.js download, no Terminal com
 
 **Windows:** Double-click **`Start (Windows).bat`** in the `Quills&Scrolls` folder.
 
-The **first time** you run it, the launcher automatically installs everything it needs (a private copy of Node.js if your computer doesn't already have one, then the app files) and then opens the app in your browser. This first run takes a minute or two; after that it starts in seconds.
+The **first time** you run it, the launcher automatically installs everything it needs (a private copy of Node.js if your computer doesn't have a recent enough one, then the app files) and then opens the app in your browser. This first run takes a minute or two; after that it starts in seconds.
+
+After you update the app (for example by downloading a newer copy), the launcher notices and reinstalls the app files, and Node.js too if the app now needs a newer one. That launch takes a minute again.
 
 Keep the launcher's window open while you're using the app — closing it stops the server. To stop, close that window; to use it again later, just double-click the launcher.
 
@@ -53,9 +55,9 @@ Keep the launcher's window open while you're using the app — closing it stops 
 - **Mac:** The Mac may warn the file is from an unidentified developer. Right-click **`Start (Mac).command`** → **Open** → **Open**. After that it opens normally on a plain double-click.
 - **Windows:** If a firewall popup appears, click **Allow access**. It's just Node.js opening a local port on your own machine.
 - You need to be **online** the first time so the launcher can download what it needs. After that it works offline.
-- While installing, the window may print something like **"22 vulnerabilities (8 moderate, 12 high, 2 critical)"**. That's normal and the app is fine to use. See [About the security warnings](#about-the-security-warnings-npm-audit).
+- While installing, the window may print something like **"13 high severity vulnerabilities"**. That's normal and the app is fine to use. See [About the security warnings](#about-the-security-warnings-npm-audit).
 
-> Prefer the command line? You can still run `npm install` once and then `npm run dev`, opening **http://localhost:5173** yourself.
+> Prefer the command line? With Node.js 22.12 or newer installed, run `npm install` once and then `npm run dev`, opening **http://localhost:5173** yourself.
 
 ### Using it on a phone or tablet
 
@@ -200,22 +202,25 @@ Settings → **Download Backup (.zip)** bundles every character and all homebrew
 
 ## About the security warnings (npm audit)
 
-When the launcher (or `npm install`) installs the app's files, npm checks every package the app is built from against a public list of known problems and prints a summary such as *"22 vulnerabilities (8 moderate, 12 high, 2 critical)"*.
+When the launcher (or `npm install`) installs the app's files, npm checks every package the app is built from against a public list of known problems and prints a summary such as *"13 high severity vulnerabilities"*.
 
 **It's not just your computer.** Everyone who installs this app sees the same message, because it comes from the list of packages that ships with the app (`package-lock.json`). The number can also go up over time without anything changing here, as new problems are published.
 
-**Why it's not a worry for normal use:**
-- Most of the warnings are in **developer tools** (building, testing and styling the app) that don't do anything while you play.
-- The rest are about websites that are **open to the internet**, or about features this app doesn't use. The app's server only answers your own computer.
-- **One thing to know:** while **phone/tablet access** is switched on, other devices on your Wi-Fi can reach the app, and a few of the warnings (in Vite, the tool that serves the app) are about what someone who can reach it might be able to read. That's one more reason to use it only on a network you trust and switch it off when you don't need it.
+**Where things stand (17 November 2026):**
+- The app's own libraries (React, Express, Zod and the rest) have **no known problems**: `npm audit --omit=dev`, which checks just those, reports 0.
+- All 13 warnings are **one problem in one small package**, *picomatch*, which matches file-name patterns for the tools around the app: Vite (which also serves the app while you play), Vitest (tests) and Tailwind (styles). Everything that uses it gets counted separately, which is why the number looks big.
+- **No fixed version of picomatch exists yet.** When one is released, `npm audit fix` should pick it up.
+- It needs specially crafted file-name patterns to slow things down, and the only patterns involved are the app's own settings, so nothing a visitor or another device sends can trigger it. That holds while phone/tablet access is on, too.
 
 **What to do (and not do):**
-- `npm audit fix` is safe to run. It only takes small, compatible updates. (It was last run on 17 November 2026, taking the count from 32 to 22.)
-- **Don't run `npm audit fix --force`.** The warnings that are left can only be fixed by jumping to new major versions (Vite 8, Tailwind 4, Zod 4, React Router 7, Vitest 5). Those need code changes, and forcing them would very likely break the app. They're best done as a planned upgrade.
+- `npm audit fix` is safe to run. It only takes small, compatible updates.
+- **Don't run `npm audit fix --force`.** For this problem npm's suggested "fix" actually downgrades Vite to an older version, and it would also try a major Tailwind upgrade. Both would break the app.
 
 ---
 
 ## For developers
+
+Needs Node.js 22.12 or newer (the launchers use Node 24).
 
 ```bash
 npm run dev          # the app (5173) + the file server (5174)

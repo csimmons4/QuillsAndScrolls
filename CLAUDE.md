@@ -18,13 +18,18 @@ npm run scrape -- --only spells    # scrape a single category (comma-separate fo
 npm run audit:content     # check overlays vs scraped data for gaps/mismatches
 ```
 
-`npm audit` reports advisories (22 after `npm audit fix` on 2026-11-17, the same for everyone who installs: they come from `package-lock.json`). The ones left need major upgrades (Vite 8, Tailwind 4, Zod 4, React Router 7, Vitest 5, uuid 14), so never run `npm audit fix --force`; plain `npm audit fix` is fine. The README's "About the security warnings" section explains this for players; keep its numbers in step. Keep `uuid` rather than `crypto.randomUUID()`, which needs a secure context and so fails over plain-HTTP phone/tablet access.
+`npm audit` (the same for everyone who installs: it comes from `package-lock.json`): on 2026-11-17, after upgrading to Express 4.22.3, uuid 14, React Router 7, Vite 8, Vitest 5 and Zod 4, `npm audit --omit=dev` is 0. The full audit's 13 are all one picomatch ReDoS advisory (GHSA-fc5q-39xc-vjpf, affects ≤ 4.0.7, the newest release) reaching vite, vitest, @vitejs/plugin-react and Tailwind 3's file watchers; no fixed release exists yet. npm's suggested fix is a *downgrade* to vite 6.2.7: ignore it, and never run `npm audit fix --force`; plain `npm audit fix` is fine and will pick up a fixed picomatch. Tailwind 4 is deliberately not done: it changes how things look and needs Safari 16.4+, which matters for older iPads on phone access. The README's "About the security warnings" section explains this for players; keep its numbers in step. Keep `uuid` rather than `crypto.randomUUID()`, which needs a secure context and so fails over plain-HTTP phone/tablet access.
 
 Tests live next to the code (`derive.test.ts`, `classData.test.ts`, `sheet/helpers.test.ts`, `currency.test.ts`, `localStore.test.ts`) and check the rules math against PHB values: modifiers, proficiency, HP, skills/saves/initiative, spell DC, class resources, multiclass and pact slots, AC, weapon attacks, the purse and save migrations. `src/test/fixtures.ts` builds the merged reference data from `public/data/wikidot` + overlays and a `makeChar()` helper. Add a test when you change a rule.
 
 **Flow tests** (`src/test/flows.test.tsx`, jsdom via `// @vitest-environment jsdom`) render the whole `<App />` and click through it with Testing Library + user-event: open a sheet from the Vault, cast a spell (slot saved), long rest + Undo, the concentration save on damage, Arcane Recovery, Wild Shape damage overflow, Level Up (new level + "Before level 2" snapshot), and a full Creator run. `src/test/app.tsx` has the harness: `fakeServer(chars)` stubs `fetch` (`/data/wikidot` read from `public/`, `/api/*` kept in memory: check `server.characters` / `server.snapshots`), `renderApp(path)`, `saved(server, id, check)` (waits out the 800 ms debounced save) and the jsdom stubs (`scrollIntoView`, `scrollTo`, `CSS.escape`). The open spell/item renders twice in jsdom (side panel and under-row), so use `findAll…[0]`. Add a flow when you build something a player clicks through.
 
-**Launchers:** `Start (Mac).command` / `Start (Windows).bat` are the double-click entry point for non-technical users. On first run they download a private Node.js into `.runtime/` (gitignored) if none is installed, run `npm install`, kill anything on ports 5173/5174, then `npm run dev` and open the browser. Keep the two scripts and the README's Setup section in sync.
+**Launchers:** `Start (Mac).command` / `Start (Windows).bat` are the double-click entry point for non-technical users. They:
+- use the computer's own Node only if it's 22.12+ (a `node -e` version check), else a private Node (`NODE_VERSION`, now v24.22.3) in `.runtime/node` (gitignored), downloaded again if its `node -v` differs;
+- run `npm install` when `node_modules` is missing or `package-lock.json` differs from `node_modules/.qs-installed-lock` (copied after each successful install), so an updated app reinstalls itself;
+- then (Mac) kill anything on ports 5173/5174, `npm run dev`, wait until ready and open the browser. The Mac wait checks `http://localhost:5173`, not `127.0.0.1`: Vite listens on `::1` only.
+
+The `.bat` is written with `goto` labels (cmd mis-parses brackets inside if-blocks) and must keep CRLF line endings (`.gitattributes`). Keep the two scripts and the README's Setup section in sync. Node ≥ 22.12 is also in `package.json` `engines` (Vite 8 and Vitest 5 need it).
 
 ## Architecture
 
@@ -60,7 +65,7 @@ src/content/ContentProvider.tsx  ←  React context, exposes useContent() hook
 Routes (Vault, Creator, Sheet, LevelUp, Lookup, Homebrew, Settings)
 ```
 
-Pages other than the Vault are `lazy()`-loaded in `App.tsx`; `vite.config.ts` splits React, zod and `src/data/` into their own chunks.
+Pages other than the Vault are `lazy()`-loaded in `App.tsx`; `vite.config.ts` splits React, zod and `src/data/` into their own chunks with Vite 8's `build.rolldownOptions.output.codeSplitting.groups` (`manualChunks` / `rollupOptions` are deprecated under Rolldown), and uses `import.meta.dirname` rather than `__dirname`.
 
 All game reference data (spells, items, races, classes, backgrounds, feats) flows through `useContent()`. Routes never fetch content directly. Classes have **no overlay** — class mechanics the scraper can't capture live in `src/data/classData.ts` and are imported directly by consumers.
 
