@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { listCharactersFromDisk, saveCharacterToDisk } from '../storage/charApi'
+import { listCharactersFromDisk, saveCharacterToDisk, takeSnapshot } from '../storage/charApi'
 import { useContent } from '../content/ContentProvider'
 import { applyLevelUp, LevelUpChoices, asiLevelsForClass, shiftBaselines } from '../character/levelUp'
 import { totalLevel, profBonus, hpMax } from '../character/derive'
@@ -591,6 +591,8 @@ export default function LevelUp() {
       updated = { ...updated, hp: { ...updated.hp, current: updated.hp.current + hpGain } }
     }
 
+    // Keep the character as it was, so the level-up can be undone from the sheet's History
+    await takeSnapshot(char.id, `Before level ${newTotalLevel}`).catch(() => {})
     await saveCharacterToDisk(updated)
     navigate(`/c/${char.id}`)
   }

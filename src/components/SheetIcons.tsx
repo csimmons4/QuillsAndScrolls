@@ -50,6 +50,11 @@ export function ClockIcon({ className }: IconProps) {
   return <Line className={className}><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" /></Line>
 }
 
+/** Settings → Phones & Tablets: a phone */
+export function PhoneIcon({ className }: IconProps) {
+  return <Line className={className}><rect x="7" y="2.5" width="10" height="19" rx="2" /><path d="M11 18.5h2" /></Line>
+}
+
 /** Spell components: a flask */
 export function FlaskIcon({ className }: IconProps) {
   return <Line className={className}><path d="M9.5 3h5M10.5 3v6L5 18.5A1.7 1.7 0 0 0 6.5 21h11a1.7 1.7 0 0 0 1.5-2.5L13.5 9V3M7.5 15h9" /></Line>

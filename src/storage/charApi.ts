@@ -74,6 +74,46 @@ export async function deleteCharacterFromDisk(id: string): Promise<void> {
   await apiFetch(`/api/characters/${id}`, { method: 'DELETE' })
 }
 
+// ── Character history (snapshots kept by the server) ─────────────────────────
+
+export interface Snapshot { stamp: string; label: string; savedAt: string; name?: string; level?: number; hp?: number }
+
+export async function listHistory(id: string): Promise<Snapshot[]> {
+  return apiFetch(`/api/characters/${id}/history`)
+}
+
+/** A snapshot's character, migrated like any load */
+export async function loadSnapshot(id: string, stamp: string): Promise<Character> {
+  const snap: { character: unknown } = await apiFetch(`/api/characters/${id}/history/${stamp}`)
+  return migrate(snap.character)
+}
+
+/** Keep the character as it is now (Level Up does this first; restoring does it to what it replaces) */
+export async function takeSnapshot(id: string, label: string): Promise<void> {
+  await apiFetch(`/api/characters/${id}/history`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ label }),
+  })
+}
+
+// ── Phones and tablets ───────────────────────────────────────────────────────
+
+export interface NetworkSettings { lan: boolean; addresses: string[] }
+
+export async function getNetworkSettings(): Promise<NetworkSettings> {
+  return apiFetch('/api/settings/network')
+}
+
+/** Saved for the next start: the app only listens on the network after a restart */
+export async function setNetworkAccess(lan: boolean): Promise<NetworkSettings> {
+  return apiFetch('/api/settings/network', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ lan }),
+  })
+}
+
 // ── Homebrew ─────────────────────────────────────────────────────────────────
 
 export type HomebrewCategory = 'spells' | 'items' | 'feats' | 'races' | 'classes' | 'backgrounds'

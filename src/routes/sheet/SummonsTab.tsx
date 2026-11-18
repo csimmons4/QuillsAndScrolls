@@ -22,6 +22,8 @@ export function SummonsTab() {
     hpPct,
   } = useSheet()
   const activeSummon = activeSummonId ? char.summons.find(s => s.id === activeSummonId) : null
+  // A druid's Wild Shape form is kept with the summons but is the druid, so it's shown on the Stats tab
+  const summonsShown = char.summons.filter(s => s.templateKey !== 'wild-shape')
 
   const dismissSummon = (id: string) => {
     offerUndo(`Dismissed ${char.summons.find(s => s.id === id)?.name ?? 'the summon'}`)
@@ -175,7 +177,7 @@ export function SummonsTab() {
   // List view
   return (
     <div className="space-y-4">
-      {char.summons.length === 0 ? (
+      {summonsShown.length === 0 ? (
         <div className="card text-center py-8 text-parchment-400">
           <div className="text-2xl mb-2">✦</div>
           <div className="font-medium">No active summons</div>
@@ -183,7 +185,7 @@ export function SummonsTab() {
         </div>
       ) : (
         <div className="space-y-3">
-          {char.summons.map(s => {
+          {summonsShown.map(s => {
             const hpPct = s.hp.max > 0 ? Math.min(100, (s.hp.current / s.hp.max) * 100) : 0
             const hpColor = hpPct > 50 ? 'bg-green-500' : hpPct > 25 ? 'bg-yellow-400' : 'bg-red-500'
             const modOf = (v: number) => Math.floor((v - 10) / 2)

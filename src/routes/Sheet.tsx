@@ -11,6 +11,8 @@ import { PortraitPicker } from '../components/PortraitPicker'
 import { FeatAbilityPicker } from '../components/FeatAbilityPicker'
 import { Tab } from './sheet/helpers'
 import { useSheetModel } from './sheet/useSheetModel'
+import { HistoryButton } from '../components/HistoryDialog'
+import { takeSnapshot } from '../storage/charApi'
 import { SheetContext } from './sheet/SheetContext'
 import { StatsTab } from './sheet/StatsTab'
 import { SpellsTab } from './sheet/SpellsTab'
@@ -140,6 +142,16 @@ export default function Sheet() {
     setRaging,
     blessed,
     setBlessed,
+    spellsOnYou,
+    toggleSpellOnYou,
+    setSpellsOnYou,
+    wildShapeForm,
+    revertWildShape,
+    applyHealing,
+    recoverSlots,
+    setRecoverSlots,
+    songOfRestRoll,
+    setSongOfRestRoll,
   } = model
 
   return (
@@ -171,7 +183,7 @@ export default function Sheet() {
           <div className="inline-flex rounded border border-parchment-300 overflow-hidden" role="group" aria-label="Rest">
             <button type="button"
               className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-semibold bg-parchment-200 text-dungeon-900 hover:bg-parchment-300 transition-colors"
-              onClick={() => { setShortRestDice({}); setShortRestOpen(true) }} title="Short Rest" aria-label="Short Rest"
+              onClick={() => { setShortRestDice({}); setRecoverSlots({}); setSongOfRestRoll(''); setShortRestOpen(true) }} title="Short Rest" aria-label="Short Rest"
             ><HourglassIcon className="w-4 h-4" /><span className="hidden sm:inline">Short Rest</span></button>
             <button type="button"
               className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-semibold bg-parchment-200 text-dungeon-900 hover:bg-parchment-300 transition-colors border-l border-parchment-300"
@@ -200,6 +212,8 @@ export default function Sheet() {
             title="Export: download this character as a .json file" aria-label="Export character as JSON"
             className="inline-flex items-center justify-center w-9 h-9 rounded border border-parchment-300 text-parchment-600 hover:text-parchment-900 hover:border-parchment-500 hover:bg-parchment-100 transition-colors"
           ><ExportIcon className="w-5 h-5" /></button>
+          <HistoryButton charId={char.id} charName={char.name}
+            onRestore={async restored => { await takeSnapshot(char.id, 'Before restoring an earlier version').catch(() => {}); save(restored) }} />
           <Link to={`/c/${char.id}/print`} title="Printable sheet (print or save as PDF)" aria-label="Printable sheet"
             className="inline-flex items-center justify-center w-9 h-9 rounded border border-parchment-300 text-parchment-600 hover:text-parchment-900 hover:border-parchment-500 hover:bg-parchment-100 transition-colors"
           ><PrinterIcon className="w-5 h-5" /></Link>
@@ -210,6 +224,15 @@ export default function Sheet() {
           most on the right */}
       <div className="card mb-3 px-4 py-3 flex flex-col lg:flex-row gap-4">
         <div className="lg:w-[25rem] shrink-0">
+          {/* Wild Shape: the beast form takes damage and healing first */}
+          {wildShapeForm && (
+            <div className="mb-2 flex items-center gap-2 rounded-lg border border-green-300 bg-green-50 px-2.5 py-1.5 text-xs">
+              <span className="font-bold text-green-800 whitespace-nowrap">{wildShapeForm.name}</span>
+              <span className="text-green-700 whitespace-nowrap tabular-nums">{wildShapeForm.hp.current}/{wildShapeForm.hp.max} HP · AC {wildShapeForm.ac}</span>
+              <div className="flex-1 h-1.5 bg-green-100 rounded-full overflow-hidden min-w-[2rem]"><div className="h-full bg-green-500 rounded-full transition-all" style={{ width: `${Math.round(wildShapeForm.hp.current / Math.max(1, wildShapeForm.hp.max) * 100)}%` }} /></div>
+              <button type="button" onClick={revertWildShape} className="rounded-full px-2 py-0.5 border border-green-400 text-green-800 hover:bg-green-100 whitespace-nowrap">Change back</button>
+            </div>
+          )}
           <div className="flex items-center gap-3 mb-2">
             <div className="flex items-baseline gap-1.5">
               <input
@@ -292,7 +315,7 @@ export default function Sheet() {
                 type="button"
                 disabled={!quickValid}
                 className="flex-1 min-w-0 py-1.5 px-1 rounded text-sm font-medium transition-colors bg-green-100 text-green-700 border border-green-200 hover:bg-green-200 disabled:opacity-40 disabled:cursor-not-allowed"
-                onClick={() => { patch({ hp: { ...char.hp, current: Math.min(maxHp, char.hp.current + quickN) } }); setDamageInput('') }}
+                onClick={() => { applyHealing(quickN); setDamageInput('') }}
               >
                 <div>Heal</div>
                 {quickAfterHeal !== null && <div className="text-xs opacity-70">→ {quickAfterHeal}</div>}
@@ -319,7 +342,10 @@ export default function Sheet() {
             { label: 'AC', value: ac, note: acSource + (stealthDisadv ? ' ⚠ Stealth disadv.' : '') },
             { label: 'Initiative', value: formatMod(initiative), note: featBonuses.initiativeBonus ? `+${featBonuses.initiativeBonus} Alert` : undefined },
             { label: 'Speed', value: `${speed}ft`, note: [
-              potionFx.speedMultiplier > 1 ? `×${potionFx.speedMultiplier} potion` : monkMovement ? `+${monkMovement}ft Unarmored Movement` : fastMovement ? `+${fastMovement}ft Fast Movement` : featBonuses.speedBonus ? `+${featBonuses.speedBonus}ft feat` : '',
+              wildShapeForm ? `${wildShapeForm.name}${wildShapeForm.notes ? `, ${wildShapeForm.notes.replace(/^Also /, '')}` : ''}` : '',
+              potionFx.speedMultiplier > 1 ? `×${potionFx.speedMultiplier} ${spellsOnYou.has('haste') ? 'Haste' : 'potion'}`
+                : wildShapeForm ? ''
+                : monkMovement ? `+${monkMovement}ft Unarmored Movement` : fastMovement ? `+${fastMovement}ft Fast Movement` : featBonuses.speedBonus ? `+${featBonuses.speedBonus}ft feat` : '',
               ...potionSpeedNotes,
             ].filter(Boolean).join(' · ') || undefined },
             { label: 'Prof. Bonus', value: formatMod(pb) },
@@ -620,9 +646,9 @@ export default function Sheet() {
           <button key={t.key} onClick={() => selectTab(t.key)}
             className={`pb-2 text-sm font-medium flex items-center gap-1.5 shrink-0 whitespace-nowrap ${tab === 'summons' ? 'tab-active' : 'tab-inactive'}`}>
             {t.label}
-            {char.summons.length > 0 && (
+            {char.summons.filter(sm => sm.templateKey !== 'wild-shape').length > 0 && (
               <span className="text-[10px] bg-amber-500 text-white rounded-full px-1.5 py-0.5 font-bold leading-none">
-                {char.summons.length}
+                {char.summons.filter(sm => sm.templateKey !== 'wild-shape').length}
               </span>
             )}
           </button>
@@ -635,6 +661,12 @@ export default function Sheet() {
         {/* Once pinned: the numbers you glance at mid-fight, from any tab */}
         <div aria-hidden={!tabsPinned}
           className={`hidden sm:flex ml-auto items-center gap-3 pb-2 pl-4 shrink-0 text-sm transition-opacity duration-200 ${tabsPinned ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+          {wildShapeForm && (
+            <span className="tabular-nums text-green-800" title={`Wild Shape: ${wildShapeForm.name}`}>
+              <span className="text-[10px] uppercase tracking-wide mr-1">{wildShapeForm.name}</span>
+              <span className="font-bold">{wildShapeForm.hp.current}</span><span className="opacity-60">/{wildShapeForm.hp.max}</span>
+            </span>
+          )}
           <span className="tabular-nums" title="Hit points">
             <span className="text-[10px] uppercase tracking-wide text-parchment-500 mr-1">HP</span>
             <span className={`font-bold ${hpTextColor}`}>{char.hp.current}</span>
@@ -661,6 +693,12 @@ export default function Sheet() {
             <button type="button" onClick={() => setRaging(false)} tabIndex={tabsPinned ? 0 : -1} title="Stop raging"
               className="rounded-full bg-red-600 text-white text-xs font-semibold px-2 py-0.5 hover:bg-red-700">Raging ✕</button>
           )}
+          {[...spellsOnYou].map(key => (
+            <button key={key} type="button" onClick={() => toggleSpellOnYou(key)} tabIndex={tabsPinned ? 0 : -1} title="This spell has ended"
+              className="rounded-full bg-indigo-600 text-white text-xs font-semibold px-2 py-0.5 hover:bg-indigo-700">
+              {({ 'mage-armor': 'Mage Armor', shield: 'Shield', 'shield-of-faith': 'Shield of Faith', haste: 'Haste', barkskin: 'Barkskin' } as const)[key]} ✕
+            </button>
+          ))}
           {blessed && (
             <button type="button" onClick={() => setBlessed(false)} tabIndex={tabsPinned ? 0 : -1} title="Bless has ended"
               className="rounded-full bg-amber-400 text-white text-xs font-semibold px-2 py-0.5 hover:bg-amber-500">Blessed ✕</button>
@@ -851,7 +889,7 @@ export default function Sheet() {
                 className="btn btn-primary text-sm"
                 onClick={() => {
                   offerUndo('Long rest taken')
-                  setRaging(false); setBlessed(false)
+                  setRaging(false); setBlessed(false); setSpellsOnYou(new Set())
                   const resets: Record<string, number> = {}
                   longRestResourceKeys(classResources).forEach(k => {
                     const r = classResources.find(x => x.key === k)!
@@ -879,6 +917,7 @@ export default function Sheet() {
                   }
                   patch({
                     hp: { ...char.hp, current: maxHp, temp: 0 },  // temporary HP don't last through a long rest
+                    summons: char.summons.filter(s => s.templateKey !== 'wild-shape'),  // Wild Shape has run out
                     classResources: { ...char.classResources, ...resets, 'breath-weapon-used': 0 },
                     spellSlots: freshSlots,
                     hitDiceUsed: newHitDiceUsed,
@@ -966,6 +1005,59 @@ export default function Sheet() {
               })}
             </div>
 
+            {/* Song of Rest: a bard's performance adds a die for anyone who spends hit dice */}
+            {char.classes.some(cc => (shortRestDice[cc.classSlug] ?? 0) > 0) && (() => {
+              const bard = char.classes.find(c => c.classSlug === 'bard' && c.level >= 2)
+              const die = bard ? (bard.level >= 17 ? 'd12' : bard.level >= 13 ? 'd10' : bard.level >= 9 ? 'd8' : 'd6') : null
+              return (
+                <div className="mb-4 flex items-center gap-2">
+                  <span className="text-sm font-medium text-parchment-700">Song of Rest</span>
+                  <span className="text-xs text-parchment-400">{die ? `roll your ${die}` : 'if a bard performed'}</span>
+                  <input type="number" min={1} max={12} placeholder="roll" value={songOfRestRoll} aria-label="Song of Rest roll"
+                    onChange={e => setSongOfRestRoll(e.target.value)} className="input text-sm py-0.5 w-16 text-center ml-auto" />
+                </div>
+              )
+            })()}
+
+            {/* Arcane Recovery (wizard) / Natural Recovery (Circle of the Land): spent slots back, once a day */}
+            {(() => {
+              const rec = classResources.find(r => (r.key === 'arcane-recovery' || r.key === 'natural-recovery') && r.current > 0)
+              if (!rec) return null
+              const budget = Math.ceil((char.classes.find(c => c.classSlug === rec.classSlug)?.level ?? 0) / 2)
+              const chosen = Object.entries(recoverSlots).reduce((n, [l, c]) => n + Number(l) * c, 0)
+              const spentLevels = [1, 2, 3, 4, 5].filter(l => (char.spellSlots[String(l)]?.used ?? 0) > 0)
+              const ord = ['', '1st', '2nd', '3rd', '4th', '5th']
+              return (
+                <div className="mb-4 rounded-lg border border-violet-200 bg-violet-50 p-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-semibold text-violet-800">{rec.name}</span>
+                    <span className="text-xs text-violet-700 tabular-nums">{chosen} / {budget} slot levels</span>
+                  </div>
+                  <p className="text-[11px] text-violet-700 mb-2">Once a day: get back spent slots worth up to {budget} levels in all, none above 5th.</p>
+                  {spentLevels.length === 0 && <p className="text-xs italic text-violet-600">No spent slots to get back.</p>}
+                  {spentLevels.map(l => {
+                    const used = char.spellSlots[String(l)]!.used
+                    const n = recoverSlots[String(l)] ?? 0
+                    return (
+                      <div key={l} className="flex items-center gap-2 py-0.5 text-sm">
+                        <span className="w-10 font-medium text-violet-900">{ord[l]}</span>
+                        <span className="text-xs text-violet-600">{used} spent</span>
+                        <div className="flex items-center gap-1.5 ml-auto">
+                          <button type="button" aria-label={`One fewer ${ord[l]}-level slot`} disabled={n === 0}
+                            onClick={() => setRecoverSlots(r => ({ ...r, [String(l)]: n - 1 }))}
+                            className="w-6 h-6 rounded bg-violet-100 hover:bg-violet-200 text-sm font-bold disabled:opacity-40">−</button>
+                          <span className="w-5 text-center font-semibold">{n}</span>
+                          <button type="button" aria-label={`Get back a ${ord[l]}-level slot`} disabled={n >= used || chosen + l > budget}
+                            onClick={() => setRecoverSlots(r => ({ ...r, [String(l)]: n + 1 }))}
+                            className="w-6 h-6 rounded bg-violet-100 hover:bg-violet-200 text-sm font-bold disabled:opacity-40">+</button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )
+            })()}
+
             {/* Total recovery */}
             {(() => {
               const conMod = abilityModFor(effectiveChar, 'con')
@@ -975,7 +1067,7 @@ export default function Sheet() {
                 const raw = parseInt(shortRestRolls[cc.classSlug] ?? '', 10)
                 if (isNaN(raw)) return sum
                 return sum + raw + conMod * spent
-              }, 0)
+              }, 0) + (parseInt(songOfRestRoll, 10) > 0 ? parseInt(songOfRestRoll, 10) : 0)
               const anySpent = char.classes.some(cc => (shortRestDice[cc.classSlug] ?? 0) > 0)
               const newHp = Math.min(maxHp, char.hp.current + totalHeal)
               return anySpent && totalHeal > 0 ? (
@@ -986,7 +1078,7 @@ export default function Sheet() {
             })()}
 
             <div className="flex gap-2 justify-end">
-              <button className="btn btn-secondary text-sm" onClick={() => { setShortRestOpen(false); setShortRestDice({}); setShortRestRolls({}) }}>Cancel</button>
+              <button className="btn btn-secondary text-sm" onClick={() => { setShortRestOpen(false); setShortRestDice({}); setShortRestRolls({}); setRecoverSlots({}); setSongOfRestRoll('') }}>Cancel</button>
               <button
                 className="btn btn-primary text-sm disabled:opacity-50"
                 // Dice marked as spent need their roll entered, or they'd be used up for nothing
@@ -998,7 +1090,8 @@ export default function Sheet() {
                 })}
                 onClick={() => {
                   offerUndo('Short rest taken')
-                  setRaging(false); setBlessed(false)
+                  // An hour's rest: Mage Armor (8 hours) lasts, the shorter spells end
+                  setRaging(false); setBlessed(false); setSpellsOnYou(prev => new Set([...prev].filter(k => k === 'mage-armor')))
                   const conMod = abilityModFor(effectiveChar, 'con')
                   const totalHeal = Math.max(0, char.classes.reduce((sum, cc) => {
                     const spent = shortRestDice[cc.classSlug] ?? 0
@@ -1006,7 +1099,13 @@ export default function Sheet() {
                     const raw = parseInt(shortRestRolls[cc.classSlug] ?? '', 10)
                     if (isNaN(raw)) return sum
                     return sum + raw + conMod * spent
-                  }, 0))
+                  }, 0)) + (Object.values(shortRestDice).some(n => n > 0) && parseInt(songOfRestRoll, 10) > 0 ? parseInt(songOfRestRoll, 10) : 0)
+                  // Arcane / Natural Recovery: the slots picked come back, and the feature is used for the day
+                  const rec = classResources.find(r => (r.key === 'arcane-recovery' || r.key === 'natural-recovery') && r.current > 0)
+                  const recovering = Object.entries(recoverSlots).filter(([, n]) => n > 0)
+                  const recoveredSlots = rec && recovering.length
+                    ? Object.fromEntries(Object.entries(char.spellSlots).map(([l, sl]) => [l, { ...sl, used: Math.max(0, sl.used - (recoverSlots[l] ?? 0)) }]))
+                    : null
                   const newHitDiceUsed: Record<string, number> = { ...(char.hitDiceUsed ?? {}) }
                   for (const [slug, spent] of Object.entries(shortRestDice)) {
                     if (spent > 0) newHitDiceUsed[slug] = (newHitDiceUsed[slug] ?? 0) + spent
@@ -1021,7 +1120,8 @@ export default function Sheet() {
                   patch({
                     hp: { ...char.hp, current: Math.min(maxHp, char.hp.current + totalHeal) },
                     hitDiceUsed: newHitDiceUsed,
-                    classResources: { ...char.classResources, ...resets, 'breath-weapon-used': 0 },
+                    classResources: { ...char.classResources, ...resets, 'breath-weapon-used': 0, ...(recoveredSlots && rec ? { [rec.key]: 0 } : {}) },
+                    ...(recoveredSlots ? { spellSlots: recoveredSlots } : {}),
                     ...(char.pactSlots ? { pactSlots: { ...char.pactSlots, used: 0 } } : {}),
                     // A short rest takes an hour: effects of an hour or less run out
                     ...potionsAfterRest(60),
@@ -1029,6 +1129,8 @@ export default function Sheet() {
                   setShortRestOpen(false)
                   setShortRestDice({})
                   setShortRestRolls({})
+                  setRecoverSlots({})
+                  setSongOfRestRoll('')
                 }}
               >Finish Rest</button>
             </div>

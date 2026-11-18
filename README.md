@@ -14,7 +14,9 @@ Everything is stored as plain `.json` files inside the project folder:
 Quills&Scrolls/
 ├── characters/
 │   ├── Thalindra_a1b2c3d4.json      ← one file per character
-│   └── Brunak_the_Bold_e5f6g7h8.json
+│   ├── Brunak_the_Bold_e5f6g7h8.json
+│   └── .history/                    ← earlier versions of each character (hidden folder)
+├── .local-settings.json             ← only if you switched on phone/tablet access
 └── homebrew/
     ├── spells/
     │   └── orb-of-destruction.json  ← one file per homebrew entry
@@ -29,6 +31,8 @@ Quills&Scrolls/
 ```
 
 You can open, copy, move, or delete these files directly in Finder (Mac) or File Explorer (Windows) — no special tools needed.
+
+On a Mac, files and folders starting with a dot are hidden: press **Cmd+Shift+.** in Finder to show them. Windows shows them normally.
 
 ---
 
@@ -49,8 +53,15 @@ Keep the launcher's window open while you're using the app — closing it stops 
 - **Mac:** The Mac may warn the file is from an unidentified developer. Right-click **`Start (Mac).command`** → **Open** → **Open**. After that it opens normally on a plain double-click.
 - **Windows:** If a firewall popup appears, click **Allow access**. It's just Node.js opening a local port on your own machine.
 - You need to be **online** the first time so the launcher can download what it needs. After that it works offline.
+- While installing, the window may print something like **"22 vulnerabilities (8 moderate, 12 high, 2 critical)"**. That's normal and the app is fine to use. See [About the security warnings](#about-the-security-warnings-npm-audit).
 
 > Prefer the command line? You can still run `npm install` once and then `npm run dev`, opening **http://localhost:5173** yourself.
+
+### Using it on a phone or tablet
+
+Off unless you switch it on. In **Settings → Phones & Tablets**, tick **Let phones and tablets on my Wi-Fi open the app**, then restart the app (close the launcher's window and double-click it again). Settings then shows an address like `http://192.168.1.20:5173` to open on the phone or tablet. Keep the computer running the app while you play.
+
+There's no password: while this is on, anyone on the same Wi-Fi can open, change or delete your characters. Only use it at home, on a network you trust. The first time, your computer may ask whether to let "node" accept incoming connections: choose **Allow**.
 
 ---
 
@@ -82,7 +93,9 @@ After scraping, refresh your browser to pick up the new data.
 The home screen. Lists all your saved characters. From here you can:
 - **Create a new character** — opens the step-by-step wizard
 - **Import a character** — load a `.json` file from another device
-- **Delete a character** — with confirmation
+- **Duplicate or delete a character** — in each card's **⋯** menu (deleting asks first)
+
+Each card shows the portrait, class and HP. A character at 0 HP shows **Down** (or **Stable**) with their death saves, and a character who has died moves to a **Fallen** section at the bottom.
 
 ### Character Creation Wizard
 Eight steps that walk you through building a Level 1 character:
@@ -99,12 +112,22 @@ Eight steps that walk you through building a Level 1 character:
 The main play screen. Tabs for:
 - **Stats** — ability scores, saving throws, skills, conditions, inspiration, class resources, rests, death saves
 - **Spells** — known/prepared spells, spell slot tracker, cast & recover
-- **Inventory** — equipment list, currency (cp/sp/ep/gp/pp), attunement
+- **Inventory** — equipment, attunement, magic item charges, potions you can drink, and a coin purse (gain or spend in any coin, with a ledger of what changed)
 - **Features** — all race, class, and background features with descriptions
 - **Summons** — track summoned or companion creatures with their own HP and stats
 - **Notes** — personality traits, ideals, bonds, flaws, backstory, free notes
 
 Every change auto-saves to disk within a second. No manual save needed during play.
+
+Handy extras on the sheet:
+- **Undo:** after removing a spell or item, drinking a potion, taking a rest and similar, a bar offers **Undo** for a few seconds.
+- **Quick find:** press **Cmd+K** (Mac) / **Ctrl+K** (Windows), or click the magnifier, to jump to any spell, item, feature or tab.
+- **Print:** the printer button opens a printable two-page sheet (black on white in every theme).
+- **Portrait:** click the initials in the sheet header to add a picture. It's saved inside the character's file.
+
+Fight helpers on the Stats tab: Rage and Bless, spells that change your AC (Mage Armor, Shield, Shield of Faith, Haste, Barkskin), and a druid's **Wild Shape** (pick a beast form; it takes damage first and the rest carries over to you). The Short Rest window handles hit dice, **Arcane Recovery** / **Natural Recovery** and **Song of Rest**. You roll every die yourself and type in the result.
+
+**History:** the clock button on a sheet lists earlier versions of the character and can put one back. A version is kept at the start of each play session, before each level-up and before a restore, up to the 40 most recent per character. They live in the hidden `characters/.history/` folder and are not part of the backup zip.
 
 ### Level Up
 Click **Level Up** on any character sheet to:
@@ -114,6 +137,8 @@ Click **Level Up** on any character sheet to:
 - Pick ASI (+2 to one stat or +1/+1) or choose a feat
 - Select a subclass when eligible
 - Add new spells known
+
+A copy of the character from before the level-up is kept in History, in case you change your mind.
 
 ### Homebrew Editor
 Add your own custom content that appears alongside official options everywhere in the app:
@@ -133,6 +158,7 @@ A searchable, filterable reference browser for **all** game content — spells, 
 - Choose a display theme — **Parchment** (warm classic), **Light** (clean white), or **Dark**
 - See when data was last scraped and how many entries exist
 - Download a full backup `.zip` of all characters + homebrew
+- Let phones and tablets on your Wi-Fi open the app (off by default, see Setup)
 - Re-scrape instructions
 
 ---
@@ -142,7 +168,9 @@ A searchable, filterable reference browser for **all** game content — spells, 
 ### Characters
 Characters auto-save to the `characters/` folder as you play. Each character is its own file named after the character.
 
-**Save to file manually:** click **💾 Save Character** on the character sheet, or press **Cmd+S** (Mac) / **Ctrl+S** (Windows). This downloads a copy to your Downloads folder as an extra backup.
+**Save right now:** click the save (disk) button in the sheet header, or press **Cmd+S** (Mac) / **Ctrl+S** (Windows). This writes the character to the `characters/` folder straight away instead of waiting for the auto-save, and the button shows a tick when it's done.
+
+**Download a copy:** the export (arrow) button next to it downloads the character as a `.json` file to your Downloads folder, as an extra backup or to send to someone.
 
 **Move a character to another device:** copy the file from `characters/` on one machine to the same folder on the other. It will appear in the Vault automatically next time you open the app.
 
@@ -167,6 +195,37 @@ homebrew/
 
 ### Full Backup
 Settings → **Download Backup (.zip)** bundles every character and all homebrew into a single zip file. Good to run before wiping your computer or moving to a new machine.
+
+---
+
+## About the security warnings (npm audit)
+
+When the launcher (or `npm install`) installs the app's files, npm checks every package the app is built from against a public list of known problems and prints a summary such as *"22 vulnerabilities (8 moderate, 12 high, 2 critical)"*.
+
+**It's not just your computer.** Everyone who installs this app sees the same message, because it comes from the list of packages that ships with the app (`package-lock.json`). The number can also go up over time without anything changing here, as new problems are published.
+
+**Why it's not a worry for normal use:**
+- Most of the warnings are in **developer tools** (building, testing and styling the app) that don't do anything while you play.
+- The rest are about websites that are **open to the internet**, or about features this app doesn't use. The app's server only answers your own computer.
+- **One thing to know:** while **phone/tablet access** is switched on, other devices on your Wi-Fi can reach the app, and a few of the warnings (in Vite, the tool that serves the app) are about what someone who can reach it might be able to read. That's one more reason to use it only on a network you trust and switch it off when you don't need it.
+
+**What to do (and not do):**
+- `npm audit fix` is safe to run. It only takes small, compatible updates. (It was last run on 17 November 2026, taking the count from 32 to 22.)
+- **Don't run `npm audit fix --force`.** The warnings that are left can only be fixed by jumping to new major versions (Vite 8, Tailwind 4, Zod 4, React Router 7, Vitest 5). Those need code changes, and forcing them would very likely break the app. They're best done as a planned upgrade.
+
+---
+
+## For developers
+
+```bash
+npm run dev          # the app (5173) + the file server (5174)
+npm test             # game-math tests + flow tests that click through the app
+npx tsc --noEmit     # type-check
+npm run build        # production build
+npm run audit:content   # compare the curated data with the scraped data
+```
+
+`CLAUDE.md` describes how the code is organised: data flow, the character model, the sheet's files, and conventions.
 
 ---
 

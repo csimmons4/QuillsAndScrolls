@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams } from 'react-router-dom'
-import { Character, ABILITIES } from '../../character/model'
+import { Character, ABILITIES, type Summon } from '../../character/model'
+import type { Beast } from '../../data/wildShapeBeasts'
 import { listCharactersFromDisk, saveCharacterToDisk } from '../../storage/charApi'
 import { useContent } from '../../content/ContentProvider'
 import { profBonus, skillMod, hpMax, totalLevel, passivePerception, spellAttackBonus, spellSaveDC, abilityModFor, formatMod, deriveClassResources, featureKey, resourceMatchesFeature, hasBardJackOfAllTrades, monkSpeedBonus, sneakAttackDice, paladinAuraBonus, initiativeBonus, spellcastingAbilityFor, type ClassResource } from '../../character/derive'
@@ -69,6 +70,9 @@ export function useSheetModel() {
   const [shortRestOpen, setShortRestOpen] = useState(false)
   const [shortRestDice, setShortRestDice] = useState<Record<string, number>>({})
   const [shortRestRolls, setShortRestRolls] = useState<Record<string, string>>({})
+  // Short rest extras: slots picked for Arcane / Natural Recovery (level → count), a Song of Rest roll
+  const [recoverSlots, setRecoverSlots] = useState<Record<string, number>>({})
+  const [songOfRestRoll, setSongOfRestRoll] = useState('')
   const [longRestOpen, setLongRestOpen] = useState(false)
   const { askConfirm, confirmDialog } = useConfirm()
   // All Proficiencies card: edit mode and the "Other…" boxes
@@ -243,7 +247,15 @@ export function useSheetModel() {
   // saved with the character, and end on a rest or when another character is opened.
   const [raging, setRaging] = useState(false)
   const [blessed, setBlessed] = useState(false)
-  useEffect(() => { setRaging(false); setBlessed(false) }, [id])
+  // Spells someone (maybe you) has cast on you that change AC or speed
+  type SpellOnYou = 'mage-armor' | 'shield' | 'shield-of-faith' | 'haste' | 'barkskin'
+  const [spellsOnYou, setSpellsOnYou] = useState<Set<SpellOnYou>>(new Set())
+  const toggleSpellOnYou = (key: SpellOnYou) => setSpellsOnYou(prev => {
+    const next = new Set(prev)
+    if (next.has(key)) next.delete(key); else next.add(key)
+    return next
+  })
+  useEffect(() => { setRaging(false); setBlessed(false); setSpellsOnYou(new Set()) }, [id])
 
   // Whether the tab bar is pinned to the top of the window (scrolled past its place); the status strip shows then
   const [tabsPinned, setTabsPinned] = useState(false)
@@ -315,6 +327,10 @@ export function useSheetModel() {
       for (const r of resist) if (!fx.resistances.includes(r)) fx.resistances.push(r)
     }
     if (blessed && !fx.rollBonusDice.includes('1d4')) fx.rollBonusDice.push('1d4')
+    if (spellsOnYou.has('haste')) {
+      fx.speedMultiplier = Math.max(fx.speedMultiplier, 2)
+      fx.saveAdvantage.add('dex')
+    }
     return fx
   })()
   // Concentration spells that add damage to your hits while they last (against the target they name)
@@ -424,9 +440,20 @@ export function useSheetModel() {
   }
 
   const mediumDexCap = featSlugs.includes('medium-armor-master') ? 3 : 2
-  const { ac: armorAc, source: armorAcSource, stealthDisadv } = computeFullAC(effectiveChar, featBonuses.naturalArmorBase, content.items, raceDef, itemBonuses.acBonus, mediumDexCap)
-  const ac = armorAc + potionFx.acBonus  // Speed (Haste) +2
-  const acSource = armorAcSource + (potionFx.acBonus ? ` +${potionFx.acBonus} potion` : '')
+  // Wild Shape: the beast form (kept as a summon) brings its own AC and speed, and takes damage and healing first
+  const wildShapeForm = char.summons.find(s => s.templateKey === 'wild-shape')
+  const { ac: armorAc, source: armorAcSource, stealthDisadv: armorStealthDisadv } = computeFullAC(effectiveChar, featBonuses.naturalArmorBase, content.items, raceDef, itemBonuses.acBonus, mediumDexCap, spellsOnYou.has('mage-armor'))
+  const spellAc = (spellsOnYou.has('shield') ? 5 : 0) + (spellsOnYou.has('shield-of-faith') ? 2 : 0) + (spellsOnYou.has('haste') ? 2 : 0)
+  const acBeforeBarkskin = (wildShapeForm ? wildShapeForm.ac : armorAc) + potionFx.acBonus + spellAc  // potion of Speed (Haste) +2
+  // Barkskin: AC can't be less than 16
+  const ac = spellsOnYou.has('barkskin') ? Math.max(16, acBeforeBarkskin) : acBeforeBarkskin
+  const stealthDisadv = !wildShapeForm && armorStealthDisadv
+  const acSource = (wildShapeForm ? `${wildShapeForm.name} (Wild Shape)` : armorAcSource)
+    + (potionFx.acBonus ? ` +${potionFx.acBonus} potion` : '')
+    + (spellsOnYou.has('shield') ? ' + Shield spell' : '')
+    + (spellsOnYou.has('shield-of-faith') ? ' + Shield of Faith' : '')
+    + (spellsOnYou.has('haste') ? ' + Haste' : '')
+    + (spellsOnYou.has('barkskin') && acBeforeBarkskin < 16 ? ' (Barkskin: 16)' : '')
   const initiative = initiativeBonus(effectiveChar) + featBonuses.initiativeBonus + itemBonuses.abilityCheckBonus
   const passive = passivePerception(effectiveCharSkills) + featBonuses.passivePerceptionBonus + itemBonuses.abilityCheckBonus
   const passiveInvestigation = 10 + skillMod(effectiveCharSkills, 'investigation') + featBonuses.passiveInvestigationBonus + itemBonuses.abilityCheckBonus
@@ -439,7 +466,7 @@ export function useSheetModel() {
   const monkMovement = !bodyArmorType && !shieldWorn ? monkSpeedBonus(char) : 0
   const fastMovement = char.classes.some(c => c.classSlug === 'barbarian' && c.level >= 5) && bodyArmorType !== 'heavy' ? 10 : 0
   const walkSpeed = raceSpeed + featBonuses.speedBonus + monkMovement + fastMovement
-  const speed = walkSpeed * potionFx.speedMultiplier  // Speed (Haste) doubles it
+  const speed = (wildShapeForm ? wildShapeForm.speed : walkSpeed) * potionFx.speedMultiplier  // Speed (Haste) doubles it
   // Fly/swim/climb speeds from potions ("equal to your walking speed" uses the current speed)
   const potionSpeedNotes = potionFx.extraSpeeds.map(s =>
     `${s.mode[0].toUpperCase()}${s.mode.slice(1)} ${s.feet ?? speed}ft${s.hover ? ' (hover)' : ''}`)
@@ -692,16 +719,42 @@ export function useSheetModel() {
   const hpTextColor = hpPct > 50 ? 'text-green-700' : hpPct > 25 ? 'text-amber-600' : 'text-red-600'
   const quickN = parseInt(damageInput, 10)
   const quickValid = !isNaN(quickN) && quickN > 0
-  const quickAfterDamage = quickValid ? Math.max(0, char.hp.current - Math.max(0, quickN - char.hp.temp)) : null
-  const quickAfterHeal   = quickValid ? Math.min(maxHp, char.hp.current + quickN) : null
+  const quickAfterDamage = !quickValid ? null
+    : wildShapeForm && quickN < wildShapeForm.hp.current ? wildShapeForm.hp.current - quickN
+    : Math.max(0, char.hp.current - Math.max(0, quickN - (wildShapeForm?.hp.current ?? 0) - char.hp.temp))
+  const quickAfterHeal = !quickValid ? null
+    : wildShapeForm ? Math.min(wildShapeForm.hp.max, wildShapeForm.hp.current + quickN)
+    : Math.min(maxHp, char.hp.current + quickN)
+
+  /** Healing: the beast form first if you're in one, otherwise you */
+  function applyHealing(amount: number) {
+    if (!char) return
+    if (wildShapeForm) {
+      patch({ summons: char.summons.map(s => s.id === wildShapeForm.id ? { ...s, hp: { ...s.hp, current: Math.min(s.hp.max, s.hp.current + amount) } } : s) })
+      return
+    }
+    patch({ hp: { ...char.hp, current: Math.min(maxHp, char.hp.current + amount) } })
+  }
 
   function applyDamage(amount: number) {
     if (!char) return
+    // In Wild Shape the beast takes it first; at 0 HP you change back and the rest carries over to you
+    let hpDamage = amount
+    let summons: Character['summons'] | undefined
+    if (wildShapeForm && amount > 0) {
+      if (amount < wildShapeForm.hp.current) {
+        summons = char.summons.map(s => s.id === wildShapeForm.id ? { ...s, hp: { ...s.hp, current: s.hp.current - amount } } : s)
+        hpDamage = 0
+      } else {
+        summons = char.summons.filter(s => s.id !== wildShapeForm.id)
+        hpDamage = amount - wildShapeForm.hp.current
+      }
+    }
     const temp = char.hp.temp
-    const overflow = temp > 0 ? Math.max(0, amount - temp) : amount
-    const newTemp = temp > 0 ? Math.max(0, temp - amount) : temp
+    const overflow = temp > 0 ? Math.max(0, hpDamage - temp) : hpDamage
+    const newTemp = temp > 0 ? Math.max(0, temp - hpDamage) : temp
     const newCurrent = Math.max(0, char.hp.current - overflow)
-    const update: Partial<Character> = { hp: { ...char.hp, temp: newTemp, current: newCurrent } }
+    const update: Partial<Character> = { hp: { ...char.hp, temp: newTemp, current: newCurrent }, ...(summons ? { summons } : {}) }
 
     // Massive damage (PHB p.197): damage left over after dropping to 0 that equals or exceeds
     // your hit point maximum kills outright
@@ -736,6 +789,15 @@ export function useSheetModel() {
     breath?: { used: boolean }      // Dragonborn Breath Weapon: once per short rest
   }
   const attackRows: AttackRow[] = (() => {
+    // In Wild Shape you attack with the beast's natural weapons
+    if (wildShapeForm) {
+      return wildShapeForm.attacks.map((atk, i) => ({
+        key: `beast-${i}`, name: atk.name,
+        toHit: atk.toHit !== undefined ? formatMod(atk.toHit) : '—',
+        damage: atk.damage ? `${atk.damage}${atk.damageType ? ` ${atk.damageType}` : ''}` : '—',
+        notes: [`Wild Shape: ${wildShapeForm.name}`, atk.range ?? '', atk.notes ?? ''].filter(Boolean).join(' · '),
+      }))
+    }
     const rows: AttackRow[] = []
     const rollDice = potionFx.rollBonusDice.map(d => ` ${d}`).join('')
     const strMod = abilityModFor(effectiveChar, 'str'), dexMod = abilityModFor(effectiveChar, 'dex')
@@ -819,6 +881,28 @@ export function useSheetModel() {
     return rows
   })()
 
+  /** Take a beast form: spends a Wild Shape use. You keep your own INT, WIS and CHA. */
+  const enterWildShape = (b: Beast | { name: string; hp: number; ac: number; speed: number }) => {
+    const use = classResources.find(r => r.key === 'wild-shape')
+    if (!use || (use.max !== null && use.current <= 0)) return
+    const beast = 'slug' in b ? b : null
+    const form: Summon = {
+      id: Math.random().toString(36).slice(2, 10),
+      name: b.name, templateKey: 'wild-shape',
+      hp: { current: b.hp, max: b.hp }, ac: b.ac, speed: b.speed,
+      ...(beast ? { abilityScores: { str: beast.str, dex: beast.dex, con: beast.con, int: char.abilityScores.int, wis: char.abilityScores.wis, cha: char.abilityScores.cha } } : {}),
+      saveProficiencies: [], immunities: [], resistances: [],
+      attacks: beast ? beast.attacks.map(a => ({ name: a.name, toHit: a.toHit, damage: a.damage, damageType: a.damageType, range: 'Melee', notes: a.notes ?? '' })) : [],
+      abilities: beast ? beast.traits : [],
+      notes: beast?.otherSpeeds ? `Also ${beast.otherSpeeds}` : '',
+    }
+    patch({
+      summons: [...char.summons.filter(s => s.templateKey !== 'wild-shape'), form],
+      ...(use.max !== null ? { classResources: { ...char.classResources, 'wild-shape': use.current - 1 } } : {}),
+    })
+  }
+  const revertWildShape = () => patch({ summons: char.summons.filter(s => s.templateKey !== 'wild-shape') })
+
   /** Start raging: spends a Rage, and ends concentration (a raging barbarian can't concentrate or cast) */
   const startRage = async () => {
     const rage = classResources.find(r => r.key === 'rage-uses')
@@ -838,12 +922,23 @@ export function useSheetModel() {
     ready: true as const,
     raging,
     setRaging,
+    spellsOnYou,
+    toggleSpellOnYou,
+    setSpellsOnYou,
     blessed,
     setBlessed,
     barbarianLevel,
     rageDamage,
     concRider,
     startRage,
+    recoverSlots,
+    setRecoverSlots,
+    songOfRestRoll,
+    setSongOfRestRoll,
+    wildShapeForm,
+    enterWildShape,
+    revertWildShape,
+    applyHealing,
     attackRows,
     id,
     content,

@@ -3,7 +3,9 @@ node_modules/
 dist/
 scripts/scraper/cache/
 characters/*.json
+characters/.history/
 homebrew/**/*.json
+.local-settings.json
 
 *.local
 .DS_Store

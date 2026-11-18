@@ -24,6 +24,12 @@ describe('armor class', () => {
     expect(ac(makeChar([{ classSlug: 'barbarian', level: 1 }], { dex: 14, con: 16 }))).toBe(10 + 2 + 3)
     expect(ac(makeChar([{ classSlug: 'monk', level: 1 }], { dex: 16, wis: 16 }))).toBe(10 + 3 + 3)
   })
+  it('makes Mage Armor 13 + DEX, only without armor', () => {
+    const wiz = makeChar([{ classSlug: 'wizard', level: 1 }], { dex: 14 })
+    expect(computeFullAC(wiz, 0, content().items, undefined, 0, 2, true).ac).toBe(13 + 2)
+    const armored = makeChar([{ classSlug: 'fighter', level: 1 }], { dex: 14 }, { equipment: [equipped('leather')] })
+    expect(computeFullAC(armored, 0, content().items, undefined, 0, 2, true).ac).toBe(11 + 2)
+  })
   it("loses the monk's Unarmored Defense with a shield, but not the barbarian's", () => {
     expect(ac(makeChar([{ classSlug: 'monk', level: 1 }], { dex: 16, wis: 16 }, { equipment: [equipped('shield')] }))).toBe(10 + 3 + 2)
     expect(ac(makeChar([{ classSlug: 'barbarian', level: 1 }], { dex: 14, con: 16 }, { equipment: [equipped('shield')] }))).toBe(10 + 2 + 3 + 2)

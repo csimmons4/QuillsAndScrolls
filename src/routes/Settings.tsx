@@ -1,12 +1,12 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useContent } from '../content/ContentProvider'
-import { listCharactersFromDisk, loadHomebrewFromDisk } from '../storage/charApi'
+import { listCharactersFromDisk, loadHomebrewFromDisk, getNetworkSettings, setNetworkAccess, type NetworkSettings } from '../storage/charApi'
 import { exportEverything } from '../storage/ioFile'
 import { CLASS_OPTIONS } from '../data/classData'
 import { deriveClassResources } from '../character/derive'
 import type { Character } from '../character/model'
 import { useTheme, THEMES } from '../theme/theme'
-import { PaletteIcon, BookIcon, ExportIcon, ScalesIcon, ChecklistIcon } from '../components/SheetIcons'
+import { PaletteIcon, BookIcon, ExportIcon, ScalesIcon, ChecklistIcon, PhoneIcon } from '../components/SheetIcons'
 
 const CLASS_SLUGS = Object.keys(CLASS_OPTIONS).sort()
 
@@ -167,6 +167,10 @@ export default function Settings() {
   }
   const hasData = Object.values(counts).some(n => n > 0)
 
+  // Phones & Tablets: null while loading, 'old-server' if the server predates the setting
+  const [network, setNetwork] = useState<NetworkSettings | null | 'old-server'>(null)
+  useEffect(() => { getNetworkSettings().then(setNetwork, () => setNetwork('old-server')) }, [])
+
   async function handleBackup() {
     const [{ characters }, hb] = await Promise.all([listCharactersFromDisk(), loadHomebrewFromDisk()])
     await exportEverything(characters, hb)
@@ -221,6 +225,47 @@ export default function Settings() {
         <button className="btn-primary" onClick={handleBackup}>
           <ExportIcon className="w-4 h-4 mr-1.5" /> Download Backup (.zip)
         </button>
+      </div>
+
+      {/* Phones & Tablets: opt-in network access */}
+      <div className="card mb-6">
+        <h2 className="section-header flex items-center gap-2"><PhoneIcon className="w-5 h-5 text-[rgb(var(--accent))] shrink-0" /> Phones &amp; Tablets</h2>
+        <p className="text-sm text-parchment-500 mb-3">
+          Open your characters on a phone or tablet on the same Wi-Fi, with this computer running the app. Off unless you switch it on.
+        </p>
+        {network === 'old-server' ? (
+          <p className="text-sm text-parchment-600 italic">This needs the app to be restarted once: close the Start window and double-click Start again.</p>
+        ) : network && (
+          <>
+            <label className="flex items-center gap-2 text-sm text-parchment-800 cursor-pointer w-fit">
+              <input type="checkbox" checked={network.lan}
+                onChange={e => { setNetworkAccess(e.target.checked).then(setNetwork, () => setNetwork('old-server')) }} />
+              Let phones and tablets on my Wi-Fi open the app
+            </label>
+            {network.lan !== __QS_LAN__ ? (
+              <p className="mt-2 text-sm text-amber-800">
+                Restart the app to switch this {network.lan ? 'on' : 'off'}: close the Start window and double-click Start again.
+              </p>
+            ) : network.lan && (
+              <div className="mt-3 text-sm text-parchment-700">
+                On the phone or tablet, open{network.addresses.length > 1 ? ' one of' : ''}:
+                {network.addresses.length === 0
+                  ? <span className="italic text-parchment-500"> no Wi-Fi address found. Is this computer connected?</span>
+                  : network.addresses.map(a => (
+                    <code key={a} className="ml-2 px-2 py-0.5 rounded bg-parchment-100 border border-parchment-200 font-mono text-parchment-900 select-all">
+                      http://{a}:{window.location.port || '5173'}
+                    </code>
+                  ))}
+              </div>
+            )}
+            <p className="mt-3 text-xs text-red-700">
+              There's no password: while this is on, anyone on the same Wi-Fi who knows the address can open, change or delete your characters. Only use it on a network you trust, like your home Wi-Fi.
+            </p>
+            <p className="mt-1 text-xs text-parchment-500">
+              The first time, your computer may ask whether to let “node” accept incoming connections. Choose Allow.
+            </p>
+          </>
+        )}
       </div>
 
       {/* Reference data */}

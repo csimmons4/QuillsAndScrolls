@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Character, SKILLS, SKILL_LABELS, SKILL_ABILITY, ABILITIES } from '../../character/model'
 import { abilityModFor, skillMod, saveMod, totalLevel, formatMod, spellSaveDC, spellAttackBonus } from '../../character/derive'
 import { DRACONIC_ANCESTRIES, LANGUAGES_STANDARD, LANGUAGES_EXOTIC, languageChoiceCount, languageChoicePlaceholder } from '../../data/raceData'
@@ -6,6 +7,7 @@ import { ARMOR_KINDS, ARTISAN_TOOLS, MUSICAL_INSTRUMENTS, GAMING_SETS, OTHER_TOO
 import { describePotionEffects } from '../../character/potionEffects'
 import { ABILITY_FULL, ABILITY_LABELS, CONDITIONS, SIMPLE_WEAPON_SLUGS, SkillSourceTag, fightingStyles, isArmorProficient, isMonkWeapon, isWeaponProficient, magicBonus, resolveArmor, resolveWeapon, weaponAttackBonus, weaponDamageMod } from './helpers'
 import { useSheet } from './SheetContext'
+import { WILD_SHAPE_BEASTS, wildShapeLimits, wildShapeBlocked, formatCr } from '../../data/wildShapeBeasts'
 
 /** The Stats tab: attacks, ability scores, saves, skills, status and proficiencies */
 export function StatsTab() {
@@ -63,7 +65,14 @@ export function StatsTab() {
     concRider,
     startRage,
     attackRows,
+    spellsOnYou,
+    toggleSpellOnYou,
+    wildShapeForm,
+    enterWildShape,
+    revertWildShape,
   } = useSheet()
+  const [beastPickerOpen, setBeastPickerOpen] = useState(false)
+  const [customBeast, setCustomBeast] = useState({ name: '', hp: '', ac: '', speed: '30' })
   return (
     <div className="space-y-5">
       {/* Attacks — full width, first: they're what you look at most in a fight */}
@@ -484,6 +493,86 @@ export function StatsTab() {
                     </p>
                   )}
                   {blessed && <p className="text-[11px] text-amber-700 mt-1.5 leading-snug">+1d4 to attack rolls and saving throws</p>}
+                </div>
+              )
+            })()}
+            {/* Wild Shape (druid 2+): take a beast form; the beast's HP soak damage first */}
+            {(() => {
+              const druid = char.classes.find(c => c.classSlug === 'druid')
+              if (!druid || druid.level < 2) return null
+              const use = classResources.find(r => r.key === 'wild-shape')
+              const usesLeft = use ? (use.max === null ? Infinity : use.current) : 0
+              const limits = wildShapeLimits(druid.level, druid.subclassSlug === 'moon')
+              return (
+                <div className="mb-4">
+                  <div className="text-[10px] font-bold uppercase tracking-widest text-parchment-500 mb-1">Wild Shape</div>
+                  {wildShapeForm ? (
+                    <div className="rounded-lg border border-green-300 bg-green-50 px-3 py-2 text-sm">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-green-800 flex-1">You're a {wildShapeForm.name}</span>
+                        <button type="button" onClick={revertWildShape} className="text-xs rounded-full px-2.5 py-0.5 border border-green-400 text-green-800 hover:bg-green-100">Change back</button>
+                      </div>
+                      <div className="text-xs text-green-700 mt-0.5">{wildShapeForm.hp.current}/{wildShapeForm.hp.max} HP · AC {wildShapeForm.ac} · {wildShapeForm.speed} ft{wildShapeForm.notes ? ` · ${wildShapeForm.notes.replace(/^Also /, '')}` : ''}</div>
+                    </div>
+                  ) : (
+                    <>
+                      <button type="button" onClick={() => setBeastPickerOpen(o => !o)} disabled={usesLeft <= 0}
+                        title={usesLeft <= 0 ? 'No Wild Shape uses left — a short rest restores them' : undefined}
+                        className="px-3 py-1 rounded-full border text-xs font-semibold border-green-300 text-green-800 hover:bg-green-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                      >{beastPickerOpen ? 'Cancel' : `Take a beast form${use?.max !== null ? ` (${usesLeft} left)` : ''}`}</button>
+                      {beastPickerOpen && (
+                        <div className="mt-2 rounded-lg border border-parchment-200 bg-parchment-50 divide-y divide-parchment-100 max-h-72 overflow-y-auto [scrollbar-width:thin]">
+                          {WILD_SHAPE_BEASTS.map(b => {
+                            const blocked = wildShapeBlocked(b, limits)
+                            return (
+                              <button key={b.slug} type="button" disabled={!!blocked} title={blocked ?? undefined}
+                                onClick={() => { enterWildShape(b); setBeastPickerOpen(false) }}
+                                className="w-full text-left px-2.5 py-1.5 flex items-center gap-2 text-xs hover:bg-green-50 disabled:opacity-40 disabled:hover:bg-transparent disabled:cursor-not-allowed">
+                                <span className="font-semibold text-parchment-900 flex-1">{b.name}</span>
+                                <span className="text-parchment-500">CR {formatCr(b.cr)} · {b.hp} HP · AC {b.ac} · {b.speed} ft{b.otherSpeeds ? `, ${b.otherSpeeds}` : ''}</span>
+                              </button>
+                            )
+                          })}
+                          {/* Any other beast: enter its numbers */}
+                          <div className="px-2.5 py-2 flex flex-wrap items-center gap-1.5 text-xs">
+                            <input className="input text-xs py-1 flex-1 min-w-[7rem]" placeholder="Other beast" value={customBeast.name} onChange={e => setCustomBeast(c => ({ ...c, name: e.target.value }))} />
+                            <input className="input text-xs py-1 w-14" placeholder="HP" inputMode="numeric" value={customBeast.hp} onChange={e => setCustomBeast(c => ({ ...c, hp: e.target.value }))} />
+                            <input className="input text-xs py-1 w-14" placeholder="AC" inputMode="numeric" value={customBeast.ac} onChange={e => setCustomBeast(c => ({ ...c, ac: e.target.value }))} />
+                            <input className="input text-xs py-1 w-16" placeholder="Speed" inputMode="numeric" value={customBeast.speed} onChange={e => setCustomBeast(c => ({ ...c, speed: e.target.value }))} />
+                            <button type="button" disabled={!customBeast.name.trim() || !(parseInt(customBeast.hp) > 0)}
+                              onClick={() => { enterWildShape({ name: customBeast.name.trim(), hp: parseInt(customBeast.hp), ac: parseInt(customBeast.ac) || 10, speed: parseInt(customBeast.speed) || 30 }); setBeastPickerOpen(false) }}
+                              className="rounded-full px-2.5 py-1 border border-green-300 text-green-800 font-semibold hover:bg-green-50 disabled:opacity-40">Take form</button>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              )
+            })()}
+            {/* Spells on you that change your AC or speed (cast by you or an ally) */}
+            {(() => {
+              const wearingArmor = char.equipment.some(e => e.equipped && (() => { const a = resolveArmor(e, content.items); return !!a && a.type !== 'shield' })())
+              const SPELLS: { key: 'mage-armor' | 'shield' | 'shield-of-faith' | 'haste' | 'barkskin'; label: string; tip: string }[] = [
+                { key: 'mage-armor', label: 'Mage Armor', tip: wearingArmor ? 'Only works without armor' : 'AC becomes 13 + DEX (8 hours)' },
+                { key: 'shield', label: 'Shield +5', tip: 'Reaction: +5 AC until the start of your next turn' },
+                { key: 'shield-of-faith', label: 'Shield of Faith', tip: '+2 AC (concentration, 10 minutes)' },
+                { key: 'haste', label: 'Haste', tip: '+2 AC, double speed, advantage on DEX saves (concentration, 1 minute)' },
+                { key: 'barkskin', label: 'Barkskin', tip: "AC can't be less than 16 (concentration, 1 hour)" },
+              ]
+              return (
+                <div className="mb-4">
+                  <div className="text-[10px] font-bold uppercase tracking-widest text-parchment-500 mb-1">Spells on you</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {SPELLS.map(sp => {
+                      const on = spellsOnYou.has(sp.key)
+                      return (
+                        <button key={sp.key} type="button" onClick={() => toggleSpellOnYou(sp.key)} title={sp.tip} aria-pressed={on}
+                          className={`px-2.5 py-0.5 rounded-full border text-xs font-semibold transition-colors ${on ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-indigo-200 text-indigo-700 hover:bg-indigo-50'} ${sp.key === 'mage-armor' && wearingArmor && !on ? 'opacity-50' : ''}`}
+                        >{sp.label}</button>
+                      )
+                    })}
+                  </div>
                 </div>
               )
             })()}

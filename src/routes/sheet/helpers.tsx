@@ -162,6 +162,7 @@ export function computeFullAC(
   raceDef: { naturalArmor?: { base: number; addDex: boolean } } | undefined,
   itemAcBonus = 0,
   mediumDexCap = 2,  // 3 with Medium Armor Master
+  mageArmor = false, // the Mage Armor spell is on (counts only without armor)
 ): { ac: number; source: string; stealthDisadv: boolean } {
   const dex = abilityModFor(char, 'dex')
   const equipped = char.equipment.filter(e => e.equipped)
@@ -231,6 +232,8 @@ export function computeFullAC(
     if (featNaturalArmorBase > 0) {
       candidates.push({ ac: featNaturalArmorBase + dex, label: 'Dragon Hide' })
     }
+
+    if (mageArmor) candidates.push({ ac: 13 + dex, label: 'Mage Armor' })
 
     const best = candidates.reduce((a, b) => a.ac >= b.ac ? a : b)
     baseAC = best.ac
