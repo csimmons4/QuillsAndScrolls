@@ -41,6 +41,7 @@ export function SpellsTab() {
     classResources,
     isMulticlassCaster,
     multiclassMaxes,
+    wildShapeForm,
     spellClassSlug,
   } = useSheet()
   return (
@@ -463,63 +464,70 @@ export function SpellsTab() {
               {/* Ways to cast it */}
               {!r.library && (slotLevels.length > 0 || r.slotCast || r.useKey || def.concentration) && (
                 <div className="px-4 py-3 border-b border-parchment-200 space-y-2">
-                  {/* Pact Magic: a warlock spell up to the pact slot level, cast at that level */}
-                  {pactCast && (
-                    <div>
-                      <div className="text-[10px] font-bold uppercase tracking-widest text-parchment-500 mb-1.5">Cast with a pact slot</div>
-                      <button type="button" disabled={pactLeft <= 0} onClick={castWithPact}
-                        title={pactLeft <= 0 ? 'No pact slots left (a short rest restores them)' : `Cast ${r.name} with a pact slot at ${slotOrdinals[char.pactSlots!.level - 1]} level — ${pactLeft} left`}
-                        className={`inline-flex items-center gap-1.5 pl-2 pr-2.5 py-1 rounded-full border text-xs font-semibold transition-colors ${pactLeft <= 0 ? 'opacity-40 cursor-not-allowed border-parchment-200 text-parchment-400 bg-parchment-50' : 'bg-indigo-600 border-indigo-600 text-white hover:bg-indigo-700 shadow-sm'}`}
-                      >
-                        <span className={`w-2 h-2 rotate-45 ${pactLeft <= 0 ? 'bg-parchment-300' : 'bg-indigo-200'}`} aria-hidden />
-                        {slotOrdinals[char.pactSlots!.level - 1]}
-                        <span className="font-normal opacity-75">{pactLeft} left</span>
-                      </button>
-                    </div>
-                  )}
-                  {slotLevels.length > 0 && (
-                    <div>
-                      <div className="text-[10px] font-bold uppercase tracking-widest text-parchment-500 mb-1.5">Cast with a slot</div>
-                      <div className="flex flex-wrap gap-1.5">
-                        {slotLevels.map(lvl => {
-                          const left = slotMaxAt(lvl) - (char.spellSlots[String(lvl)]?.used ?? 0)
-                          const out = left <= 0
-                          return (
-                            <button key={lvl} type="button" disabled={out} onClick={() => castAt(lvl)}
-                              title={out ? `No ${slotOrdinals[lvl - 1]}-level slots left` : `Cast ${r.name} with a ${slotOrdinals[lvl - 1]}-level slot — ${left} left`}
-                              className={`inline-flex items-center gap-1.5 pl-2 pr-2.5 py-1 rounded-full border text-xs font-semibold transition-colors ${out ? 'opacity-40 cursor-not-allowed border-parchment-200 text-parchment-400 bg-parchment-50' : 'bg-violet-600 border-violet-600 text-white hover:bg-violet-700 shadow-sm'}`}
-                            >
-                              <span className={`w-2 h-2 rotate-45 ${out ? 'bg-parchment-300' : 'bg-violet-200'}`} aria-hidden />
-                              {slotOrdinals[lvl - 1]}
-                              <span className="font-normal opacity-75">{left} left</span>
-                            </button>
-                          )
-                        })}
+                  {/* Wild Shape: no spellcasting in beast form until Beast Spells (druid 18) */}
+                  {wildShapeForm && (char.classes.find(c => c.classSlug === 'druid')?.level ?? 0) < 18 ? (
+                    <p className="text-xs italic text-green-800">You can't cast spells as a {wildShapeForm.name}: Wild Shape allows it from druid level 18 (Beast Spells). A spell you were already concentrating on keeps going.</p>
+                  ) : (
+                  <>
+                    {/* Pact Magic: a warlock spell up to the pact slot level, cast at that level */}
+                    {pactCast && (
+                      <div>
+                        <div className="text-[10px] font-bold uppercase tracking-widest text-parchment-500 mb-1.5">Cast with a pact slot</div>
+                        <button type="button" disabled={pactLeft <= 0} onClick={castWithPact}
+                          title={pactLeft <= 0 ? 'No pact slots left (a short rest restores them)' : `Cast ${r.name} with a pact slot at ${slotOrdinals[char.pactSlots!.level - 1]} level — ${pactLeft} left`}
+                          className={`inline-flex items-center gap-1.5 pl-2 pr-2.5 py-1 rounded-full border text-xs font-semibold transition-colors ${pactLeft <= 0 ? 'opacity-40 cursor-not-allowed border-parchment-200 text-parchment-400 bg-parchment-50' : 'bg-indigo-600 border-indigo-600 text-white hover:bg-indigo-700 shadow-sm'}`}
+                        >
+                          <span className={`w-2 h-2 rotate-45 ${pactLeft <= 0 ? 'bg-parchment-300' : 'bg-indigo-200'}`} aria-hidden />
+                          {slotOrdinals[char.pactSlots!.level - 1]}
+                          <span className="font-normal opacity-75">{pactLeft} left</span>
+                        </button>
                       </div>
-                    </div>
-                  )}
-                  {r.slotCast && slotLevels.length === 0 && !pactCast && <p className="text-xs italic text-parchment-400">No spell slots to cast this with.</p>}
-                  {(r.useKey || def.concentration) && (
-                    <div className="flex flex-wrap gap-1.5">
-                      {r.useKey && r.usesMax !== undefined && (
-                        <>
-                          <button type="button" disabled={r.usesLeft === 0}
-                            onClick={() => patch({ freeSpellUses: { ...char.freeSpellUses, [r.useKey!]: spent + 1 } })}
-                            className={`px-3 py-1 rounded-full border text-xs font-semibold transition-colors ${r.usesLeft === 0 ? 'opacity-40 cursor-not-allowed border-parchment-200 text-parchment-400' : 'bg-indigo-50 border-indigo-300 text-indigo-700 hover:bg-indigo-100'}`}
-                          >Cast free · {r.usesLeft}/{r.usesMax}</button>
-                          {spent > 0 && (
-                            <button type="button" onClick={() => patch({ freeSpellUses: { ...char.freeSpellUses, [r.useKey!]: Math.max(0, spent - 1) } })}
-                              className="px-2.5 py-1 rounded-full border text-xs text-parchment-500 hover:text-indigo-600 border-parchment-200 hover:border-indigo-300 transition-colors"
-                            >Restore</button>
-                          )}
-                        </>
-                      )}
-                      {def.concentration && (
-                        <button type="button" onClick={toggleConcentration}
-                          className={`px-3 py-1 rounded-full border text-xs font-semibold transition-colors ${isConcentrating ? 'bg-amber-400 border-amber-400 text-white' : 'bg-amber-50 border-amber-300 text-amber-700 hover:bg-amber-100'}`}
-                        >{isConcentrating ? 'Stop concentrating' : 'Concentrate'}</button>
-                      )}
-                    </div>
+                    )}
+                    {slotLevels.length > 0 && (
+                      <div>
+                        <div className="text-[10px] font-bold uppercase tracking-widest text-parchment-500 mb-1.5">Cast with a slot</div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {slotLevels.map(lvl => {
+                            const left = slotMaxAt(lvl) - (char.spellSlots[String(lvl)]?.used ?? 0)
+                            const out = left <= 0
+                            return (
+                              <button key={lvl} type="button" disabled={out} onClick={() => castAt(lvl)}
+                                title={out ? `No ${slotOrdinals[lvl - 1]}-level slots left` : `Cast ${r.name} with a ${slotOrdinals[lvl - 1]}-level slot — ${left} left`}
+                                className={`inline-flex items-center gap-1.5 pl-2 pr-2.5 py-1 rounded-full border text-xs font-semibold transition-colors ${out ? 'opacity-40 cursor-not-allowed border-parchment-200 text-parchment-400 bg-parchment-50' : 'bg-violet-600 border-violet-600 text-white hover:bg-violet-700 shadow-sm'}`}
+                              >
+                                <span className={`w-2 h-2 rotate-45 ${out ? 'bg-parchment-300' : 'bg-violet-200'}`} aria-hidden />
+                                {slotOrdinals[lvl - 1]}
+                                <span className="font-normal opacity-75">{left} left</span>
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
+                    {r.slotCast && slotLevels.length === 0 && !pactCast && <p className="text-xs italic text-parchment-400">No spell slots to cast this with.</p>}
+                    {(r.useKey || def.concentration) && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {r.useKey && r.usesMax !== undefined && (
+                          <>
+                            <button type="button" disabled={r.usesLeft === 0}
+                              onClick={() => patch({ freeSpellUses: { ...char.freeSpellUses, [r.useKey!]: spent + 1 } })}
+                              className={`px-3 py-1 rounded-full border text-xs font-semibold transition-colors ${r.usesLeft === 0 ? 'opacity-40 cursor-not-allowed border-parchment-200 text-parchment-400' : 'bg-indigo-50 border-indigo-300 text-indigo-700 hover:bg-indigo-100'}`}
+                            >Cast free · {r.usesLeft}/{r.usesMax}</button>
+                            {spent > 0 && (
+                              <button type="button" onClick={() => patch({ freeSpellUses: { ...char.freeSpellUses, [r.useKey!]: Math.max(0, spent - 1) } })}
+                                className="px-2.5 py-1 rounded-full border text-xs text-parchment-500 hover:text-indigo-600 border-parchment-200 hover:border-indigo-300 transition-colors"
+                              >Restore</button>
+                            )}
+                          </>
+                        )}
+                        {def.concentration && (
+                          <button type="button" onClick={toggleConcentration}
+                            className={`px-3 py-1 rounded-full border text-xs font-semibold transition-colors ${isConcentrating ? 'bg-amber-400 border-amber-400 text-white' : 'bg-amber-50 border-amber-300 text-amber-700 hover:bg-amber-100'}`}
+                          >{isConcentrating ? 'Stop concentrating' : 'Concentrate'}</button>
+                        )}
+                      </div>
+                    )}
+                  </>
                   )}
                 </div>
               )}

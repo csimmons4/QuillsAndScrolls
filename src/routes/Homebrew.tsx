@@ -57,7 +57,8 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
   )
 }
 
-/** The entry's ID ("slug"): made from the name, shown small, editable on request */
+/** The entry's ID ("slug"): made from the name when saved (empty `value` = automatic), shown small,
+ *  editable on request. An existing entry keeps its ID when renamed. */
 function SlugField({ value, name, onChange }: { value: string; name: string; onChange: (v: string) => void }) {
   const [editing, setEditing] = useState(false)
   if (editing) return (
@@ -68,7 +69,7 @@ function SlugField({ value, name, onChange }: { value: string; name: string; onC
   return (
     <p className="text-[11px] text-parchment-500 -mt-2">
       ID <code className="font-mono text-parchment-600">{value || autoSlug(name) || '—'}</code>{' '}
-      <button type="button" className="underline hover:text-parchment-800" onClick={() => setEditing(true)}>change</button>
+      <button type="button" className="underline hover:text-parchment-800" onClick={() => { if (!value) onChange(autoSlug(name)); setEditing(true) }}>change</button>
     </p>
   )
 }
@@ -262,7 +263,7 @@ function ItemForm({ initial, onSave, onCancel }: { initial?: Record<string, unkn
       <Field label="Name">
         <input className="input" value={f.name} onChange={e => {
           const name = e.target.value
-          setF(prev => ({ ...prev, name, slug: prev.slug || autoSlug(name) }))
+          setF(prev => ({ ...prev, name }))
         }} />
       </Field>
       <SlugField value={f.slug} name={f.name} onChange={v => up('slug', v)} />
@@ -493,7 +494,7 @@ function SpellForm({ initial, onSave, onCancel }: { initial?: Record<string, unk
       <Field label="Name">
         <input className="input" value={f.name} onChange={e => {
           const name = e.target.value
-          setF(prev => ({ ...prev, name, slug: prev.slug || autoSlug(name) }))
+          setF(prev => ({ ...prev, name }))
         }} />
       </Field>
       <SlugField value={f.slug} name={f.name} onChange={v => up('slug', v)} />
@@ -625,7 +626,7 @@ function FeatForm({ initial, onSave, onCancel }: { initial?: Record<string, unkn
       <Field label="Name">
         <input className="input" value={f.name} onChange={e => {
           const name = e.target.value
-          setF(prev => ({ ...prev, name, slug: prev.slug || autoSlug(name) }))
+          setF(prev => ({ ...prev, name }))
         }} />
       </Field>
       <SlugField value={f.slug} name={f.name} onChange={v => up('slug', v)} />
@@ -716,7 +717,7 @@ function RaceForm({ initial, onSave, onCancel }: { initial?: Record<string, unkn
       <Field label="Name">
         <input className="input" value={f.name} onChange={e => {
           const name = e.target.value
-          setF(prev => ({ ...prev, name, slug: prev.slug || autoSlug(name) }))
+          setF(prev => ({ ...prev, name }))
         }} />
       </Field>
       <SlugField value={f.slug} name={f.name} onChange={v => up('slug', v)} />
@@ -814,7 +815,7 @@ function ClassForm({ initial, onSave, onCancel }: { initial?: Record<string, unk
       <Field label="Name">
         <input className="input" value={f.name} onChange={e => {
           const name = e.target.value
-          setF(prev => ({ ...prev, name, slug: prev.slug || autoSlug(name) }))
+          setF(prev => ({ ...prev, name }))
         }} />
       </Field>
       <SlugField value={f.slug} name={f.name} onChange={v => up('slug', v)} />
@@ -923,7 +924,7 @@ function BackgroundForm({ initial, onSave, onCancel }: { initial?: Record<string
       <Field label="Name">
         <input className="input" value={f.name} onChange={e => {
           const name = e.target.value
-          setF(prev => ({ ...prev, name, slug: prev.slug || autoSlug(name) }))
+          setF(prev => ({ ...prev, name }))
         }} />
       </Field>
       <SlugField value={f.slug} name={f.name} onChange={v => up('slug', v)} />

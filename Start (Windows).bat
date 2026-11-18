@@ -71,12 +71,20 @@ exit /b 1
 
 REM ── 3. Start the app and open the browser ───────────────────────────────────
 echo.
+echo Clearing any previous sessions...
+REM Stop whatever is still listening on the app's ports (an earlier launch left open)
+powershell -NoProfile -Command "Get-NetTCPConnection -LocalPort 5173,5174 -State Listen -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }"
+timeout /t 1 /nobreak >nul
+
 echo Starting Quills ^& Scrolls...
 start "" npm run dev
 
 echo Waiting for the app to be ready...
 :wait_loop
 timeout /t 2 /nobreak >nul
+REM "localhost", which curl tries over IPv6 and IPv4: the app page may only listen on ::1
+curl -s http://localhost:5173 >nul 2>&1
+if errorlevel 1 goto wait_loop
 curl -s http://127.0.0.1:5174/api/characters >nul 2>&1
 if errorlevel 1 goto wait_loop
 

@@ -23,14 +23,31 @@ afterEach(async () => {
   sessionStorage.clear()
 })
 
+export interface FakeSnapshot { id: string; stamp: string; label: string; savedAt: string; character: Character }
 export interface FakeServer {
   characters: Map<string, Character>
-  snapshots: { id: string; label: string }[]
+  /** History, oldest first; works like the real server's (Deleted snapshots, Recently deleted) */
+  snapshots: FakeSnapshot[]
+  /** Homebrew by category */
+  homebrew: Record<string, Record<string, unknown>[]>
 }
 
 /** Answers the app's fetches: /data/wikidot from public/, the /api routes from memory */
 export function fakeServer(chars: Character[]): FakeServer {
-  const server: FakeServer = { characters: new Map(chars.map(c => [c.id, structuredClone(c)])), snapshots: [] }
+  const server: FakeServer = {
+    characters: new Map(chars.map(c => [c.id, structuredClone(c)])),
+    snapshots: [],
+    homebrew: { spells: [], items: [], feats: [], races: [], classes: [], backgrounds: [] },
+  }
+  let clock = 0
+  const snapshot = (id: string, label: string) => {
+    const character = server.characters.get(id)
+    if (!character) return false
+    clock++
+    server.snapshots.push({ id, label, stamp: `s${String(clock).padStart(4, '0')}`, savedAt: new Date(Date.UTC(2026, 10, 17, 12, 0, clock)).toISOString(), character: structuredClone(character) })
+    return true
+  }
+  const newestFirst = (id: string) => server.snapshots.filter(s => s.id === id).reverse()
   const reply = (body: unknown, status = 200) => ({
     ok: status < 400, status,
     json: async () => structuredClone(body),
@@ -47,11 +64,46 @@ export function fakeServer(chars: Character[]): FakeServer {
     if (pathname === '/api/characters') return reply([...server.characters.values()])
     let m = pathname.match(/^\/api\/characters\/([^/]+)$/)
     if (m && method === 'PUT') { server.characters.set(m[1], body()); return reply({ ok: true }) }
-    if (m && method === 'DELETE') { server.characters.delete(m[1]); return reply({ ok: true }) }
+    if (m && method === 'DELETE') {
+      if (snapshot(m[1], 'Deleted')) server.characters.delete(m[1])
+      return reply({ ok: true })
+    }
     m = pathname.match(/^\/api\/characters\/([^/]+)\/history$/)
-    if (m && method === 'POST') { server.snapshots.push({ id: m[1], label: body().label }); return reply({ ok: true }) }
-    if (m) return reply([])
-    if (pathname === '/api/homebrew') return reply({ spells: [], items: [], feats: [], races: [], classes: [], backgrounds: [] })
+    if (m && method === 'POST') return reply({ ok: snapshot(m[1], body().label) })
+    if (m) return reply(newestFirst(m[1]).map(s => ({
+      stamp: s.stamp, label: s.label, savedAt: s.savedAt, name: s.character.name,
+      level: s.character.classes.reduce((n, c) => n + c.level, 0), hp: s.character.hp.current,
+    })))
+    m = pathname.match(/^\/api\/characters\/([^/]+)\/history\/([^/]+)$/)
+    if (m) {
+      const s = server.snapshots.find(x => x.id === m![1] && x.stamp === m![2])
+      return s ? reply({ label: s.label, savedAt: s.savedAt, character: s.character }) : reply({ error: 'no such snapshot' }, 404)
+    }
+    if (pathname === '/api/history') {
+      const out: Record<string, Record<string, unknown>> = {}
+      for (const s of server.snapshots) (out[s.id] ??= {})[`${s.stamp}.json`] = { label: s.label, savedAt: s.savedAt, character: s.character }
+      return reply(out)
+    }
+    if (pathname === '/api/deleted' && method === 'GET') {
+      const gone = [...new Set(server.snapshots.map(s => s.id))].filter(id => !server.characters.has(id))
+      return reply(gone.map(id => newestFirst(id)[0]).map(s => ({
+        id: s.id, stamp: s.stamp, label: s.label, savedAt: s.savedAt, name: s.character.name,
+        level: s.character.classes.reduce((n, c) => n + c.level, 0),
+      })))
+    }
+    m = pathname.match(/^\/api\/deleted\/([^/]+)$/)
+    if (m && method === 'DELETE') {
+      if (server.characters.has(m[1])) return reply({ error: 'character still exists' }, 409)
+      server.snapshots = server.snapshots.filter(s => s.id !== m![1])
+      return reply({ ok: true })
+    }
+    if (pathname === '/api/homebrew') return reply(server.homebrew)
+    m = pathname.match(/^\/api\/homebrew\/([^/]+)\/([^/]+)$/)
+    if (m && server.homebrew[m[1]]) {
+      const list = server.homebrew[m[1]].filter(e => e.slug !== m![2])
+      server.homebrew[m[1]] = method === 'PUT' ? [...list, { ...body(), slug: m[2] }] : list
+      return reply({ ok: true })
+    }
     if (pathname === '/api/settings/network') return reply({ lan: false, addresses: [] })
     return reply({ error: 'not found' }, 404)
   })

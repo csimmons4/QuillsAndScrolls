@@ -2,7 +2,8 @@ import { useEffect, useState, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Character } from '../character/model'
 import { importCharacter } from '../storage/ioFile'
-import { listCharactersFromDisk, saveCharacterToDisk, deleteCharacterFromDisk, type CharacterLoadFailure } from '../storage/charApi'
+import { listCharactersFromDisk, saveCharacterToDisk, deleteCharacterFromDisk, listDeleted, restoreDeleted, forgetDeleted, type CharacterLoadFailure, type DeletedCharacter } from '../storage/charApi'
+import { when } from '../components/HistoryDialog'
 import { totalLevel, hpMax } from '../character/derive'
 import { sumFeatBonuses } from '../character/featBonuses'
 import { sumItemBonuses, effectiveAbilityScores } from '../character/itemBonuses'
@@ -15,6 +16,7 @@ import { v4 as uuidv4 } from 'uuid'
 export default function Vault() {
   const [characters, setCharacters] = useState<Character[]>([])
   const [failures, setFailures] = useState<CharacterLoadFailure[]>([])
+  const [deleted, setDeleted] = useState<DeletedCharacter[]>([])
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -31,6 +33,8 @@ export default function Vault() {
       const { characters, failures } = await listCharactersFromDisk()
       setCharacters(characters)
       setFailures(failures)
+      // An app started before Recently deleted existed has no such route: show none
+      setDeleted(await listDeleted().catch(() => []))
     } catch {
       setError('Could not reach the character server. Make sure you started the app with "npm run dev".')
     } finally {
@@ -67,9 +71,25 @@ export default function Vault() {
   }
 
   async function handleDelete(id: string, name: string) {
-    if (!(await askConfirm({ title: 'Delete Character', message: `Delete “${name}”? This cannot be undone.`, confirmLabel: 'Delete', danger: true }))) return
+    if (!(await askConfirm({ title: 'Delete Character', message: `Delete “${name}”? You can bring it back from Recently deleted at the bottom of the Vault.`, confirmLabel: 'Delete', danger: true }))) return
     await deleteCharacterFromDisk(id)
     if (recent?.id === id) setRecent(null)
+    await refresh()
+  }
+
+  async function handleRestore(d: DeletedCharacter) {
+    try {
+      await restoreDeleted(d)
+      await refresh()
+    } catch {
+      setError(`Could not restore ${d.name ?? 'that character'}.`)
+    }
+  }
+
+  async function handleForget(d: DeletedCharacter) {
+    const name = d.name ?? 'this character'
+    if (!(await askConfirm({ title: 'Delete Forever', message: `Delete “${name}” for good? Its earlier versions are removed too, and this can't be undone.`, confirmLabel: 'Delete forever', danger: true }))) return
+    await forgetDeleted(d.id)
     await refresh()
   }
 
@@ -249,9 +269,9 @@ export default function Vault() {
   return (
     <div>
       {confirmDialog}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <h1 className="text-3xl font-bold text-parchment-800">Character Vault</h1>
-        <div className="flex gap-2">
+        <div className="flex gap-2 whitespace-nowrap">
           <button className="btn-secondary" onClick={() => fileRef.current?.click()}>
             Import .json
           </button>
@@ -310,6 +330,32 @@ export default function Vault() {
             </>
           )}
         </>
+      )}
+
+      {/* Recently deleted: kept (as their history) until deleted forever */}
+      {!loading && deleted.length > 0 && (
+        <details className="group mt-8">
+          <summary className="flex items-center gap-3 mb-3 cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden">
+            <span className="text-xs font-bold uppercase tracking-[0.3em] text-parchment-500">Recently deleted ({deleted.length})</span>
+            <div className="flex-1 h-px bg-parchment-300" />
+            <span className="text-xs text-parchment-400 transition-transform group-open:rotate-180">▾</span>
+          </summary>
+          <div className="card p-0 divide-y divide-parchment-100">
+            {deleted.map(d => (
+              <div key={d.id} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-2.5">
+                <span className="font-semibold text-parchment-800">{d.name || 'Unnamed character'}</span>
+                <span className="text-xs text-parchment-500">
+                  Level {d.level} · {d.label === 'Deleted' ? 'deleted' : 'last saved'} {when(d.savedAt)}
+                </span>
+                <div className="ml-auto flex gap-2">
+                  <button type="button" className="btn-secondary text-xs py-1" onClick={() => handleRestore(d)}>Restore</button>
+                  <button type="button" className="btn-ghost text-xs py-1 text-red-700" onClick={() => handleForget(d)}>Delete forever</button>
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="text-[11px] text-parchment-400 mt-1.5">Restoring brings a character back as it was just before it was deleted, with its History.</p>
+        </details>
       )}
     </div>
   )

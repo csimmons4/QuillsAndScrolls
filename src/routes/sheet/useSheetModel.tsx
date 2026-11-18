@@ -243,19 +243,36 @@ export function useSheetModel() {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  // Fight effects that last a minute: raging (barbarian) and being Blessed by an ally. They aren't
-  // saved with the character, and end on a rest or when another character is opened.
-  const [raging, setRaging] = useState(false)
-  const [blessed, setBlessed] = useState(false)
-  // Spells someone (maybe you) has cast on you that change AC or speed
+  // Fight effects that last a minute: raging (barbarian) and being Blessed by an ally, plus spells someone
+  // (maybe you) cast on you that change AC or speed. They aren't saved with the character and end on a
+  // rest; the tab's sessionStorage keeps them through a page refresh (per character, `qs:fight:<id>`).
   type SpellOnYou = 'mage-armor' | 'shield' | 'shield-of-faith' | 'haste' | 'barkskin'
-  const [spellsOnYou, setSpellsOnYou] = useState<Set<SpellOnYou>>(new Set())
+  type FightEffects = { raging?: boolean; blessed?: boolean; spellsOnYou?: SpellOnYou[] }
+  const readFight = (charId: string | undefined): FightEffects => {
+    try { return JSON.parse(sessionStorage.getItem(`qs:fight:${charId}`) ?? '{}') } catch { return {} }
+  }
+  const [fightFor, setFightFor] = useState(id)     // the character the effects below belong to
+  const [raging, setRaging] = useState(() => !!readFight(id).raging)
+  const [blessed, setBlessed] = useState(() => !!readFight(id).blessed)
+  const [spellsOnYou, setSpellsOnYou] = useState<Set<SpellOnYou>>(() => new Set(readFight(id).spellsOnYou ?? []))
   const toggleSpellOnYou = (key: SpellOnYou) => setSpellsOnYou(prev => {
     const next = new Set(prev)
     if (next.has(key)) next.delete(key); else next.add(key)
     return next
   })
-  useEffect(() => { setRaging(false); setBlessed(false); setSpellsOnYou(new Set()) }, [id])
+  // Another character opened on the same sheet: switch to its effects
+  useEffect(() => {
+    if (fightFor === id) return
+    const f = readFight(id)
+    setFightFor(id); setRaging(!!f.raging); setBlessed(!!f.blessed); setSpellsOnYou(new Set(f.spellsOnYou ?? []))
+  }, [id, fightFor])
+  useEffect(() => {
+    if (fightFor !== id) return   // mid-switch: these values are still the previous character's
+    try {
+      if (raging || blessed || spellsOnYou.size) sessionStorage.setItem(`qs:fight:${id}`, JSON.stringify({ raging, blessed, spellsOnYou: [...spellsOnYou] }))
+      else sessionStorage.removeItem(`qs:fight:${id}`)
+    } catch { /* storage unavailable: the effects just won't survive a refresh */ }
+  }, [id, fightFor, raging, blessed, spellsOnYou])
 
   // Whether the tab bar is pinned to the top of the window (scrolled past its place); the status strip shows then
   const [tabsPinned, setTabsPinned] = useState(false)

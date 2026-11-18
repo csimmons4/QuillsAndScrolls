@@ -178,31 +178,31 @@ export default function Sheet() {
           </p>
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
           {/* Rests, as one segmented control */}
           <div className="inline-flex rounded border border-parchment-300 overflow-hidden" role="group" aria-label="Rest">
             <button type="button"
-              className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-semibold bg-parchment-200 text-dungeon-900 hover:bg-parchment-300 transition-colors"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 sm:px-3 sm:py-2 text-sm font-semibold bg-parchment-200 text-dungeon-900 hover:bg-parchment-300 transition-colors"
               onClick={() => { setShortRestDice({}); setRecoverSlots({}); setSongOfRestRoll(''); setShortRestOpen(true) }} title="Short Rest" aria-label="Short Rest"
             ><HourglassIcon className="w-4 h-4" /><span className="hidden sm:inline">Short Rest</span></button>
             <button type="button"
-              className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-semibold bg-parchment-200 text-dungeon-900 hover:bg-parchment-300 transition-colors border-l border-parchment-300"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 sm:px-3 sm:py-2 text-sm font-semibold bg-parchment-200 text-dungeon-900 hover:bg-parchment-300 transition-colors border-l border-parchment-300"
               onClick={() => setLongRestOpen(true)} title="Long Rest" aria-label="Long Rest"
             ><MoonIcon className="w-4 h-4" /><span className="hidden sm:inline">Long Rest</span></button>
           </div>
-          <Link to={`/c/${char.id}/level-up`} className="btn-primary text-sm gap-1.5 px-3" title="Level Up" aria-label="Level Up">
+          <Link to={`/c/${char.id}/level-up`} className="btn-primary text-sm gap-1.5 px-2.5 sm:px-3" title="Level Up" aria-label="Level Up">
             <LevelUpIcon className="w-4 h-4" /><span className="hidden sm:inline">Level Up</span>
           </Link>
           <span className="hidden sm:block w-px h-7 bg-parchment-300 mx-1" aria-hidden />
           <button type="button" onClick={() => { setFindQuery(''); setFindIndex(0); setFindOpen(true) }}
             title={`Find a spell, item or feature (${/Mac|iPhone|iPad/.test(navigator.platform) ? '⌘K' : 'Ctrl+K'})`} aria-label="Find on this sheet"
-            className="inline-flex items-center justify-center w-9 h-9 rounded border border-parchment-300 text-parchment-600 hover:text-parchment-900 hover:border-parchment-500 hover:bg-parchment-100 transition-colors"
+            className="inline-flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 rounded border border-parchment-300 text-parchment-600 hover:text-parchment-900 hover:border-parchment-500 hover:bg-parchment-100 transition-colors"
           ><SearchIcon className="w-5 h-5" /></button>
           {/* File actions. The sheet also saves on its own; this saves this instant (⌘S / Ctrl+S). */}
           <button type="button" onClick={saveToFile}
             title={saveFlash === 'saved' ? 'Saved' : 'Save now (⌘S / Ctrl+S). Changes also save automatically.'}
             aria-label={saveFlash === 'saved' ? 'Saved' : 'Save now'}
-            className={`inline-flex items-center justify-center w-9 h-9 rounded border transition-colors ${
+            className={`inline-flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 rounded border transition-colors ${
               saveFlash === 'saved'
                 ? 'border-green-400 bg-green-50 text-green-600'
                 : 'border-parchment-300 text-parchment-600 hover:text-parchment-900 hover:border-parchment-500 hover:bg-parchment-100'
@@ -210,12 +210,12 @@ export default function Sheet() {
           >{saveFlash === 'saved' ? <CheckIcon className="w-5 h-5" /> : <SaveIcon className="w-5 h-5" />}</button>
           <button type="button" onClick={() => exportCharacter(char)}
             title="Export: download this character as a .json file" aria-label="Export character as JSON"
-            className="inline-flex items-center justify-center w-9 h-9 rounded border border-parchment-300 text-parchment-600 hover:text-parchment-900 hover:border-parchment-500 hover:bg-parchment-100 transition-colors"
+            className="inline-flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 rounded border border-parchment-300 text-parchment-600 hover:text-parchment-900 hover:border-parchment-500 hover:bg-parchment-100 transition-colors"
           ><ExportIcon className="w-5 h-5" /></button>
           <HistoryButton charId={char.id} charName={char.name}
             onRestore={async restored => { await takeSnapshot(char.id, 'Before restoring an earlier version').catch(() => {}); save(restored) }} />
           <Link to={`/c/${char.id}/print`} title="Printable sheet (print or save as PDF)" aria-label="Printable sheet"
-            className="inline-flex items-center justify-center w-9 h-9 rounded border border-parchment-300 text-parchment-600 hover:text-parchment-900 hover:border-parchment-500 hover:bg-parchment-100 transition-colors"
+            className="inline-flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 rounded border border-parchment-300 text-parchment-600 hover:text-parchment-900 hover:border-parchment-500 hover:bg-parchment-100 transition-colors"
           ><PrinterIcon className="w-5 h-5" /></Link>
         </div>
       </div>
@@ -641,7 +641,8 @@ export default function Sheet() {
       <>
       {/* Tabs: pinned to the top of the window, so they're in reach anywhere on a long tab */}
       <div ref={tabsAnchor} />
-      <div className="sticky top-0 z-30 bg-parchment-100 flex gap-5 border-b border-parchment-200 pt-3 mb-5 overflow-x-auto [scrollbar-width:none]">
+      <div className="sticky top-0 z-30 bg-parchment-100 flex border-b border-parchment-200 mb-5">
+        <div className="flex gap-3 sm:gap-5 pt-3 min-w-0 flex-1 overflow-x-auto [scrollbar-width:none]">
         {TABS.map(t => t.key === 'summons' ? (
           <button key={t.key} onClick={() => selectTab(t.key)}
             className={`pb-2 text-sm font-medium flex items-center gap-1.5 shrink-0 whitespace-nowrap ${tab === 'summons' ? 'tab-active' : 'tab-inactive'}`}>
@@ -658,9 +659,11 @@ export default function Sheet() {
             {t.label}
           </button>
         ))}
-        {/* Once pinned: the numbers you glance at mid-fight, from any tab */}
+        </div>
+        {/* Once pinned: the numbers you glance at mid-fight, from any tab. Beside the tabs on wider
+            screens; on a phone, a slim row just under them (laid over the page, so nothing jumps) */}
         <div aria-hidden={!tabsPinned}
-          className={`hidden sm:flex ml-auto items-center gap-3 pb-2 pl-4 shrink-0 text-sm transition-opacity duration-200 ${tabsPinned ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+          className={`${tabsPinned ? 'flex' : 'hidden sm:flex'} absolute sm:static top-full inset-x-0 flex-wrap sm:flex-nowrap items-center gap-x-3 gap-y-1 px-1 py-1.5 sm:p-0 sm:pt-3 sm:pb-2 sm:pl-4 shrink-0 text-sm bg-parchment-100 sm:bg-transparent border-b border-parchment-200 sm:border-0 shadow-sm sm:shadow-none transition-opacity duration-200 ${tabsPinned ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
           {wildShapeForm && (
             <span className="tabular-nums text-green-800" title={`Wild Shape: ${wildShapeForm.name}`}>
               <span className="text-[10px] uppercase tracking-wide mr-1">{wildShapeForm.name}</span>
@@ -1121,6 +1124,9 @@ export default function Sheet() {
                     hp: { ...char.hp, current: Math.min(maxHp, char.hp.current + totalHeal) },
                     hitDiceUsed: newHitDiceUsed,
                     classResources: { ...char.classResources, ...resets, 'breath-weapon-used': 0, ...(recoveredSlots && rec ? { [rec.key]: 0 } : {}) },
+                    // Wild Shape lasts half the druid level in hours: an hour's rest ends a one-hour form
+                    ...(wildShapeForm && Math.floor((char.classes.find(c => c.classSlug === 'druid')?.level ?? 0) / 2) <= 1
+                      ? { summons: char.summons.filter(s => s.templateKey !== 'wild-shape') } : {}),
                     ...(recoveredSlots ? { spellSlots: recoveredSlots } : {}),
                     ...(char.pactSlots ? { pactSlots: { ...char.pactSlots, used: 0 } } : {}),
                     // A short rest takes an hour: effects of an hour or less run out

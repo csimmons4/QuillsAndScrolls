@@ -96,6 +96,7 @@ The home screen. Lists all your saved characters. From here you can:
 - **Create a new character** — opens the step-by-step wizard
 - **Import a character** — load a `.json` file from another device
 - **Duplicate or delete a character** — in each card's **⋯** menu (deleting asks first)
+- **Bring back a deleted character** — open **Recently deleted** at the bottom and click **Restore**. It comes back as it was just before it was deleted, with its History. **Delete forever** removes it for good.
 
 Each card shows the portrait, class and HP. A character at 0 HP shows **Down** (or **Stable**) with their death saves, and a character who has died moves to a **Fallen** section at the bottom.
 
@@ -122,14 +123,15 @@ The main play screen. Tabs for:
 Every change auto-saves to disk within a second. No manual save needed during play.
 
 Handy extras on the sheet:
+- **Fight effects stay put:** Rage, Bless and spells on you survive a page refresh (they end on a rest, as before).
 - **Undo:** after removing a spell or item, drinking a potion, taking a rest and similar, a bar offers **Undo** for a few seconds.
 - **Quick find:** press **Cmd+K** (Mac) / **Ctrl+K** (Windows), or click the magnifier, to jump to any spell, item, feature or tab.
 - **Print:** the printer button opens a printable two-page sheet (black on white in every theme).
 - **Portrait:** click the initials in the sheet header to add a picture. It's saved inside the character's file.
 
-Fight helpers on the Stats tab: Rage and Bless, spells that change your AC (Mage Armor, Shield, Shield of Faith, Haste, Barkskin), and a druid's **Wild Shape** (pick a beast form; it takes damage first and the rest carries over to you). The Short Rest window handles hit dice, **Arcane Recovery** / **Natural Recovery** and **Song of Rest**. You roll every die yourself and type in the result.
+Fight helpers on the Stats tab: Rage and Bless, spells that change your AC (Mage Armor, Shield, Shield of Faith, Haste, Barkskin), and a druid's **Wild Shape** (pick a beast form; it takes damage first and the rest carries over to you, and it uses the beast's AC, speed and attacks; Circle of the Moon druids can spend a spell slot to heal the beast). The Short Rest window handles hit dice, **Arcane Recovery** / **Natural Recovery** and **Song of Rest**. You roll every die yourself and type in the result.
 
-**History:** the clock button on a sheet lists earlier versions of the character and can put one back. A version is kept at the start of each play session, before each level-up and before a restore, up to the 40 most recent per character. They live in the hidden `characters/.history/` folder and are not part of the backup zip.
+**History:** the clock button on a sheet lists earlier versions of the character and can put one back. A version is kept at the start of each play session, before each level-up and before a restore, up to the 40 most recent per character. They live in the hidden `characters/.history/` folder, and the backup zip includes them unless you untick that option.
 
 ### Level Up
 Click **Level Up** on any character sheet to:
@@ -159,7 +161,7 @@ A searchable, filterable reference browser for **all** game content — spells, 
 ### Settings
 - Choose a display theme — **Parchment** (warm classic), **Light** (clean white), or **Dark**
 - See when data was last scraped and how many entries exist
-- Download a full backup `.zip` of all characters + homebrew
+- Download a full backup `.zip` of all characters + homebrew (and each character's History, unless you untick it)
 - Let phones and tablets on your Wi-Fi open the app (off by default, see Setup)
 - Re-scrape instructions
 

@@ -97,6 +97,29 @@ export async function takeSnapshot(id: string, label: string): Promise<void> {
   })
 }
 
+/** Every snapshot of every character, raw, keyed by character id then file name (for the backup zip) */
+export async function exportHistory(): Promise<Record<string, Record<string, unknown>>> {
+  return apiFetch('/api/history')
+}
+
+// ── Recently deleted (characters whose history outlived them) ───────────────
+
+export interface DeletedCharacter { id: string; stamp: string; label: string; savedAt: string; name?: string; level?: number }
+
+export async function listDeleted(): Promise<DeletedCharacter[]> {
+  return apiFetch('/api/deleted')
+}
+
+/** Brings a deleted character back as it was in its newest snapshot (taken just before deleting) */
+export async function restoreDeleted(d: DeletedCharacter): Promise<void> {
+  await saveCharacterToDisk(await loadSnapshot(d.id, d.stamp))
+}
+
+/** Removes a deleted character's history for good */
+export async function forgetDeleted(id: string): Promise<void> {
+  await apiFetch(`/api/deleted/${id}`, { method: 'DELETE' })
+}
+
 // ── Phones and tablets ───────────────────────────────────────────────────────
 
 export interface NetworkSettings { lan: boolean; addresses: string[] }

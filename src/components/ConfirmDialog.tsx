@@ -32,7 +32,7 @@ export function useConfirm() {
 
   const confirmDialog = pending && (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => close(false)}>
-      <div className="card max-w-sm w-full p-5" onClick={e => e.stopPropagation()}>
+      <div className="card max-w-sm w-full p-5" role="alertdialog" aria-modal="true" aria-label={pending.title} onClick={e => e.stopPropagation()}>
         <h2 className="section-header">{pending.title}</h2>
         <div className="text-sm text-parchment-600 mb-5">{pending.message}</div>
         <div className="flex gap-2 justify-end">

@@ -35,7 +35,9 @@ export async function importHomebrew(file: File): Promise<unknown> {
 
 export async function exportEverything(
   characters: Character[],
-  homebrew: unknown
+  homebrew: unknown,
+  // Snapshots by character id then file name, stored as on disk (characters/.history/<id>/<file>)
+  history?: Record<string, Record<string, unknown>>,
 ): Promise<void> {
   const { default: JSZip } = await import('jszip')
   const zip = new JSZip()
@@ -44,11 +46,15 @@ export async function exportEverything(
   for (const char of characters) {
     charFolder.file(`${char.name.replace(/[^a-z0-9]/gi, '_')}_${char.id.slice(0, 8)}.json`, JSON.stringify(char, null, 2))
   }
+  for (const [id, snaps] of Object.entries(history ?? {})) {
+    const dir = charFolder.folder(`.history/${id}`)!
+    for (const [file, snap] of Object.entries(snaps)) dir.file(file, JSON.stringify(snap))
+  }
   const blob = await zip.generateAsync({ type: 'blob' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = `quills-scrolls-backup-${new Date().toISOString().slice(0, 10)}.zip`
+  a.download = `quills-scrolls-backup-${new Date().toLocaleDateString('en-CA')}.zip`  // local YYYY-MM-DD
   a.click()
   setTimeout(() => URL.revokeObjectURL(url), 1000)
 }

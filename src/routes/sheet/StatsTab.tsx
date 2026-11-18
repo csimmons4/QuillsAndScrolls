@@ -70,9 +70,13 @@ export function StatsTab() {
     wildShapeForm,
     enterWildShape,
     revertWildShape,
+    multiclassMaxes,
   } = useSheet()
   const [beastPickerOpen, setBeastPickerOpen] = useState(false)
   const [customBeast, setCustomBeast] = useState({ name: '', hp: '', ac: '', speed: '30' })
+  // Combat Wild Shape: the slot level being spent and the d8s rolled for it
+  const [cwsLevel, setCwsLevel] = useState<number | null>(null)
+  const [cwsRoll, setCwsRoll] = useState('')
   return (
     <div className="space-y-5">
       {/* Attacks — full width, first: they're what you look at most in a fight */}
@@ -195,6 +199,7 @@ export function StatsTab() {
                 <div key={a} className="flex items-center gap-2 text-sm">
                   <input
                     type="checkbox"
+                    className="w-[18px] h-[18px] sm:w-auto sm:h-auto"
                     checked={char.saveProficiencies.includes(a)}
                     onChange={e => {
                       const s = new Set(char.saveProficiencies)
@@ -392,6 +397,7 @@ export function StatsTab() {
                     {/* Prof checkbox — manual only; auto profs show as locked */}
                     <input
                       type="checkbox"
+                      className="w-[18px] h-[18px] sm:w-auto sm:h-auto"
                       checked={effectiveProf}
                       disabled={isAutoProf && !isManualProf}
                       title={isAutoProf && !isManualProf ? `Granted by: ${profTags.map(t => t.label).join(', ')}` : 'Proficient'}
@@ -404,6 +410,7 @@ export function StatsTab() {
                     {/* Expert checkbox */}
                     <input
                       type="checkbox"
+                      className="w-[18px] h-[18px] sm:w-auto sm:h-auto"
                       checked={effectiveExpert}
                       disabled={isAutoExpert && !isManualExpert}
                       title={isAutoExpert && !isManualExpert ? `Expertise granted by: ${expertTags.map(t => t.label).join(', ')}` : 'Expertise (double proficiency)'}
@@ -513,6 +520,50 @@ export function StatsTab() {
                         <button type="button" onClick={revertWildShape} className="text-xs rounded-full px-2.5 py-0.5 border border-green-400 text-green-800 hover:bg-green-100">Change back</button>
                       </div>
                       <div className="text-xs text-green-700 mt-0.5">{wildShapeForm.hp.current}/{wildShapeForm.hp.max} HP · AC {wildShapeForm.ac} · {wildShapeForm.speed} ft{wildShapeForm.notes ? ` · ${wildShapeForm.notes.replace(/^Also /, '')}` : ''}</div>
+                      {/* Hours equal to half the druid level (PHB p.67); a long rest ends it here, a short rest too when it's only an hour */}
+                      <div className="text-[11px] text-green-700 mt-0.5">Lasts up to {Math.max(1, Math.floor(druid.level / 2))} hour{Math.floor(druid.level / 2) > 1 ? 's' : ''}</div>
+                      {/* Combat Wild Shape (Circle of the Moon): a bonus action and a spell slot heal 1d8 per slot level */}
+                      {druid.subclassSlug === 'moon' && (() => {
+                        const slotMax = (l: number) => multiclassMaxes ? (multiclassMaxes[String(l)] ?? 0) : (char.spellSlots[String(l)]?.max ?? 0)
+                        const slotUsed = (l: number) => char.spellSlots[String(l)]?.used ?? 0
+                        const levels = [1, 2, 3, 4, 5, 6, 7, 8, 9].filter(l => slotMax(l) - slotUsed(l) > 0)
+                        const ord = ['', '1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th']
+                        const roll = parseInt(cwsRoll, 10)
+                        const rollOk = cwsLevel !== null && roll >= cwsLevel && roll <= cwsLevel * 8
+                        const heal = () => {
+                          if (cwsLevel === null || !rollOk) return
+                          patch({
+                            spellSlots: { ...char.spellSlots, [String(cwsLevel)]: { max: slotMax(cwsLevel), used: slotUsed(cwsLevel) + 1 } },
+                            summons: char.summons.map(sm => sm.id === wildShapeForm.id ? { ...sm, hp: { ...sm.hp, current: Math.min(sm.hp.max, sm.hp.current + roll) } } : sm),
+                          })
+                          setCwsLevel(null); setCwsRoll('')
+                        }
+                        return (
+                          <div className="mt-2 pt-2 border-t border-green-200">
+                            <div className="text-[11px] font-semibold text-green-800">Combat Wild Shape: spend a slot to heal 1d8 per slot level</div>
+                            {cwsLevel === null ? (
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                {levels.map(l => (
+                                  <button key={l} type="button" onClick={() => { setCwsLevel(l); setCwsRoll('') }}
+                                    title={`Spend a ${ord[l]}-level slot: heal ${l}d8`}
+                                    className="text-xs rounded-full px-2 py-0.5 border border-green-300 text-green-800 hover:bg-green-100">{ord[l]}</button>
+                                ))}
+                                {levels.length === 0 && <span className="text-xs italic text-green-700">No spell slots left</span>}
+                              </div>
+                            ) : (
+                              <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                                <span className="text-xs text-green-800">Roll {cwsLevel}d8:</span>
+                                <input type="number" min={cwsLevel} max={cwsLevel * 8} value={cwsRoll} placeholder={`${cwsLevel}–${cwsLevel * 8}`}
+                                  aria-label={`Combat Wild Shape roll, ${cwsLevel}d8`}
+                                  onChange={e => setCwsRoll(e.target.value)} className="input text-xs py-0.5 w-16 text-center" />
+                                <button type="button" disabled={!rollOk} onClick={heal}
+                                  className="text-xs rounded-full px-2.5 py-0.5 border border-green-400 text-green-800 font-semibold hover:bg-green-100 disabled:opacity-40">Heal {rollOk ? roll : ''}</button>
+                                <button type="button" onClick={() => setCwsLevel(null)} className="text-xs text-green-700 hover:underline">Cancel</button>
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })()}
                     </div>
                   ) : (
                     <>

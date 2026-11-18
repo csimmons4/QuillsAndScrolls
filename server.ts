@@ -48,7 +48,8 @@ app.get('/api/characters', (_req, res) => {
 // Snapshots live in characters/.history/<id>/<stamp>.json: one automatically when a save comes in
 // more than 30 minutes after the last snapshot (so every sitting has a starting point to go back
 // to), one on request (Level Up takes one first), and the version being replaced whenever a
-// snapshot is restored. The newest 40 are kept. Deleting a character keeps its history.
+// snapshot is restored. The newest 40 are kept. Deleting a character takes a "Deleted" snapshot
+// first and keeps the history, so the Vault's Recently deleted can bring it back.
 const HISTORY_DIR = path.join(CHARS_DIR, '.history')
 const SNAPSHOT_GAP_MS = 30 * 60 * 1000
 const MAX_SNAPSHOTS = 40
@@ -121,7 +122,43 @@ app.put('/api/characters/:id', (req, res) => {
 
 app.delete('/api/characters/:id', (req, res) => {
   const file = findFileById(req.params.id)
-  if (file) fs.unlinkSync(path.join(CHARS_DIR, file))
+  if (file) {
+    takeSnapshot(req.params.id, 'Deleted')
+    fs.unlinkSync(path.join(CHARS_DIR, file))
+  }
+  res.json({ ok: true })
+})
+
+// Every snapshot of every character (deleted ones too), for the backup zip: { id: { file: snapshot } }
+app.get('/api/history', (_req, res) => {
+  const ids = fs.existsSync(HISTORY_DIR) ? fs.readdirSync(HISTORY_DIR) : []
+  res.json(Object.fromEntries(ids.map(id => [id, Object.fromEntries(snapshotFiles(id).flatMap(f => {
+    try { return [[f, JSON.parse(fs.readFileSync(path.join(historyDir(id), f), 'utf-8'))]] } catch { return [] }
+  }))])))
+})
+
+// Recently deleted: characters with history but no file, newest snapshot first
+app.get('/api/deleted', (_req, res) => {
+  const ids = fs.existsSync(HISTORY_DIR) ? fs.readdirSync(HISTORY_DIR).filter(id => !findFileById(id)) : []
+  const deleted = ids.flatMap(id => {
+    const newest = snapshotFiles(id)[0]
+    if (!newest) return []
+    try {
+      const snap = JSON.parse(fs.readFileSync(path.join(historyDir(id), newest), 'utf-8'))
+      const c = snap.character ?? {}
+      return [{
+        id, stamp: newest.replace(/\.json$/, ''), label: snap.label, savedAt: snap.savedAt, name: c.name,
+        level: (c.classes ?? []).reduce((n: number, cc: { level?: number }) => n + (cc.level ?? 0), 0),
+      }]
+    } catch { return [] }
+  })
+  res.json(deleted.sort((a, b) => b.savedAt.localeCompare(a.savedAt)))
+})
+
+// Delete forever: only for a character that's really gone (its history is all that's left)
+app.delete('/api/deleted/:id', (req, res) => {
+  if (findFileById(req.params.id)) { res.status(409).json({ error: 'character still exists' }); return }
+  fs.rmSync(historyDir(req.params.id), { recursive: true, force: true })
   res.json({ ok: true })
 })
 

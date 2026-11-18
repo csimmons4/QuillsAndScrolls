@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useContent } from '../content/ContentProvider'
-import { listCharactersFromDisk, loadHomebrewFromDisk, getNetworkSettings, setNetworkAccess, type NetworkSettings } from '../storage/charApi'
+import { listCharactersFromDisk, loadHomebrewFromDisk, exportHistory, getNetworkSettings, setNetworkAccess, type NetworkSettings } from '../storage/charApi'
 import { exportEverything } from '../storage/ioFile'
 import { CLASS_OPTIONS } from '../data/classData'
 import { deriveClassResources } from '../character/derive'
@@ -171,9 +171,16 @@ export default function Settings() {
   const [network, setNetwork] = useState<NetworkSettings | null | 'old-server'>(null)
   useEffect(() => { getNetworkSettings().then(setNetwork, () => setNetwork('old-server')) }, [])
 
+  // Backup: History is included unless switched off; a server from before this can't send it
+  const [backupHistory, setBackupHistory] = useState(true)
+  const [backupNote, setBackupNote] = useState('')
+
   async function handleBackup() {
     const [{ characters }, hb] = await Promise.all([listCharactersFromDisk(), loadHomebrewFromDisk()])
-    await exportEverything(characters, hb)
+    let history: Awaited<ReturnType<typeof exportHistory>> | undefined
+    if (backupHistory) history = await exportHistory().catch(() => undefined)
+    setBackupNote(backupHistory && !history ? 'Earlier versions couldn’t be included: restart the app once, then try again.' : '')
+    await exportEverything(characters, hb, history)
   }
 
   return (
@@ -222,9 +229,14 @@ export default function Settings() {
         <p className="text-sm text-parchment-500 mb-4">
           Download all your characters and homebrew as a single ZIP. Re-import individual characters with the Vault's “Import .json” button.
         </p>
+        <label className="flex items-center gap-2 text-sm text-parchment-800 cursor-pointer w-fit mb-4">
+          <input type="checkbox" checked={backupHistory} onChange={e => setBackupHistory(e.target.checked)} />
+          Include each character’s earlier versions (History)
+        </label>
         <button className="btn-primary" onClick={handleBackup}>
           <ExportIcon className="w-4 h-4 mr-1.5" /> Download Backup (.zip)
         </button>
+        {backupNote && <p className="mt-2 text-sm text-amber-800">{backupNote}</p>}
       </div>
 
       {/* Phones & Tablets: opt-in network access */}

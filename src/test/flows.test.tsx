@@ -4,7 +4,15 @@ import { describe, it, expect } from 'vitest'
 import { screen, within, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { fakeServer, renderApp, saved } from './app'
-import { makeChar } from './fixtures'
+import { cleanup } from '@testing-library/react'
+import { makeChar, equipped } from './fixtures'
+
+/** Opens an inventory item's card by clicking its row */
+const openItem = async (user: ReturnType<typeof userEvent.setup>, name: string) => {
+  await screen.findAllByText(name)
+  const row = [...document.querySelectorAll<HTMLElement>('[data-item-idx]')].find(r => r.textContent!.includes(name))!
+  await user.click(within(row).getAllByRole('button')[0])
+}
 
 // Rendering the whole app with the full reference data takes a moment
 const SLOW = { timeout: 15000 }
@@ -106,6 +114,116 @@ describe('Sheet', () => {
     const after = await saved(server, char.id, c => c.hp.current === 24)
     expect(after.summons.some(s => s.templateKey === 'wild-shape')).toBe(false)
   }, SLOW.timeout)
+
+  it('drinking a Potion of Healing heals by the roll you type and uses one up', async () => {
+    // 12 max HP (a full d10 + 2), so the 7 rolled all counts
+    const char = makeChar([{ classSlug: 'fighter', level: 1, hitDieRolls: [10] }], { con: 14 }, {
+      name: 'Test Fighter', hp: { current: 3, temp: 0 },
+      equipment: [{ ...equipped('potion-of-healing', 'Potion of Healing', { equipped: false }), quantity: 2 }],
+    })
+    const server = fakeServer([char])
+    const user = userEvent.setup()
+    renderApp(`/c/${char.id}`)
+    await user.click(await screen.findByRole('button', { name: 'Inventory' }, find))
+    await openItem(user, 'Potion of Healing')
+    await user.click((await screen.findAllByRole('button', { name: /^Drink/ }))[0])
+    // the open item shows in the side panel and under its row, so take the first
+    const roll = (await screen.findAllByLabelText(/HP regained/))[0]
+    await user.type(roll, '7')
+    await user.click(within(roll.closest('.flex-col') as HTMLElement).getByRole('button', { name: 'Heal' }))
+    const after = await saved(server, char.id, c => c.hp.current === 10)
+    expect(after.equipment[0].quantity).toBe(1)
+  }, SLOW.timeout)
+
+  it('attuning a worn Cloak of Protection adds its +1 to AC', async () => {
+    const char = makeChar([{ classSlug: 'wizard', level: 1 }], { dex: 14 }, {
+      name: 'Test Wizard', hp: { current: 6, temp: 0 },
+      equipment: [equipped('cloak-of-protection', 'Cloak of Protection', { slot: 'cloak' })],
+    })
+    const server = fakeServer([char])
+    const user = userEvent.setup()
+    const acNow = () => document.querySelector('.stat-box')!.textContent!
+    renderApp(`/c/${char.id}`)
+    await screen.findByLabelText('Character name', undefined, find)
+    expect(acNow()).toMatch(/^AC\s*12/)
+    await user.click(screen.getByRole('button', { name: 'Inventory' }))
+    await openItem(user, 'Cloak of Protection')
+    await user.click((await screen.findAllByRole('button', { name: /Attune$/ }))[0])
+    await saved(server, char.id, c => c.equipment[0].attuned)
+    expect(acNow()).toMatch(/^AC\s*13/)
+  }, SLOW.timeout)
+
+  it('History puts an earlier version back, keeping the one it replaces', async () => {
+    const char = makeChar([{ classSlug: 'fighter', level: 2 }], { con: 14 }, { name: 'Test Fighter', hp: { current: 20, temp: 0 } })
+    const server = fakeServer([{ ...char, classes: [{ ...char.classes[0], level: 1 }], hp: { current: 12, temp: 0 } }])
+    // a snapshot of the level 1 version, then the character as it is now (level 2)
+    await fetch(`/api/characters/${char.id}/history`, { method: 'POST', body: JSON.stringify({ label: 'Before level 2' }) })
+    server.characters.set(char.id, structuredClone(char))
+    const user = userEvent.setup()
+    renderApp(`/c/${char.id}`)
+    await user.click(await screen.findByRole('button', { name: 'Character history' }, find))
+    const dialog = await screen.findByRole('dialog', { name: /history/ })
+    await user.click(await within(dialog).findByRole('button', { name: 'Restore' }))
+    await user.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Restore' }))
+    const after = await saved(server, char.id, c => c.classes[0].level === 1)
+    expect(after.hp.current).toBe(12)
+    expect(server.snapshots.map(sn => sn.label)).toEqual(['Before level 2', 'Before restoring an earlier version'])
+  }, SLOW.timeout)
+
+  it('fight effects survive a page refresh', async () => {
+    const char = wizard(1, { hp: { current: 6, temp: 0 } })
+    fakeServer([char])
+    const user = userEvent.setup()
+    renderApp(`/c/${char.id}`)
+    await user.click(await screen.findByRole('button', { name: 'Mage Armor' }, find))
+    expect(document.querySelector('.stat-box')!.textContent).toMatch(/^AC\s*15/)
+    cleanup()   // the page goes away and comes back
+    renderApp(`/c/${char.id}`)
+    await screen.findByLabelText('Character name', undefined, find)
+    expect(document.querySelector('.stat-box')!.textContent).toMatch(/^AC\s*15/)
+  }, SLOW.timeout)
+})
+
+describe('Vault: Recently deleted', () => {
+  it('a deleted character can be brought back, or deleted for good', async () => {
+    const char = wizard(1)
+    const server = fakeServer([char])
+    const user = userEvent.setup()
+    renderApp('/')
+    await user.click(await screen.findByRole('button', { name: 'More actions for Test Wizard' }, find))
+    await user.click(screen.getByRole('menuitem', { name: /^Delete/ }))
+    await user.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Delete' }))
+    await waitFor(() => expect(server.characters.has(char.id)).toBe(false))
+    await user.click(await screen.findByText(/Recently deleted \(1\)/))
+    await user.click(screen.getByRole('button', { name: 'Restore' }))
+    await waitFor(() => expect(server.characters.get(char.id)?.name).toBe('Test Wizard'))
+    // delete again, then for good: the history goes too
+    await user.click(await screen.findByRole('button', { name: 'More actions for Test Wizard' }))
+    await user.click(screen.getByRole('menuitem', { name: /^Delete/ }))
+    await user.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Delete' }))
+    await user.click(await screen.findByText(/Recently deleted \(1\)/))
+    await user.click(screen.getByRole('button', { name: 'Delete forever' }))
+    await user.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Delete forever' }))
+    await waitFor(() => expect(server.snapshots).toEqual([]))
+  }, SLOW.timeout)
+})
+
+describe('Homebrew', () => {
+  it('adds an item and edits it', async () => {
+    const server = fakeServer([])
+    const user = userEvent.setup()
+    renderApp('/homebrew')
+    const nameInput = () => screen.getByText('Name', { selector: 'label' }).parentElement!.querySelector('input')!
+    await screen.findByRole('button', { name: 'Add Item' }, find)
+    await user.type(nameInput(), 'Lucky Coin')
+    await user.click(screen.getByRole('button', { name: 'Add Item' }))
+    await waitFor(() => expect(server.homebrew.items.map(i => i.name)).toEqual(['Lucky Coin']))
+    await user.click(await screen.findByRole('button', { name: 'Edit' }))
+    await user.clear(nameInput())
+    await user.type(nameInput(), 'Very Lucky Coin')
+    await user.click(screen.getByRole('button', { name: 'Update' }))
+    await waitFor(() => expect(server.homebrew.items.map(i => [i.name, i.slug])).toEqual([['Very Lucky Coin', 'lucky-coin']]))
+  }, SLOW.timeout)
 })
 
 describe('Level Up', () => {
@@ -118,7 +236,7 @@ describe('Level Up', () => {
     await user.click(apply[apply.length - 1])
     const after = await saved(server, char.id, c => c.classes[0].level === 2)
     expect(after.classes[0].level).toBe(2)
-    expect(server.snapshots).toEqual([{ id: char.id, label: 'Before level 2' }])
+    expect(server.snapshots.map(sn => [sn.id, sn.label])).toEqual([[char.id, 'Before level 2']])
   }, SLOW.timeout)
 })
 

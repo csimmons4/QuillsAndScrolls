@@ -5,7 +5,7 @@ import { useConfirm } from './ConfirmDialog'
 import { ClockIcon } from './SheetIcons'
 
 /** "Today 3:42 PM", "Yesterday 9:10 PM", "12 Nov 2026, 8:05 PM" */
-function when(iso: string): string {
+export function when(iso: string): string {
   const d = new Date(iso)
   const time = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
   const days = Math.floor((new Date().setHours(0, 0, 0, 0) - new Date(d).setHours(0, 0, 0, 0)) / 86400000)
@@ -55,7 +55,7 @@ export function HistoryButton({ charId, charName, onRestore }: {
   return (
     <>
       <button type="button" onClick={() => setOpen(true)} title="History: go back to an earlier version" aria-label="Character history"
-        className="inline-flex items-center justify-center w-9 h-9 rounded border border-parchment-300 text-parchment-600 hover:text-parchment-900 hover:border-parchment-500 hover:bg-parchment-100 transition-colors"
+        className="inline-flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 rounded border border-parchment-300 text-parchment-600 hover:text-parchment-900 hover:border-parchment-500 hover:bg-parchment-100 transition-colors"
       ><ClockIcon className="w-5 h-5" /></button>
       {open && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-start justify-center px-4 pt-20" onMouseDown={() => setOpen(false)}>

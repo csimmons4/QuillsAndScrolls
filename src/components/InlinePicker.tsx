@@ -13,10 +13,14 @@ interface InlinePickerProps {
   allowDeselect?: boolean
 }
 
+// Two columns on a phone, so names like "Constitution" fit (written out in full for Tailwind)
+const GRID_COLS: Record<number, string> = { 2: 'grid-cols-2', 3: 'grid-cols-2 sm:grid-cols-3', 4: 'grid-cols-2 sm:grid-cols-4' }
+
 /** Chip/button grid for small fixed-option selects (abilities, alignment, etc.) */
 export function InlinePicker({ options, value, onChange, columns = 3, allowDeselect = true }: InlinePickerProps) {
   return (
-    <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${columns}, 1fr)` }}>
+    <div className={`grid gap-1.5 ${GRID_COLS[columns] ?? ''}`}
+      style={GRID_COLS[columns] ? undefined : { gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>
       {options.map(opt => {
         const selected = value === opt.value
         return (
@@ -24,7 +28,7 @@ export function InlinePicker({ options, value, onChange, columns = 3, allowDesel
             key={opt.value}
             type="button"
             onClick={() => { if (!selected || allowDeselect) onChange(selected ? '' : opt.value) }}
-            className={`text-left px-2.5 py-1.5 rounded border text-sm transition-colors ${
+            className={`text-left px-2.5 py-1.5 rounded border text-sm transition-colors min-w-0 ${
               selected
                 ? 'border-parchment-600 bg-parchment-50 font-semibold'
                 : 'border-parchment-200 hover:border-parchment-400'
