@@ -218,6 +218,27 @@ describe('Sheet', () => {
   }, SLOW.timeout)
 })
 
+describe('Notes: campaign board', () => {
+  it('saves a note’s new colour, and deletes a note cleanly', async () => {
+    const char = wizard(1)
+    const server = fakeServer([char])
+    const warn = vi.spyOn(console, 'error')
+    const user = userEvent.setup()
+    renderApp(`/c/${char.id}`)
+    await user.click(await screen.findByRole('button', { name: 'Notes' }, find))
+    await user.click(await screen.findByRole('button', { name: /New Board/ }))
+    await user.click(await screen.findByRole('button', { name: /Add Note/ }))
+    const notesOf = (c = server.characters.get(char.id)!) => c.campaignBoard?.boards.flatMap(b => b.notes) ?? []
+    await saved(server, char.id, c => notesOf(c).length === 1)
+    await user.click(screen.getAllByRole('button', { name: 'pink note' })[0])
+    await saved(server, char.id, c => notesOf(c)[0]?.color === 'pink')
+    await user.click(screen.getByRole('button', { name: 'Delete note' }))
+    await saved(server, char.id, c => notesOf(c).length === 0)
+    expect(warn.mock.calls.filter(call => String(call[0]).includes('while rendering a different component'))).toEqual([])
+    warn.mockRestore()
+  }, SLOW.timeout)
+})
+
 describe('Vault: Recently deleted', () => {
   it('a deleted character can be brought back, or deleted for good', async () => {
     const char = wizard(1)

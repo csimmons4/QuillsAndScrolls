@@ -250,8 +250,12 @@ export function CampaignBoard({
   }
 
   function deleteNote(id: string) {
-    setNotes(prev => { const n = prev.filter(n => n.id !== id); onChange(n, conns.filter(c => c.from !== id && c.to !== id)); return n })
-    setConns(prev => prev.filter(c => c.from !== id && c.to !== id))
+    // Worked out here rather than inside a state updater: the parent's save can't run while React renders
+    const nextNotes = notes.filter(n => n.id !== id)
+    const nextConns = conns.filter(c => c.from !== id && c.to !== id)
+    setNotes(nextNotes)
+    setConns(nextConns)
+    onChange(nextNotes, nextConns)
     if (connectingFrom === id) setConnectingFrom(null)
   }
 
@@ -339,10 +343,10 @@ export function CampaignBoard({
         <div className="flex-1" />
         {/* Zoom controls */}
         <div className="flex items-center gap-1">
-          <button type="button" onClick={() => setScale(Math.max(MIN_SCALE, scale - 0.15))}
+          <button type="button" aria-label="Zoom out" onClick={() => setScale(Math.max(MIN_SCALE, scale - 0.15))}
             className="w-6 h-6 flex items-center justify-center bg-black/25 hover:bg-black/45 text-parchment-200 rounded text-sm font-bold transition-colors">−</button>
           <span className="text-xs text-parchment-300 w-10 text-center">{Math.round(scale * 100)}%</span>
-          <button type="button" onClick={() => setScale(Math.min(MAX_SCALE, scale + 0.15))}
+          <button type="button" aria-label="Zoom in" onClick={() => setScale(Math.min(MAX_SCALE, scale + 0.15))}
             className="w-6 h-6 flex items-center justify-center bg-black/25 hover:bg-black/45 text-parchment-200 rounded text-sm font-bold transition-colors">+</button>
           <button type="button" onClick={() => setScale(1)}
             className="text-[10px] text-parchment-400 hover:text-parchment-200 px-1.5 transition-colors">Reset</button>
@@ -543,8 +547,9 @@ export function CampaignBoard({
                 >
                   {/* Color swatches */}
                   {Object.keys(NOTE_BG).map(c => (
-                    <button key={c} type="button"
-                      onClick={e => { e.stopPropagation(); patchNote(note.id, { color: c }); setTimeout(() => onChange(notes, conns), 0) }}
+                    <button key={c} type="button" aria-label={`${c} note`} title={c}
+                      // saved with the new colour (a delayed save of `notes` kept the old one)
+                      onClick={e => { e.stopPropagation(); updateNotes(notes.map(n => n.id === note.id ? { ...n, color: c } : n)) }}
                       style={{ background: NOTE_BG[c].card, borderColor: NOTE_BG[c].pin, outline: note.color === c ? `2px solid ${NOTE_BG[c].pin}` : 'none' }}
                       className="w-3 h-3 rounded-full border shrink-0"
                     />
@@ -555,7 +560,7 @@ export function CampaignBoard({
                     style={{ color: isConnSrc ? '#ef4444' : pal.sub }}
                     className="text-[10px] font-semibold px-1.5 py-0.5 rounded hover:bg-black/10 transition-colors"
                   >{isConnSrc ? 'Cancel' : '⬡ Link'}</button>
-                  <button type="button"
+                  <button type="button" aria-label="Delete note"
                     onClick={e => { e.stopPropagation(); deleteNote(note.id) }}
                     className="text-[10px] px-1.5 py-0.5 rounded hover:bg-black/10 transition-colors"
                     style={{ color: pal.sub }}
