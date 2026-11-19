@@ -12,7 +12,8 @@
     "preview": "vite preview",
     "scrape": "tsx scripts/scraper/scrape.ts",
     "audit:content": "tsx scripts/auditContent.ts",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:sweep": "vitest run --config vitest.sweep.config.ts"
   },
   "dependencies": {
     "cors": "^2.8.5",
