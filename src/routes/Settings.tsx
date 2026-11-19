@@ -1,7 +1,7 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { useContent } from '../content/ContentProvider'
 import { listCharactersFromDisk, loadHomebrewFromDisk, exportHistory, getNetworkSettings, setNetworkAccess, type NetworkSettings } from '../storage/charApi'
-import { exportEverything } from '../storage/ioFile'
+import { exportEverything, restoreBackup, type RestoreSummary } from '../storage/ioFile'
 import { CLASS_OPTIONS } from '../data/classData'
 import { deriveClassResources } from '../character/derive'
 import type { Character } from '../character/model'
@@ -175,6 +175,27 @@ export default function Settings() {
   const [backupHistory, setBackupHistory] = useState(true)
   const [backupNote, setBackupNote] = useState('')
 
+  // Restore from a backup zip: never overwrites; the summary says what came back
+  const restoreInput = useRef<HTMLInputElement>(null)
+  const [restoring, setRestoring] = useState(false)
+  const [restored, setRestored] = useState<RestoreSummary | null>(null)
+  const [restoreError, setRestoreError] = useState('')
+  async function handleRestore(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    setRestoring(true); setRestored(null); setRestoreError('')
+    try {
+      const summary = await restoreBackup(file)
+      setRestored(summary)
+      if (summary.homebrew.added.length) content.reload()
+    } catch {
+      setRestoreError('That file doesn’t look like a Quills & Scrolls backup (the .zip from Download Backup).')
+    } finally {
+      setRestoring(false)
+    }
+  }
+
   async function handleBackup() {
     const [{ characters }, hb] = await Promise.all([listCharactersFromDisk(), loadHomebrewFromDisk()])
     let history: Awaited<ReturnType<typeof exportHistory>> | undefined
@@ -233,10 +254,39 @@ export default function Settings() {
           <input type="checkbox" checked={backupHistory} onChange={e => setBackupHistory(e.target.checked)} />
           Include each character’s earlier versions (History)
         </label>
-        <button className="btn-primary" onClick={handleBackup}>
-          <ExportIcon className="w-4 h-4 mr-1.5" /> Download Backup (.zip)
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button className="btn-primary" onClick={handleBackup}>
+            <ExportIcon className="w-4 h-4 mr-1.5" /> Download Backup (.zip)
+          </button>
+          <button className="btn-secondary" disabled={restoring} onClick={() => restoreInput.current?.click()}>
+            {restoring ? 'Restoring…' : 'Restore from Backup…'}
+          </button>
+          <input ref={restoreInput} type="file" accept=".zip,application/zip" className="hidden" aria-label="Backup to restore" onChange={handleRestore} />
+        </div>
         {backupNote && <p className="mt-2 text-sm text-amber-800">{backupNote}</p>}
+        <p className="mt-2 text-xs text-parchment-500">Restoring never overwrites anything: characters you’ve changed since the backup come back beside the current version, and your homebrew is kept where it differs.</p>
+        {restoreError && <p className="mt-2 text-sm text-red-700">{restoreError}</p>}
+        {restored && (() => {
+          const { characters: c, homebrew: h, history } = restored
+          const names = (list: string[]) => list.length ? ` (${list.join(', ')})` : ''
+          const lines = [
+            c.added.length > 0 && `${c.added.length} character${c.added.length > 1 ? 's' : ''} brought back${names(c.added)}.`,
+            c.copies.length > 0 && `${c.copies.length} character${c.copies.length > 1 ? 's' : ''} changed since the backup, so the backup’s version came in beside yours${names(c.copies)}.`,
+            c.alreadyHere.length > 0 && `${c.alreadyHere.length} character${c.alreadyHere.length > 1 ? 's were' : ' was'} already here.`,
+            h.added.length > 0 && `${h.added.length} homebrew entr${h.added.length > 1 ? 'ies' : 'y'} added${names(h.added)}.`,
+            h.alreadyHere > 0 && `${h.alreadyHere} homebrew entr${h.alreadyHere > 1 ? 'ies were' : 'y was'} already here.`,
+            h.keptYours.length > 0 && `Kept your version of ${h.keptYours.join(', ')} (the backup’s is different).`,
+            history.added > 0 && `${history.added} earlier version${history.added > 1 ? 's' : ''} added to History.`,
+          ].filter((l): l is string => !!l)
+          return (
+            <div className="mt-3 rounded-lg border border-green-300 bg-green-50 px-3 py-2 text-sm text-green-900 space-y-0.5">
+              <div className="font-semibold">Backup restored</div>
+              {lines.length ? lines.map(l => <div key={l}>{l}</div>) : <div>Everything in this backup was already here.</div>}
+              {c.unreadable.length > 0 && <div className="text-red-700">Couldn’t read: {c.unreadable.join(', ')}.</div>}
+              {history.couldNotAdd && <div className="text-amber-800">Some earlier versions couldn’t be added: restart the app once and restore again (nothing is added twice).</div>}
+            </div>
+          )
+        })()}
       </div>
 
       {/* Phones & Tablets: opt-in network access */}

@@ -4,9 +4,8 @@ import { Character } from '../character/model'
 import { importCharacter } from '../storage/ioFile'
 import { listCharactersFromDisk, saveCharacterToDisk, deleteCharacterFromDisk, listDeleted, restoreDeleted, forgetDeleted, type CharacterLoadFailure, type DeletedCharacter } from '../storage/charApi'
 import { when } from '../components/HistoryDialog'
-import { totalLevel, hpMax } from '../character/derive'
-import { sumFeatBonuses } from '../character/featBonuses'
-import { sumItemBonuses, effectiveAbilityScores } from '../character/itemBonuses'
+import { totalLevel } from '../character/derive'
+import { restingVitals } from '../character/vitals'
 import { CLASS_OPTIONS } from '../data/classData'
 import { useContent } from '../content/ContentProvider'
 import { useRecentCharacter } from '../storage/recentCharacter'
@@ -120,15 +119,8 @@ export default function Vault() {
       .join(' / ')
   }
 
-  /** Hit point maximum the way the sheet works it out: equipped items' CON, plus Tough */
-  function maxHpOf(char: Character) {
-    const featSlugs = char.featuresChosen
-      .filter(fc => fc.key.startsWith('feat-'))
-      .map(fc => typeof fc.value === 'string' ? fc.value : fc.value[0])
-    const scores = effectiveAbilityScores(char.abilityScores as Record<string, number>, sumItemBonuses(char.equipment, content.items))
-    return hpMax({ ...char, abilityScores: scores as Character['abilityScores'] }, content)
-      + sumFeatBonuses(featSlugs, content.feats).hpBonusPerLevel * totalLevel(char)
-  }
+  /** Hit point maximum the way the sheet works it out (items, feats, running potions) */
+  const maxHpOf = (char: Character) => restingVitals(char, content).maxHp
 
   // At 0 HP with three failed death saves the sheet shows "You have died", and the Vault lays the
   // character to rest. Healing on the sheet clears the saves, which brings them back.
@@ -354,7 +346,7 @@ export default function Vault() {
               </div>
             ))}
           </div>
-          <p className="text-[11px] text-parchment-400 mt-1.5">Restoring brings a character back as it was just before it was deleted, with its History.</p>
+          <p className="text-[11px] text-parchment-500 mt-1.5">Restoring brings a character back as it was just before it was deleted, with its History.</p>
         </details>
       )}
     </div>

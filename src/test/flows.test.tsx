@@ -208,6 +208,62 @@ describe('Vault: Recently deleted', () => {
   }, SLOW.timeout)
 })
 
+describe('Party', () => {
+  it('shows each character’s numbers as the sheet works them out, and opens the sheet', async () => {
+    const char = wizard(3, {
+      hp: { current: 9, temp: 2 }, conditions: ['Poisoned'],
+      equipment: [equipped('cloak-of-protection', 'Cloak of Protection', { slot: 'cloak', attuned: true })],
+    })
+    fakeServer([char])
+    const user = userEvent.setup()
+    renderApp('/party')
+    const card = (await screen.findByText('Test Wizard', undefined, find)).closest('a')!
+    const stat = (label: string) => within(card).getByText(label).nextElementSibling!.textContent
+    expect(stat('AC')).toBe('13')            // 10 + DEX 2 + the cloak's 1
+    expect(stat('Spell DC')).toBe('13')      // 8 + proficiency 2 + INT 3
+    expect(within(card).getByText('Poisoned')).toBeTruthy()
+    expect(within(card).getByText('+2')).toBeTruthy()   // temporary HP
+    await user.click(card)
+    expect(((await screen.findByLabelText('Character name', undefined, find)) as HTMLInputElement).value).toBe('Test Wizard')
+  }, SLOW.timeout)
+})
+
+describe('Settings: restore a backup', () => {
+  it('brings back what is missing and never overwrites', async () => {
+    const same = wizard(1, { name: 'Same Sam' })
+    const changed = wizard(1, { name: 'Changed Cass' })
+    const gone = wizard(2, { name: 'Gone Gwen' })
+    const server = fakeServer([same, { ...changed, hp: { current: 1, temp: 0 } }])
+    const mine = { slug: 'lucky-coin', name: 'Lucky Coin', type: 'Wondrous Item', rarity: 'Common' }
+    server.homebrew.items.push(mine)
+    // The backup: Sam as he is, Cass as she was, Gwen (not here any more) with two earlier versions,
+    // a homebrew entry the app lacks and an older Lucky Coin
+    const { default: JSZip } = await import('jszip')
+    const zip = new JSZip()
+    zip.file('homebrew.json', JSON.stringify({ items: [{ ...mine, rarity: 'Rare' }, { slug: 'old-map', name: 'Old Map', type: 'Wondrous Item', rarity: 'Common' }], spells: [] }))
+    for (const c of [same, changed, gone]) zip.file(`characters/${c.name.replace(/ /g, '_')}_${c.id.slice(0, 8)}.json`, JSON.stringify(c))
+    for (const stamp of ['2026-11-01T10-00-00-000Z', '2026-11-02T10-00-00-000Z']) {
+      zip.file(`characters/.history/${gone.id}/${stamp}.json`, JSON.stringify({ label: 'Start of a session', savedAt: '2026-11-01T10:00:00.000Z', character: gone }))
+    }
+    const file = new File([await zip.generateAsync({ type: 'arraybuffer' })], 'backup.zip', { type: 'application/zip' })
+
+    const user = userEvent.setup()
+    renderApp('/settings')
+    await user.upload(await screen.findByLabelText('Backup to restore', undefined, find), file)
+    expect(await screen.findByText('Backup restored', undefined, find)).toBeTruthy()
+
+    expect(server.characters.get(gone.id)?.name).toBe('Gone Gwen')
+    expect(server.characters.get(changed.id)?.hp.current).toBe(1)                    // yours untouched
+    expect([...server.characters.values()].filter(c => c.name === 'Changed Cass')).toHaveLength(2)   // the backup's beside it
+    expect(server.characters.size).toBe(4)
+    expect(server.homebrew.items.find(i => i.slug === 'lucky-coin')?.rarity).toBe('Common')     // yours kept
+    expect(server.homebrew.items.map(i => i.slug).sort()).toEqual(['lucky-coin', 'old-map'])
+    expect(server.snapshots.filter(sn => sn.id === gone.id)).toHaveLength(2)
+    expect(screen.getByText(/1 character brought back \(Gone Gwen\)/)).toBeTruthy()
+    expect(screen.getByText(/Kept your version of Lucky Coin/)).toBeTruthy()
+  }, SLOW.timeout)
+})
+
 describe('Homebrew', () => {
   it('adds an item and edits it', async () => {
     const server = fakeServer([])

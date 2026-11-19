@@ -466,7 +466,7 @@ export function SpellsTab() {
                 <div className="px-4 py-3 border-b border-parchment-200 space-y-2">
                   {/* Wild Shape: no spellcasting in beast form until Beast Spells (druid 18) */}
                   {wildShapeForm && (char.classes.find(c => c.classSlug === 'druid')?.level ?? 0) < 18 ? (
-                    <p className="text-xs italic text-green-800">You can't cast spells as a {wildShapeForm.name}: Wild Shape allows it from druid level 18 (Beast Spells). A spell you were already concentrating on keeps going.</p>
+                    <p className="text-xs italic text-green-800">You can't cast spells as {/^[aeiou]/i.test(wildShapeForm.name) ? 'an' : 'a'} {wildShapeForm.name}: Wild Shape allows it from druid level 18 (Beast Spells). A spell you were already concentrating on keeps going.</p>
                   ) : (
                   <>
                     {/* Pact Magic: a warlock spell up to the pact slot level, cast at that level */}

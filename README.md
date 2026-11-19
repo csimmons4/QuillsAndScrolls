@@ -129,7 +129,7 @@ Handy extras on the sheet:
 - **Print:** the printer button opens a printable two-page sheet (black on white in every theme).
 - **Portrait:** click the initials in the sheet header to add a picture. It's saved inside the character's file.
 
-Fight helpers on the Stats tab: Rage and Bless, spells that change your AC (Mage Armor, Shield, Shield of Faith, Haste, Barkskin), and a druid's **Wild Shape** (pick a beast form; it takes damage first and the rest carries over to you, and it uses the beast's AC, speed and attacks; Circle of the Moon druids can spend a spell slot to heal the beast). The Short Rest window handles hit dice, **Arcane Recovery** / **Natural Recovery** and **Song of Rest**. You roll every die yourself and type in the result.
+Fight helpers on the Stats tab: Rage and Bless, spells that change your AC (Mage Armor, Shield, Shield of Faith, Haste, Barkskin), and a druid's **Wild Shape** (pick a beast form; it takes damage first and the rest carries over to you, and it uses the beast's AC, speed and attacks; Circle of the Moon druids can spend a spell slot to heal the beast, take bigger beasts up to CR 6 as they level, and from level 10 become an elemental for both Wild Shape uses). The Short Rest window handles hit dice, **Arcane Recovery** / **Natural Recovery** and **Song of Rest**. You roll every die yourself and type in the result.
 
 **History:** the clock button on a sheet lists earlier versions of the character and can put one back. A version is kept at the start of each play session, before each level-up and before a restore, up to the 40 most recent per character. They live in the hidden `characters/.history/` folder, and the backup zip includes them unless you untick that option.
 
@@ -155,13 +155,16 @@ Add your own custom content that appears alongside official options everywhere i
 
 Each entry is saved as its own `.json` file so you can share individual pieces with players (see below).
 
+### Party
+Everyone at a glance on one page: HP (or Down / Stable / Fallen), AC, passive Perception, Insight and Investigation, spell save DC, plus Wild Shape, concentration, conditions, exhaustion and running potions. It updates every few seconds, so with phones and tablets switched on, changes players make on their own devices show up. Click a card to open that sheet.
+
 ### Compendium
 A searchable, filterable reference browser for **all** game content — spells, items, feats, races, backgrounds, and classes (official plus your homebrew). Filter by category and search by name or description without opening a character.
 
 ### Settings
 - Choose a display theme — **Parchment** (warm classic), **Light** (clean white), or **Dark**
 - See when data was last scraped and how many entries exist
-- Download a full backup `.zip` of all characters + homebrew (and each character's History, unless you untick it)
+- Download a full backup `.zip` of all characters + homebrew (and each character's History, unless you untick it), and restore from one
 - Let phones and tablets on your Wi-Fi open the app (off by default, see Setup)
 - Re-scrape instructions
 
@@ -199,6 +202,15 @@ homebrew/
 
 ### Full Backup
 Settings → **Download Backup (.zip)** bundles every character and all homebrew into a single zip file. Good to run before wiping your computer or moving to a new machine.
+
+**Restore from a backup:** Settings → **Restore from Backup…** and pick the zip. Nothing is ever overwritten:
+- characters the app doesn't have come back as they were,
+- characters that are already here unchanged are skipped,
+- a character you've changed since the backup comes back beside your current version,
+- homebrew you're missing is added, and where the backup has a different version of an entry, yours is kept,
+- earlier versions (History) are added.
+
+A summary afterwards says what came back. Restoring the same backup twice adds nothing new.
 
 ---
 

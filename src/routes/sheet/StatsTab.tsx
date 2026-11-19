@@ -7,7 +7,7 @@ import { ARMOR_KINDS, ARTISAN_TOOLS, MUSICAL_INSTRUMENTS, GAMING_SETS, OTHER_TOO
 import { describePotionEffects } from '../../character/potionEffects'
 import { ABILITY_FULL, ABILITY_LABELS, CONDITIONS, SIMPLE_WEAPON_SLUGS, SkillSourceTag, fightingStyles, isArmorProficient, isMonkWeapon, isWeaponProficient, magicBonus, resolveArmor, resolveWeapon, weaponAttackBonus, weaponDamageMod } from './helpers'
 import { useSheet } from './SheetContext'
-import { WILD_SHAPE_BEASTS, wildShapeLimits, wildShapeBlocked, formatCr } from '../../data/wildShapeBeasts'
+import { WILD_SHAPE_BEASTS, ELEMENTAL_FORMS, canElementalWildShape, wildShapeLimits, wildShapeBlocked, formatCr } from '../../data/wildShapeBeasts'
 
 /** The Stats tab: attacks, ability scores, saves, skills, status and proficiencies */
 export function StatsTab() {
@@ -516,10 +516,16 @@ export function StatsTab() {
                   {wildShapeForm ? (
                     <div className="rounded-lg border border-green-300 bg-green-50 px-3 py-2 text-sm">
                       <div className="flex items-center gap-2">
-                        <span className="font-semibold text-green-800 flex-1">You're a {wildShapeForm.name}</span>
+                        <span className="font-semibold text-green-800 flex-1">You're {/^[aeiou]/i.test(wildShapeForm.name) ? 'an' : 'a'} {wildShapeForm.name}</span>
                         <button type="button" onClick={revertWildShape} className="text-xs rounded-full px-2.5 py-0.5 border border-green-400 text-green-800 hover:bg-green-100">Change back</button>
                       </div>
-                      <div className="text-xs text-green-700 mt-0.5">{wildShapeForm.hp.current}/{wildShapeForm.hp.max} HP · AC {wildShapeForm.ac} · {wildShapeForm.speed} ft{wildShapeForm.notes ? ` · ${wildShapeForm.notes.replace(/^Also /, '')}` : ''}</div>
+                      <div className="text-xs text-green-700 mt-0.5">{wildShapeForm.hp.current}/{wildShapeForm.hp.max} HP · AC {wildShapeForm.ac} · {[wildShapeForm.speed ? `${wildShapeForm.speed} ft` : '', wildShapeForm.notes.replace(/^Also /, '')].filter(Boolean).join(', ')}</div>
+                      {(wildShapeForm.resistances.length > 0 || wildShapeForm.immunities.length > 0) && (
+                        <div className="text-[11px] text-green-700 mt-0.5">
+                          {wildShapeForm.resistances.length > 0 && <>Resists {wildShapeForm.resistances.join(', ')}. </>}
+                          {wildShapeForm.immunities.length > 0 && <>Immune to {wildShapeForm.immunities.join(', ')}.</>}
+                        </div>
+                      )}
                       {/* Hours equal to half the druid level (PHB p.67); a long rest ends it here, a short rest too when it's only an hour */}
                       <div className="text-[11px] text-green-700 mt-0.5">Lasts up to {Math.max(1, Math.floor(druid.level / 2))} hour{Math.floor(druid.level / 2) > 1 ? 's' : ''}</div>
                       {/* Combat Wild Shape (Circle of the Moon): a bonus action and a spell slot heal 1d8 per slot level */}
@@ -580,11 +586,28 @@ export function StatsTab() {
                                 onClick={() => { enterWildShape(b); setBeastPickerOpen(false) }}
                                 className="w-full text-left px-2.5 py-1.5 flex items-center gap-2 text-xs hover:bg-green-50 disabled:opacity-40 disabled:hover:bg-transparent disabled:cursor-not-allowed">
                                 <span className="font-semibold text-parchment-900 flex-1">{b.name}</span>
-                                <span className="text-parchment-500">CR {formatCr(b.cr)} · {b.hp} HP · AC {b.ac} · {b.speed} ft{b.otherSpeeds ? `, ${b.otherSpeeds}` : ''}</span>
+                                <span className="text-parchment-500">CR {formatCr(b.cr)} · {b.hp} HP · AC {b.ac} · {[b.speed ? `${b.speed} ft` : '', b.otherSpeeds ?? ''].filter(Boolean).join(', ')}</span>
                               </button>
                             )
                           })}
-                          {/* Any other beast: enter its numbers */}
+                          {/* Elemental Wild Shape (Moon 10): both uses for an elemental */}
+                  {canElementalWildShape(druid.level, druid.subclassSlug === 'moon') && (
+                    <>
+                      <div className="px-2.5 pt-2 pb-1 text-[10px] font-bold uppercase tracking-widest text-parchment-500 bg-parchment-100/60">Elemental Wild Shape · both uses</div>
+                      {ELEMENTAL_FORMS.map(b => {
+                        const blocked = usesLeft < 2 ? 'Takes both Wild Shape uses' : null
+                        return (
+                          <button key={b.slug} type="button" disabled={!!blocked} title={blocked ?? undefined}
+                            onClick={() => { enterWildShape(b); setBeastPickerOpen(false) }}
+                            className="w-full text-left px-2.5 py-1.5 flex items-center gap-2 text-xs hover:bg-green-50 disabled:opacity-40 disabled:hover:bg-transparent disabled:cursor-not-allowed">
+                            <span className="font-semibold text-parchment-900 flex-1">{b.name}</span>
+                            <span className="text-parchment-500">{b.hp} HP · AC {b.ac} · {[b.speed ? `${b.speed} ft` : '', b.otherSpeeds ?? ''].filter(Boolean).join(', ')}</span>
+                          </button>
+                        )
+                      })}
+                    </>
+                  )}
+                  {/* Any other beast: enter its numbers */}
                           <div className="px-2.5 py-2 flex flex-wrap items-center gap-1.5 text-xs">
                             <input className="input text-xs py-1 flex-1 min-w-[7rem]" placeholder="Other beast" value={customBeast.name} onChange={e => setCustomBeast(c => ({ ...c, name: e.target.value }))} />
                             <input className="input text-xs py-1 w-14" placeholder="HP" inputMode="numeric" value={customBeast.hp} onChange={e => setCustomBeast(c => ({ ...c, hp: e.target.value }))} />

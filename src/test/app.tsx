@@ -75,6 +75,13 @@ export function fakeServer(chars: Character[]): FakeServer {
       level: s.character.classes.reduce((n, c) => n + c.level, 0), hp: s.character.hp.current,
     })))
     m = pathname.match(/^\/api\/characters\/([^/]+)\/history\/([^/]+)$/)
+    if (m && method === 'PUT') {
+      if (server.snapshots.some(x => x.id === m![1] && x.stamp === m![2])) return reply({ added: false })
+      const snap = body()
+      server.snapshots.push({ id: m[1], stamp: m[2], label: snap.label, savedAt: snap.savedAt, character: snap.character })
+      server.snapshots.sort((a, b) => a.stamp.localeCompare(b.stamp))
+      return reply({ added: true })
+    }
     if (m) {
       const s = server.snapshots.find(x => x.id === m![1] && x.stamp === m![2])
       return s ? reply({ label: s.label, savedAt: s.savedAt, character: s.character }) : reply({ error: 'no such snapshot' }, 404)

@@ -97,6 +97,16 @@ export async function takeSnapshot(id: string, label: string): Promise<void> {
   })
 }
 
+/** Adds one snapshot from a backup unless one by that name exists; true if it was kept */
+export async function importSnapshot(id: string, stamp: string, snapshot: unknown): Promise<boolean> {
+  const r = await apiFetch(`/api/characters/${id}/history/${stamp}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(snapshot),
+  })
+  return !!r.added
+}
+
 /** Every snapshot of every character, raw, keyed by character id then file name (for the backup zip) */
 export async function exportHistory(): Promise<Record<string, Record<string, unknown>>> {
   return apiFetch('/api/history')

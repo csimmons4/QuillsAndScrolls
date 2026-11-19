@@ -6,16 +6,16 @@ import { listCharactersFromDisk, saveCharacterToDisk } from '../../storage/charA
 import { useContent } from '../../content/ContentProvider'
 import { profBonus, skillMod, hpMax, totalLevel, passivePerception, spellAttackBonus, spellSaveDC, abilityModFor, formatMod, deriveClassResources, featureKey, resourceMatchesFeature, hasBardJackOfAllTrades, monkSpeedBonus, sneakAttackDice, paladinAuraBonus, initiativeBonus, spellcastingAbilityFor, type ClassResource } from '../../character/derive'
 import { touchUpdated } from '../../character/create'
-import { CLASS_OPTIONS, infusionBonus, LAND_CIRCLE_SPELLS, isMulticlassSpellcaster, multiclassSpellSlotsMax } from '../../data/classData'
+import { CLASS_OPTIONS, LAND_CIRCLE_SPELLS, isMulticlassSpellcaster, multiclassSpellSlotsMax } from '../../data/classData'
 import { sumFeatBonuses } from '../../character/featBonuses'
-import { sumItemBonuses, effectiveAbilityScores } from '../../character/itemBonuses'
+import { featSlugsOf, itemBonusesOf, effectiveCharOf, skillCharOf } from '../../character/vitals'
 import type { Coin } from '../../character/currency'
 import { useRecentCharacter } from '../../storage/recentCharacter'
 import { useConfirm } from '../../components/ConfirmDialog'
 import { featArmorKinds } from '../../character/proficiencies'
 import { runningPotions, sumPotionEffects } from '../../character/potionEffects'
 import type { ArmorStats } from '../../content/loaders'
-import { ABILITY_LABELS, Tab, artificerLevelOf, computeFullAC, deriveResistances, deriveSkillSources, missingProficiencies, resolveArmor, toSkillKey, resolveWeapon, magicBonus, isWeaponProficient, fightingStyles, weaponAttackBonus, weaponDamageMod, isMonkWeapon } from './helpers'
+import { ABILITY_LABELS, Tab, artificerLevelOf, computeFullAC, deriveResistances, deriveSkillSources, missingProficiencies, resolveArmor, resolveWeapon, magicBonus, isWeaponProficient, fightingStyles, weaponAttackBonus, weaponDamageMod, isMonkWeapon } from './helpers'
 import { DRACONIC_ANCESTRIES } from '../../data/raceData'
 
 /** Everything the character sheet works from: its state, what follows from the character (AC,
@@ -307,24 +307,13 @@ export function useSheetModel() {
   const pb = profBonus(char)
 
   // Collect all feat slugs and derive passive bonuses
-  const featSlugs = char.featuresChosen
-    .filter(fc => fc.key === 'feat-l1' || fc.key.startsWith('feat-'))
-    .map(fc => typeof fc.value === 'string' ? fc.value : fc.value[0])
+  const featSlugs = featSlugsOf(char)
   const featBonuses = sumFeatBonuses(featSlugs, content.feats)
   // Armor proficiency from feats (Heavily Armored, …): counted without being stored
   const featArmor = featArmorKinds(featSlugs, content)
   const artificerLevel = artificerLevelOf(char)
-  // An attuned Enhanced Arcane Focus in hand adds its +1/+2 to spell attacks, like a magic focus
-  const itemBonuses = (() => {
-    const b = sumItemBonuses(char.equipment, content.items)
-    const focus = Math.max(0, ...char.equipment.filter(e => e.equipped).map(e => infusionBonus(e, artificerLevel, 'spellAttack')))
-    // Resistant Armor ("resistant-armor@fire"), worn and attuned
-    const resisted = char.equipment
-      .filter(e => e.equipped && e.attuned && e.infusion?.startsWith('resistant-armor@'))
-      .map(e => e.infusion!.split('@')[1])
-    if (!focus && resisted.length === 0) return b
-    return { ...b, spellAttackBonus: b.spellAttackBonus + focus, resistances: [...new Set([...b.resistances, ...resisted])] }
-  })()
+  // Items' bonuses, with an attuned Enhanced Arcane Focus and Resistant Armor (character/vitals.ts)
+  const itemBonuses = itemBonusesOf(char, content)
 
   // Active potions still running (not out of rounds or uses), and everything they change
   const running = runningPotions(char, content.items)
@@ -369,26 +358,12 @@ export function useSheetModel() {
   })
 
   // Apply ability score overrides/bonuses from equipped items and active potions (Giant Strength)
-  const scoreOverrides = { ...itemBonuses.abilityScoreOverrides }
-  for (const [ab, v] of Object.entries(potionScoreOverrides)) scoreOverrides[ab] = Math.max(scoreOverrides[ab] ?? 0, v)
-  const effectiveScores = effectiveAbilityScores(char.abilityScores as Record<string, number>, { ...itemBonuses, abilityScoreOverrides: scoreOverrides })
-  const effectiveChar = effectiveScores === (char.abilityScores as Record<string, number>)
-    ? char
-    : { ...char, abilityScores: effectiveScores as typeof char.abilityScores }
+  const effectiveChar = effectiveCharOf(char, itemBonuses, potionScoreOverrides)
 
   const raceDef = content.races.find(r => r.slug === char.raceSlug)
 
   // effectiveCharSkills: merge ALL auto-granted skill profs/expertise so mods are always correct
-  const _toSlug = toSkillKey
-  const _bgProfs = content.backgrounds.find(b => b.slug === char.backgroundSlug)?.skillProficiencies.map(_toSlug) ?? []
-  const _raceProfs = raceDef?.grantedSkills?.map(_toSlug) ?? []
-  const _featProfs = featSlugs.flatMap(slug => content.feats.find(f => f.slug === slug)?.grantedSkillProficiencies?.map(_toSlug) ?? [])
-  const _featExpert = featSlugs.flatMap(slug => content.feats.find(f => f.slug === slug)?.grantedSkillExpertise?.map(_toSlug) ?? [])
-  const effectiveCharSkills = {
-    ...effectiveChar,
-    skillProficiencies: [...new Set([...char.skillProficiencies, ..._bgProfs, ..._raceProfs, ..._featProfs, ...itemBonuses.skillProficiencies])],
-    skillExpertise: [...new Set([...char.skillExpertise, ..._featExpert, ...itemBonuses.skillExpertise])],
-  }
+  const effectiveCharSkills = skillCharOf(char, effectiveChar, content, featSlugs, itemBonuses)
 
   // Collect all free spells from feats + race/subrace
   // Single source of truth for granted/innate spells (feats, race, subclass) — rendered once.
@@ -901,21 +876,22 @@ export function useSheetModel() {
   /** Take a beast form: spends a Wild Shape use. You keep your own INT, WIS and CHA. */
   const enterWildShape = (b: Beast | { name: string; hp: number; ac: number; speed: number }) => {
     const use = classResources.find(r => r.key === 'wild-shape')
-    if (!use || (use.max !== null && use.current <= 0)) return
     const beast = 'slug' in b ? b : null
+    const cost = beast?.elemental ? 2 : 1   // Elemental Wild Shape takes both uses
+    if (!use || (use.max !== null && use.current < cost)) return
     const form: Summon = {
       id: Math.random().toString(36).slice(2, 10),
       name: b.name, templateKey: 'wild-shape',
       hp: { current: b.hp, max: b.hp }, ac: b.ac, speed: b.speed,
       ...(beast ? { abilityScores: { str: beast.str, dex: beast.dex, con: beast.con, int: char.abilityScores.int, wis: char.abilityScores.wis, cha: char.abilityScores.cha } } : {}),
-      saveProficiencies: [], immunities: [], resistances: [],
+      saveProficiencies: [], immunities: beast?.immunities ?? [], resistances: beast?.resistances ?? [],
       attacks: beast ? beast.attacks.map(a => ({ name: a.name, toHit: a.toHit, damage: a.damage, damageType: a.damageType, range: 'Melee', notes: a.notes ?? '' })) : [],
       abilities: beast ? beast.traits : [],
       notes: beast?.otherSpeeds ? `Also ${beast.otherSpeeds}` : '',
     }
     patch({
       summons: [...char.summons.filter(s => s.templateKey !== 'wild-shape'), form],
-      ...(use.max !== null ? { classResources: { ...char.classResources, 'wild-shape': use.current - 1 } } : {}),
+      ...(use.max !== null ? { classResources: { ...char.classResources, 'wild-shape': use.current - cost } } : {}),
     })
   }
   const revertWildShape = () => patch({ summons: char.summons.filter(s => s.templateKey !== 'wild-shape') })
@@ -1112,15 +1088,8 @@ export function useSheetModel() {
     potionFx,
     potionScoreOverrides,
     potionWeaponMods,
-    scoreOverrides,
-    effectiveScores,
     effectiveChar,
     raceDef,
-    _toSlug,
-    _bgProfs,
-    _raceProfs,
-    _featProfs,
-    _featExpert,
     effectiveCharSkills,
     freeSpells,
     subraceOpts,

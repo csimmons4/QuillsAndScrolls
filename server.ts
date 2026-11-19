@@ -98,6 +98,19 @@ app.get('/api/characters/:id/history/:stamp', (req, res) => {
   res.json(JSON.parse(fs.readFileSync(file, 'utf-8')))
 })
 
+// Restoring a backup: add a snapshot only if there isn't one by that name already (never overwrites)
+app.put('/api/characters/:id/history/:stamp', (req, res) => {
+  const stamp = req.params.stamp.replace(/[^a-zA-Z0-9-]/g, '')
+  const dir = historyDir(req.params.id)
+  const file = path.join(dir, `${stamp}.json`)
+  if (!stamp || !req.body?.character) { res.status(400).json({ error: 'not a snapshot' }); return }
+  if (fs.existsSync(file)) { res.json({ added: false }); return }
+  fs.mkdirSync(dir, { recursive: true })
+  fs.writeFileSync(file, JSON.stringify(req.body))
+  for (const old of snapshotFiles(req.params.id).slice(MAX_SNAPSHOTS)) fs.unlinkSync(path.join(dir, old))
+  res.json({ added: fs.existsSync(file) })   // an old one may fall outside the newest 40 straight away
+})
+
 app.post('/api/characters/:id/history', (req, res) => {
   const ok = takeSnapshot(req.params.id, String(req.body?.label ?? 'Saved by hand').slice(0, 80))
   res.json({ ok })
