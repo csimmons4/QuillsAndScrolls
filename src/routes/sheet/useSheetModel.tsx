@@ -151,6 +151,37 @@ export function useSheetModel() {
     }, 800)
   }, [])
 
+  // Escape closes the rest and Add Feat windows, like their Cancel buttons (a confirmation on top
+  // takes the Escape itself)
+  useEffect(() => {
+    if (!shortRestOpen && !longRestOpen && !addFeatOpen) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || document.querySelector('[role="alertdialog"]')) return
+      setShortRestOpen(false); setShortRestDice({}); setShortRestRolls({}); setRecoverSlots({}); setSongOfRestRoll('')
+      setLongRestOpen(false)
+      setAddFeatOpen(false); setAddFeatPending(null); setAddFeatAbility('')
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [shortRestOpen, longRestOpen, addFeatOpen])
+
+  // Leaving or closing the tab during the 800 ms wait: save at once, so the last change isn't lost
+  useEffect(() => {
+    const flush = () => {
+      if (!diskSaveTimer.current || !charRef.current) return
+      clearTimeout(diskSaveTimer.current)
+      diskSaveTimer.current = null
+      saveCharacterToDisk(charRef.current, { keepalive: true }).catch(err => console.warn('Auto-save failed:', err))
+    }
+    const onHide = () => { if (document.visibilityState === 'hidden') flush() }
+    window.addEventListener('pagehide', flush)
+    document.addEventListener('visibilitychange', onHide)
+    return () => {
+      window.removeEventListener('pagehide', flush)
+      document.removeEventListener('visibilitychange', onHide)
+    }
+  }, [])
+
   // Another tab (or an outside edit) may have saved this character since this tab loaded it. When the
   // tab comes back into view, pick up the newer copy rather than later saving the stale one over it.
   useEffect(() => {

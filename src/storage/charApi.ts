@@ -62,11 +62,15 @@ export async function listCharactersFromDisk(): Promise<CharacterListResult> {
   return { characters, failures }
 }
 
-export async function saveCharacterToDisk(char: Character): Promise<void> {
+/** `keepalive` lets the save finish after the page closes; browsers allow it for bodies under 64 KB,
+ *  so a bigger character (a portrait) is sent as an ordinary request */
+export async function saveCharacterToDisk(char: Character, opts: { keepalive?: boolean } = {}): Promise<void> {
+  const body = JSON.stringify(char)
   await apiFetch(`/api/characters/${char.id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(char),
+    body,
+    keepalive: !!opts.keepalive && body.length < 60_000,
   })
 }
 

@@ -22,13 +22,20 @@ app.use(express.json({ limit: '4mb' }))
 
 // ── Characters ──────────────────────────────────────────────────────────────
 
+// Ids and homebrew slugs become file names, so anything else (a "../", an empty name) is refused:
+// with phone access on, other devices on the Wi-Fi can reach these routes too
+const isId = (id: unknown): id is string => typeof id === 'string' && /^[A-Za-z0-9-]{8,64}$/.test(id)
+const isSlug = (slug: unknown): slug is string => typeof slug === 'string' && /^[A-Za-z0-9-]{1,120}$/.test(slug)
+
 function charFilename(char: { name: string; id: string }): string {
-  return `${char.name.replace(/[^a-z0-9]/gi, '_')}_${char.id.slice(0, 8)}.json`
+  return `${String(char.name ?? '').replace(/[^a-z0-9]/gi, '_')}_${char.id.slice(0, 8)}.json`
 }
 
+/** The file holding a character: names end in "_<first 8 characters of the id>.json" */
 function findFileById(id: string): string | null {
-  const files = fs.readdirSync(CHARS_DIR).filter(f => f.endsWith('.json'))
-  return files.find(f => f.includes(id.slice(0, 8))) ?? null
+  if (!isId(id)) return null
+  const suffix = `_${id.slice(0, 8)}.json`
+  return fs.readdirSync(CHARS_DIR).find(f => f.endsWith(suffix)) ?? null
 }
 
 app.get('/api/characters', (_req, res) => {
@@ -54,8 +61,12 @@ const HISTORY_DIR = path.join(CHARS_DIR, '.history')
 const SNAPSHOT_GAP_MS = 30 * 60 * 1000
 const MAX_SNAPSHOTS = 40
 
-const historyDir = (id: string) => path.join(HISTORY_DIR, id.replace(/[^a-z0-9-]/gi, ''))
+const historyDir = (id: string) => {
+  if (!isId(id)) throw new Error(`not a character id: ${id}`)
+  return path.join(HISTORY_DIR, id)
+}
 const snapshotFiles = (id: string) => {
+  if (!isId(id)) return []
   const dir = historyDir(id)
   return fs.existsSync(dir) ? fs.readdirSync(dir).filter(f => f.endsWith('.json')).sort().reverse() : []
 }
@@ -76,6 +87,11 @@ function lastSnapshotAge(id: string): number {
   const newest = snapshotFiles(id)[0]
   return newest ? Date.now() - fs.statSync(path.join(historyDir(id), newest)).mtimeMs : Infinity
 }
+
+// Every route with an :id refuses one that isn't a character id
+app.param('id', (req, res, next, id) => {
+  if (isId(id)) next(); else res.status(400).json({ error: 'not a character id' })
+})
 
 app.get('/api/characters/:id/history', (req, res) => {
   const dir = historyDir(req.params.id)
@@ -118,7 +134,7 @@ app.post('/api/characters/:id/history', (req, res) => {
 
 app.put('/api/characters/:id', (req, res) => {
   const char = req.body
-  if (!char?.id) { res.status(400).json({ error: 'missing id' }); return }
+  if (!isId(char?.id) || char.id !== req.params.id) { res.status(400).json({ error: 'missing or mismatched id' }); return }
 
   const existing = findFileById(char.id)
   // The first save of a new sitting keeps the version it replaces
@@ -144,7 +160,7 @@ app.delete('/api/characters/:id', (req, res) => {
 
 // Every snapshot of every character (deleted ones too), for the backup zip: { id: { file: snapshot } }
 app.get('/api/history', (_req, res) => {
-  const ids = fs.existsSync(HISTORY_DIR) ? fs.readdirSync(HISTORY_DIR) : []
+  const ids = fs.existsSync(HISTORY_DIR) ? fs.readdirSync(HISTORY_DIR).filter(isId) : []
   res.json(Object.fromEntries(ids.map(id => [id, Object.fromEntries(snapshotFiles(id).flatMap(f => {
     try { return [[f, JSON.parse(fs.readFileSync(path.join(historyDir(id), f), 'utf-8'))]] } catch { return [] }
   }))])))
@@ -152,7 +168,7 @@ app.get('/api/history', (_req, res) => {
 
 // Recently deleted: characters with history but no file, newest snapshot first
 app.get('/api/deleted', (_req, res) => {
-  const ids = fs.existsSync(HISTORY_DIR) ? fs.readdirSync(HISTORY_DIR).filter(id => !findFileById(id)) : []
+  const ids = fs.existsSync(HISTORY_DIR) ? fs.readdirSync(HISTORY_DIR).filter(id => isId(id) && !findFileById(id)) : []
   const deleted = ids.flatMap(id => {
     const newest = snapshotFiles(id)[0]
     if (!newest) return []
@@ -200,8 +216,8 @@ app.get('/api/homebrew', (_req, res) => {
 // PUT a single entry — homebrew/spells/locate-wikidot.json
 app.put('/api/homebrew/:category/:slug', (req, res) => {
   const { category, slug } = req.params
-  if (!CATEGORIES.includes(category as HBCategory)) {
-    res.status(400).json({ error: 'unknown category' }); return
+  if (!CATEGORIES.includes(category as HBCategory) || !isSlug(slug)) {
+    res.status(400).json({ error: 'unknown category or bad id' }); return
   }
   const file = path.join(HOMEBREW_DIR, category, `${slug}.json`)
   fs.writeFileSync(file, JSON.stringify(req.body, null, 2))
@@ -211,6 +227,9 @@ app.put('/api/homebrew/:category/:slug', (req, res) => {
 // DELETE a single entry
 app.delete('/api/homebrew/:category/:slug', (req, res) => {
   const { category, slug } = req.params
+  if (!CATEGORIES.includes(category as HBCategory) || !isSlug(slug)) {
+    res.status(400).json({ error: 'unknown category or bad id' }); return
+  }
   const file = path.join(HOMEBREW_DIR, category, `${slug}.json`)
   if (fs.existsSync(file)) fs.unlinkSync(file)
   res.json({ ok: true })

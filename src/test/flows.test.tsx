@@ -1,10 +1,12 @@
 // @vitest-environment jsdom
 // Flow tests: click through the app as a player would and check what gets saved
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { screen, within, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { fakeServer, renderApp, saved } from './app'
-import { cleanup } from '@testing-library/react'
+import { cleanup, render } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
+import { ErrorBoundary } from '../components/ErrorBoundary'
 import { makeChar, equipped } from './fixtures'
 
 /** Opens an inventory item's card by clicking its row */
@@ -168,6 +170,38 @@ describe('Sheet', () => {
     const after = await saved(server, char.id, c => c.classes[0].level === 1)
     expect(after.hp.current).toBe(12)
     expect(server.snapshots.map(sn => sn.label)).toEqual(['Before level 2', 'Before restoring an earlier version'])
+  }, SLOW.timeout)
+
+  it('saves straight away when the tab is hidden, without waiting out the delay', async () => {
+    const char = wizard(1, { hp: { current: 6, temp: 0 } })
+    const server = fakeServer([char])
+    const user = userEvent.setup()
+    renderApp(`/c/${char.id}`)
+    await user.type(await screen.findByLabelText(/Amount to damage/, undefined, find), '2')
+    await user.click(screen.getByRole('button', { name: /^Damage/ }))
+    Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true })
+    try {
+      document.dispatchEvent(new Event('visibilitychange'))
+      // well inside the 800 ms the sheet otherwise waits
+      await waitFor(() => expect(server.characters.get(char.id)!.hp.current).toBe(4), { timeout: 300 })
+    } finally {
+      delete (document as { visibilityState?: unknown }).visibilityState
+    }
+  }, SLOW.timeout)
+
+  it('Escape closes the rest window and the History dialog', async () => {
+    const char = wizard(1)
+    fakeServer([char])
+    const user = userEvent.setup()
+    renderApp(`/c/${char.id}`)
+    await user.click(await screen.findByRole('button', { name: 'Long Rest' }, find))
+    expect(screen.getByRole('dialog', { name: 'Long rest' })).toBeTruthy()
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('dialog', { name: 'Long rest' })).toBeNull()
+    await user.click(screen.getByRole('button', { name: 'Character history' }))
+    expect(await screen.findByRole('dialog', { name: /history/ })).toBeTruthy()
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('dialog', { name: /history/ })).toBeNull()
   }, SLOW.timeout)
 
   it('fight effects survive a page refresh', async () => {
@@ -340,4 +374,15 @@ describe('Creator', () => {
     expect(made.abilityScores.str).toBe(16)   // 15 + Human's +1
     expect(made.skillProficiencies).toEqual(expect.arrayContaining(['athletics', 'intimidation', 'insight', 'religion']))
   }, 30000)
+})
+
+describe('Error boundary', () => {
+  it('shows what went wrong instead of a blank page', () => {
+    const quiet = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const Broken = () => { throw new Error('the dice rolled off the table') }
+    render(<MemoryRouter><ErrorBoundary><Broken /></ErrorBoundary></MemoryRouter>)
+    expect(screen.getByRole('alert').textContent).toMatch(/Something went wrong.*the dice rolled off the table/s)
+    expect(screen.getByRole('link', { name: 'Back to the Vault' })).toBeTruthy()
+    quiet.mockRestore()
+  })
 })

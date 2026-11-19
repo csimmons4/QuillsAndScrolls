@@ -4,6 +4,7 @@ import { ThemeProvider } from './theme/theme'
 import { RecentCharacterProvider, useRecentCharacter } from './storage/recentCharacter'
 import { lazy, Suspense } from 'react'
 import Vault from './routes/Vault'
+import { ErrorBoundary } from './components/ErrorBoundary'
 
 // The other pages load when first opened, so the Vault comes up quickly
 const Creator = lazy(() => import('./routes/Creator'))
@@ -46,6 +47,12 @@ function NavBar() {
   )
 }
 
+/** A page that fails to render shows the error instead of a blank window; another page starts fresh */
+function PageBoundary({ children }: { children: React.ReactNode }) {
+  const { pathname } = useLocation()
+  return <ErrorBoundary key={pathname}>{children}</ErrorBoundary>
+}
+
 export default function App() {
   return (
     <ThemeProvider>
@@ -55,6 +62,7 @@ export default function App() {
         <div className="min-h-screen flex flex-col">
           <NavBar />
           <main className="flex-1 max-w-7xl w-full mx-auto px-4 py-6 print:p-0 print:max-w-none">
+            <PageBoundary>
             <Suspense fallback={<div className="text-center py-20 text-parchment-400">Loading…</div>}>
             <Routes>
               <Route path="/" element={<Vault />} />
@@ -68,6 +76,7 @@ export default function App() {
               <Route path="/settings" element={<Settings />} />
             </Routes>
             </Suspense>
+            </PageBoundary>
           </main>
         </div>
       </ContentProvider>

@@ -158,6 +158,7 @@ export function StatsTab() {
                     min={1}
                     max={30}
                     className="text-2xl font-bold w-12 text-center bg-transparent border-none outline-none focus:bg-parchment-50 rounded"
+                    aria-label={`${ABILITY_FULL[a]} score`}
                     value={char.abilityScores[a]}
                     onChange={e => {
                       const scores = { ...char.abilityScores, [a]: parseInt(e.target.value, 10) || 10 }
@@ -200,6 +201,7 @@ export function StatsTab() {
                   <input
                     type="checkbox"
                     className="w-[18px] h-[18px] sm:w-auto sm:h-auto"
+                    aria-label={`${ABILITY_FULL[a]} saving throw proficiency`}
                     checked={char.saveProficiencies.includes(a)}
                     onChange={e => {
                       const s = new Set(char.saveProficiencies)
@@ -401,6 +403,7 @@ export function StatsTab() {
                       checked={effectiveProf}
                       disabled={isAutoProf && !isManualProf}
                       title={isAutoProf && !isManualProf ? `Granted by: ${profTags.map(t => t.label).join(', ')}` : 'Proficient'}
+                      aria-label={`${SKILL_LABELS[skill]} proficiency`}
                       onChange={e => {
                         const s = new Set(char.skillProficiencies)
                         e.target.checked ? s.add(skill) : s.delete(skill)
@@ -414,6 +417,7 @@ export function StatsTab() {
                       checked={effectiveExpert}
                       disabled={isAutoExpert && !isManualExpert}
                       title={isAutoExpert && !isManualExpert ? `Expertise granted by: ${expertTags.map(t => t.label).join(', ')}` : 'Expertise (double proficiency)'}
+                      aria-label={`${SKILL_LABELS[skill]} expertise`}
                       onChange={e => {
                         const s = new Set(char.skillExpertise)
                         e.target.checked ? s.add(skill) : s.delete(skill)

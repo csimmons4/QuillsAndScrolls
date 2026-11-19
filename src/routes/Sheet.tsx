@@ -836,7 +836,7 @@ export default function Sheet() {
       {/* Concentration save after taking damage */}
       {concCheck && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="card max-w-sm w-full p-5">
+          <div className="card max-w-sm w-full p-5" role="dialog" aria-modal="true" aria-label="Concentration save">
             <h2 className="section-header">Concentration Save</h2>
             <p className="text-sm text-parchment-600 mb-4">
               You took {concCheck.damage} damage while concentrating on <strong>{concCheck.spellName}</strong>. Roll a Constitution saving throw.
@@ -867,7 +867,7 @@ export default function Sheet() {
       {/* Long Rest modal */}
       {longRestOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="card max-w-sm w-full p-5">
+          <div className="card max-w-sm w-full p-5" role="dialog" aria-modal="true" aria-label="Long rest">
             <h2 className="section-header">Long Rest</h2>
             <p className="text-sm text-parchment-600 mb-4">Taking a long rest will fully restore your HP, spell slots, class resources, and recover half your hit dice.</p>
             <ul className="text-xs text-parchment-500 space-y-1 mb-6">
@@ -945,7 +945,7 @@ export default function Sheet() {
       {/* Short Rest modal */}
       {shortRestOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="card max-w-sm w-full p-5">
+          <div className="card max-w-sm w-full p-5" role="dialog" aria-modal="true" aria-label="Short rest">
             <h2 className="section-header">Short Rest</h2>
             <p className="text-xs text-parchment-500 mb-4">Roll your hit dice physically and enter the result. CON modifier is added automatically.</p>
 
@@ -1147,10 +1147,10 @@ export default function Sheet() {
       {/* Add Feat modal */}
       {addFeatOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-parchment-50 rounded-lg shadow-xl w-full max-w-lg max-h-[80vh] flex flex-col">
+          <div className="bg-parchment-50 rounded-lg shadow-xl w-full max-w-lg max-h-[80vh] flex flex-col" role="dialog" aria-modal="true" aria-label="Add feat">
             <div className="flex items-center justify-between p-4 border-b border-parchment-200">
               <h3 className="font-semibold text-parchment-900">Add Feat</h3>
-              <button type="button" className="text-parchment-400 hover:text-parchment-700 text-xl leading-none"
+              <button type="button" className="text-parchment-400 hover:text-parchment-700 text-xl leading-none" aria-label="Close"
                 onClick={() => setAddFeatOpen(false)}>✕</button>
             </div>
             <div className="p-3 border-b border-parchment-200">

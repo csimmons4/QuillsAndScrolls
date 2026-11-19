@@ -130,7 +130,8 @@ export default function Party() {
         <p className="text-sm text-parchment-500 mt-1">Everyone at a glance. It updates every few seconds, so changes made on other devices show up here.</p>
       </div>
       {error && <div className="mb-4 rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
-      {characters === null ? (
+      {/* Until the reference data is in, hit dice (and so max HP) aren't known */}
+      {characters === null || content.loading ? (
         <div className="text-center py-20 text-parchment-400">Loading…</div>
       ) : characters.length === 0 ? (
         <div className="text-center py-20 text-parchment-500">No characters yet. <Link to="/new" className="underline">Create one</Link>.</div>

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useId, isValidElement, cloneElement, type ReactElement } from 'react'
 import { HomebrewStore } from '../storage/localStore'
 import { loadHomebrewFromDisk, saveHomebrewEntry, deleteHomebrewEntry, importHomebrewStore, HomebrewCategory } from '../storage/charApi'
 import { exportHomebrew, importHomebrew } from '../storage/ioFile'
@@ -48,11 +48,14 @@ function autoSlug(name: string) {
 // ─── Shared UI primitives ──────────────────────────────────────────────────
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+  // A single control (input, select, textarea, NumInput) gets the label pointed at it
+  const id = useId()
+  const single = isValidElement(children) && (typeof children.type !== 'string' || ['input', 'select', 'textarea'].includes(children.type))
   return (
     <div>
-      <label className="label">{label}</label>
+      <label className="label" htmlFor={single ? id : undefined}>{label}</label>
       {hint && <p className="text-[11px] text-parchment-400 mb-1">{hint}</p>}
-      {children}
+      {single ? cloneElement(children as ReactElement<{ id?: string }>, { id }) : children}
     </div>
   )
 }
@@ -87,9 +90,9 @@ function Section({ title, open, onToggle, children }: { title: string; open: boo
   )
 }
 
-function NumInput({ value, onChange, placeholder, min, max }: { value: string; onChange: (v: string) => void; placeholder?: string; min?: number; max?: number }) {
+function NumInput({ value, onChange, placeholder, min, max, id }: { value: string; onChange: (v: string) => void; placeholder?: string; min?: number; max?: number; id?: string }) {
   return (
-    <input type="number" className="input w-24 text-sm" value={value} min={min} max={max}
+    <input type="number" id={id} className="input w-24 text-sm" value={value} min={min} max={max}
       placeholder={placeholder ?? '0'} onChange={e => onChange(e.target.value)} />
   )
 }

@@ -55,8 +55,8 @@ function ClassCoverage() {
 
       <div className="flex flex-wrap gap-3 mb-5">
         <div>
-          <label className="label">Class</label>
-          <select className="input" value={classSlug} onChange={e => handleClassChange(e.target.value)}>
+          <label className="label" htmlFor="coverage-class">Class</label>
+          <select id="coverage-class" className="input" value={classSlug} onChange={e => handleClassChange(e.target.value)}>
             {CLASS_SLUGS.map(s => (
               <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
             ))}
@@ -64,8 +64,8 @@ function ClassCoverage() {
         </div>
 
         <div>
-          <label className="label">Level</label>
-          <select className="input" value={level} onChange={e => setLevel(Number(e.target.value))}>
+          <label className="label" htmlFor="coverage-level">Level</label>
+          <select id="coverage-level" className="input" value={level} onChange={e => setLevel(Number(e.target.value))}>
             {Array.from({ length: 20 }, (_, i) => i + 1).map(l => (
               <option key={l} value={l}>{l}</option>
             ))}
@@ -73,8 +73,8 @@ function ClassCoverage() {
         </div>
 
         <div>
-          <label className="label">Subclass</label>
-          <select className="input" value={subclassSlug ?? ''} onChange={e => setSubclassSlug(e.target.value || undefined)}>
+          <label className="label" htmlFor="coverage-subclass">Subclass</label>
+          <select id="coverage-subclass" className="input" value={subclassSlug ?? ''} onChange={e => setSubclassSlug(e.target.value || undefined)}>
             <option value="">— None —</option>
             {subclasses.map(sc => (
               <option key={sc.slug} value={sc.slug}>{sc.name} (L{sc.level}+)</option>

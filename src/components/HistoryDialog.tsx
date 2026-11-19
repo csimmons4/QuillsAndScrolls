@@ -35,6 +35,14 @@ export function HistoryButton({ charId, charName, onRestore }: {
       setError('History needs the app to be restarted once: close it and open it again.'))
   }, [open, charId])
 
+  // Escape closes it (unless the Restore confirmation is up: that one takes the Escape)
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !document.querySelector('[role="alertdialog"]')) setOpen(false) }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [open])
+
   const restore = async (s: Snapshot) => {
     if (!(await askConfirm({
       title: 'Restore this version?',
@@ -59,7 +67,7 @@ export function HistoryButton({ charId, charName, onRestore }: {
       ><ClockIcon className="w-5 h-5" /></button>
       {open && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-start justify-center px-4 pt-20" onMouseDown={() => setOpen(false)}>
-          <div role="dialog" aria-label={`${charName}'s history`} onMouseDown={e => e.stopPropagation()}
+          <div role="dialog" aria-modal="true" aria-label={`${charName}'s history`} onMouseDown={e => e.stopPropagation()}
             className="spell-card-in w-full max-w-md rounded-xl border border-parchment-300 bg-parchment-50 shadow-2xl overflow-hidden">
             <div className="flex items-start gap-3 px-4 pt-4 pb-3 border-b border-parchment-200">
               <ClockIcon className="w-5 h-5 mt-0.5 text-[rgb(var(--accent))] shrink-0" />

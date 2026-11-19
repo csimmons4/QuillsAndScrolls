@@ -16,9 +16,13 @@ export function exportCharacter(char: Character): void {
 
 export async function importCharacter(file: File): Promise<Character> {
   const text = await file.text()
-  const raw = JSON.parse(text)
-  return migrate(raw)
+  return withUsableId(migrate(JSON.parse(text)))
 }
+
+/** The server names files after ids and refuses anything but letters, digits and dashes (8–64 of
+ *  them): a hand-made file with another kind of id gets a fresh one */
+const withUsableId = (char: Character): Character =>
+  /^[A-Za-z0-9-]{8,64}$/.test(char.id) ? char : { ...char, id: uuidv4() }
 
 export function exportHomebrew(data: unknown): void {
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
@@ -97,7 +101,7 @@ export async function restoreBackup(file: File): Promise<RestoreSummary> {
   const byId = new Map(existing.map(c => [c.id, c]))
   for (const f of charFiles) {
     let char: Character
-    try { char = migrate(JSON.parse(await f.async('string'))) }
+    try { char = withUsableId(migrate(JSON.parse(await f.async('string')))) }
     catch { summary.characters.unreadable.push(f.name.split('/').pop()!); continue }
     const here = byId.get(char.id)
     // Already here: the same character, or a copy an earlier restore brought in beside it

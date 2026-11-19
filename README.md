@@ -120,7 +120,7 @@ The main play screen. Tabs for:
 - **Summons** — track summoned or companion creatures with their own HP and stats
 - **Notes** — personality traits, ideals, bonds, flaws, backstory, free notes
 
-Every change auto-saves to disk within a second. No manual save needed during play.
+Every change auto-saves to disk within a second, and straight away if you switch away from or close the tab. No manual save needed during play. Pop-up windows close with **Esc**.
 
 Handy extras on the sheet:
 - **Fight effects stay put:** Rage, Bless and spells on you survive a page refresh (they end on a rest, as before).

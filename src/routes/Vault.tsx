@@ -294,7 +294,8 @@ export default function Vault() {
         </div>
       )}
 
-      {loading ? (
+      {/* Until the reference data is in, hit dice (and so max HP) aren't known */}
+      {loading || content.loading ? (
         <div className="text-center py-20 text-parchment-400">Loading characters...</div>
       ) : characters.length === 0 ? (
         <div className="text-center py-20 text-parchment-500">
