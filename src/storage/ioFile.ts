@@ -74,7 +74,7 @@ export interface RestoreSummary {
 }
 
 /** JSON with sorted keys, so two copies of the same data compare equal whatever their key order */
-function stableJson(v: unknown): string {
+export function stableJson(v: unknown): string {
   return JSON.stringify(v, (_k, val) => val && typeof val === 'object' && !Array.isArray(val)
     ? Object.fromEntries(Object.entries(val).sort(([a], [b]) => a.localeCompare(b))) : val)
 }

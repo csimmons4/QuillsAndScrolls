@@ -1,7 +1,7 @@
 import { useState, useEffect, useId, isValidElement, cloneElement, type ReactElement } from 'react'
 import { HomebrewStore } from '../storage/localStore'
-import { loadHomebrewFromDisk, saveHomebrewEntry, deleteHomebrewEntry, importHomebrewStore, HomebrewCategory } from '../storage/charApi'
-import { exportHomebrew, importHomebrew } from '../storage/ioFile'
+import { loadHomebrewFromDisk, saveHomebrewEntry, deleteHomebrewEntry, HomebrewCategory } from '../storage/charApi'
+import { exportHomebrew, importHomebrew, stableJson } from '../storage/ioFile'
 import { useContent } from '../content/ContentProvider'
 
 type Category = 'items' | 'spells' | 'feats' | 'races' | 'classes' | 'backgrounds'
@@ -1063,6 +1063,7 @@ export default function Homebrew() {
   const [editEntry, setEditEntry] = useState<Record<string, unknown> | null>(null)
   const [editIdx, setEditIdx] = useState<number | null>(null)
   const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')   // what an import added or left alone
   const { reload } = useContent()
 
   useEffect(() => { loadHomebrewFromDisk().then(setStore) }, [])
@@ -1076,8 +1077,18 @@ export default function Homebrew() {
 
   async function handleSave(entry: Record<string, unknown>) {
     if (!String(entry.name ?? '').trim()) { setError('Name is required.'); return }
+    // Entries are files named by ID: never write over a different entry that has this ID already
+    const slug = String(entry.slug ?? '')
+    const previousSlug = editEntry ? String(editEntry.slug ?? '') : null
+    const clash = (store[category] as Record<string, unknown>[]).find(e => e.slug === slug && slug !== previousSlug)
+    if (clash) {
+      setError(`There's already a homebrew entry with the ID “${slug}” (${String(clash.name ?? slug)}). Change the name, or change the ID.`)
+      return
+    }
     setError('')
     await saveHomebrewEntry(category as HomebrewCategory, entry)
+    // The ID was changed while editing: the old file goes, or the entry would be there twice
+    if (previousSlug && previousSlug !== slug) await deleteHomebrewEntry(category as HomebrewCategory, previousSlug)
     await refreshStore()
     setEditEntry(null)
     setEditIdx(null)
@@ -1101,9 +1112,26 @@ export default function Homebrew() {
     try {
       const data = await importHomebrew(file) as HomebrewStore
       const isSingleEntry = data && !Array.isArray(data) && 'name' in data
-      if (isSingleEntry) await saveHomebrewEntry(category as HomebrewCategory, data as unknown as Record<string, unknown>)
-      else await importHomebrewStore(data)
+      const categories: HomebrewCategory[] = ['spells', 'items', 'feats', 'races', 'classes', 'backgrounds']
+      const incoming: [HomebrewCategory, Record<string, unknown>][] = isSingleEntry
+        ? [[category as HomebrewCategory, data as unknown as Record<string, unknown>]]
+        : categories.flatMap(cat => ((data[cat] ?? []) as Record<string, unknown>[]).map(e => [cat, e] as [HomebrewCategory, Record<string, unknown>]))
+      // Never write over an entry you have with the same ID: identical ones are skipped, different
+      // ones keep your version (delete yours first to take the imported one)
+      const added: string[] = [], kept: string[] = []
+      for (const [cat, raw] of incoming) {
+        const entry: Record<string, unknown> = { ...raw, slug: String(raw.slug || autoSlug(String(raw.name ?? ''))) }
+        if (!entry.slug) continue
+        const mine = (store[cat] as Record<string, unknown>[]).find(e => e.slug === entry.slug)
+        if (!mine) { await saveHomebrewEntry(cat, entry); added.push(String(entry.name ?? entry.slug)) }
+        else if (stableJson(mine) !== stableJson(entry)) kept.push(String(entry.name ?? entry.slug))
+      }
       await refreshStore()
+      setError('')
+      setNotice([
+        added.length ? `Imported ${added.length} entr${added.length > 1 ? 'ies' : 'y'}: ${added.join(', ')}.` : 'Nothing new to import.',
+        kept.length ? `Kept your version of ${kept.join(', ')} (the file has a different one; delete yours first to take it).` : '',
+      ].filter(Boolean).join(' '))
     } catch {
       setError('Failed to import — check the file is a valid homebrew entry or pack.')
     }
@@ -1138,6 +1166,7 @@ export default function Homebrew() {
       </div>
 
       {error && <div className="mb-4 p-3 rounded bg-red-50 border border-red-200 text-red-700 text-sm">{error}</div>}
+      {notice && <div className="mb-4 p-3 rounded bg-green-50 border border-green-200 text-green-800 text-sm">{notice}</div>}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
         {/* Form panel */}

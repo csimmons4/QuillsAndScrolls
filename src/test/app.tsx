@@ -13,6 +13,15 @@ Element.prototype.scrollIntoView = () => {}
 Element.prototype.scrollTo = () => {}
 window.scrollTo = () => {}
 globalThis.CSS ??= { escape: (s: string) => s.replace(/[^\w-]/g, c => `\\${c}`) } as typeof CSS
+// Blob.text(), which browsers have and jsdom doesn't (file imports read files with it)
+Blob.prototype.text ??= function (this: Blob) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result as string)
+    reader.onerror = () => reject(reader.error)
+    reader.readAsText(this)
+  })
+}
 
 afterEach(async () => {
   cleanup()

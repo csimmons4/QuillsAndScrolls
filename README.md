@@ -198,7 +198,7 @@ homebrew/
 
 **Share a single spell with a player:** send them the `.json` file from `homebrew/spells/`. They drop it into their own `homebrew/spells/` folder and it appears in their app automatically — no import button needed.
 
-**Share everything at once:** go to Settings → **Download Backup (.zip)** — includes all characters and all homebrew in one file. Players can also use the **Import** button on the Homebrew page to load individual files or a full pack.
+**Share everything at once:** go to Settings → **Download Backup (.zip)** — includes all characters and all homebrew in one file. Players can also use the **Import** button on the Homebrew page to load individual files or a full pack. Import never replaces an entry you already have: if the file has a different version of one of yours, yours is kept and the page says so (delete yours first to take theirs).
 
 ### Full Backup
 Settings → **Download Backup (.zip)** bundles every character and all homebrew into a single zip file. Good to run before wiping your computer or moving to a new machine.

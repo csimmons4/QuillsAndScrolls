@@ -314,6 +314,42 @@ describe('Homebrew', () => {
     await user.click(screen.getByRole('button', { name: 'Update' }))
     await waitFor(() => expect(server.homebrew.items.map(i => [i.name, i.slug])).toEqual([['Very Lucky Coin', 'lucky-coin']]))
   }, SLOW.timeout)
+
+  it('importing a pack adds what’s new and keeps your version of anything that differs', async () => {
+    const server = fakeServer([])
+    server.homebrew.items.push({ slug: 'pistol', name: 'Pistol', type: 'Weapon', rarity: 'Common', description: 'mine' })
+    const pack = { items: [{ slug: 'pistol', name: 'Pistol', type: 'Weapon', rarity: 'Rare', description: 'theirs' }, { slug: 'old-map', name: 'Old Map', type: 'Wondrous Item', rarity: 'Common' }], spells: [] }
+    const user = userEvent.setup()
+    const { container } = renderApp('/homebrew')
+    await screen.findByRole('button', { name: 'Add Item' }, find)
+    await user.upload(container.querySelector('input[type=file][accept=".json"]') as HTMLInputElement,
+      new File([JSON.stringify(pack)], 'pack.json', { type: 'application/json' }))
+    expect(await screen.findByText(/Imported 1 entry: Old Map\. Kept your version of Pistol/)).toBeTruthy()
+    expect(server.homebrew.items.find(i => i.slug === 'pistol')?.description).toBe('mine')
+    expect(server.homebrew.items.map(i => i.slug).sort()).toEqual(['old-map', 'pistol'])
+  }, SLOW.timeout)
+
+  it('won’t overwrite another entry with the same ID, and changing an ID leaves one copy', async () => {
+    const server = fakeServer([])
+    server.homebrew.items.push({ slug: 'pistol', name: 'Pistol', type: 'Weapon', rarity: 'Common', description: 'mine' })
+    const user = userEvent.setup()
+    renderApp('/homebrew')
+    const nameInput = () => screen.getByText('Name', { selector: 'label' }).parentElement!.querySelector('input')!
+    await screen.findByRole('button', { name: 'Add Item' }, find)
+    await user.type(nameInput(), 'Pistol')
+    await user.click(screen.getByRole('button', { name: 'Add Item' }))
+    expect(await screen.findByText(/already a homebrew entry with the ID “pistol”/)).toBeTruthy()
+    expect(server.homebrew.items).toHaveLength(1)
+    expect(server.homebrew.items[0].description).toBe('mine')
+    // edit the real one and give it a new ID
+    await user.click(screen.getByRole('button', { name: 'Edit' }))
+    await user.click(screen.getByRole('button', { name: 'change' }))
+    const idInput = screen.getByLabelText('ID')
+    await user.clear(idInput)
+    await user.type(idInput, 'flintlock')
+    await user.click(screen.getByRole('button', { name: 'Update' }))
+    await waitFor(() => expect(server.homebrew.items.map(i => i.slug)).toEqual(['flintlock']))
+  }, SLOW.timeout)
 })
 
 describe('Level Up', () => {

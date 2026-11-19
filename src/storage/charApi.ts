@@ -183,15 +183,3 @@ export async function deleteHomebrewEntry(
   await apiFetch(`/api/homebrew/${category}/${slug}`, { method: 'DELETE' })
 }
 
-// Used when importing a full homebrew pack — saves each entry individually
-export async function importHomebrewStore(data: HomebrewStore): Promise<void> {
-  const validCategories: HomebrewCategory[] = ['spells', 'items', 'feats', 'races', 'classes', 'backgrounds']
-  const saves: Promise<void>[] = []
-  for (const cat of validCategories) {
-    const entries = (data[cat] ?? []) as Record<string, unknown>[]
-    for (const entry of entries) {
-      saves.push(saveHomebrewEntry(cat, entry))
-    }
-  }
-  await Promise.all(saves)
-}
