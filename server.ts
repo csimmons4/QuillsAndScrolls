@@ -6,6 +6,9 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
+// Two ways to run: `npm run dev` (Vite serves the app on 5173 with live reload; this server is only
+// the API, on 5174) and `npm start` (this server serves the built app from dist/ and the API, on 5173)
+const SERVE_APP = process.argv.includes('--serve')
 // QS_DATA_DIR / QS_API_PORT let a second copy run against a throwaway folder (tests, trying things)
 const DATA_DIR = process.env.QS_DATA_DIR ? path.resolve(process.env.QS_DATA_DIR) : __dirname
 const CHARS_DIR = path.join(DATA_DIR, 'characters')
@@ -254,21 +257,46 @@ function lanAddresses(): string[] {
     .filter(a => !a.startsWith('169.254.'))
 }
 
+// `running`: whether the app was started with network access (it reads the setting once, at start)
+const lanAtStart = !!readLocalSettings().lan
+
 app.get('/api/settings/network', (_req, res) => {
-  res.json({ lan: !!readLocalSettings().lan, addresses: lanAddresses() })
+  res.json({ lan: !!readLocalSettings().lan, running: lanAtStart, addresses: lanAddresses() })
 })
 
 app.put('/api/settings/network', (req, res) => {
   const next = { ...readLocalSettings(), lan: !!req.body?.lan }
   fs.writeFileSync(LOCAL_SETTINGS, JSON.stringify(next, null, 2))
-  res.json({ lan: next.lan, addresses: lanAddresses() })
+  res.json({ lan: next.lan, running: lanAtStart, addresses: lanAddresses() })
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-const PORT = Number(process.env.QS_API_PORT) || 5174
-app.listen(PORT, '127.0.0.1', () => {
-  console.log(`Character server → http://localhost:${PORT}`)
+// ── The built app (npm start) ────────────────────────────────────────────────
+
+if (SERVE_APP) {
+  const DIST = path.join(__dirname, 'dist')
+  // Files with a hash in their name never change, so browsers may keep them; everything else is
+  // checked each time, so an update shows up straight away
+  app.use(express.static(DIST, {
+    index: false,
+    setHeaders: (res, file) => res.setHeader('Cache-Control',
+      file.includes(`${path.sep}assets${path.sep}`) ? 'public, max-age=31536000, immutable' : 'no-cache'),
+  }))
+  // Every page of the app (/c/…, /party, …) is index.html; unknown /api paths stay 404
+  app.get(/^(?!\/api\/).*/, (_req, res) => {
+    res.setHeader('Cache-Control', 'no-cache')
+    res.sendFile(path.join(DIST, 'index.html'))
+  })
+}
+
+const PORT = Number(process.env.QS_API_PORT) || (SERVE_APP ? 5173 : 5174)
+// Only the built app is ever reachable from other devices (with phone access on); in development
+// Vite does that part and this server stays on this computer
+const HOST = SERVE_APP && lanAtStart ? '0.0.0.0' : '127.0.0.1'
+app.listen(PORT, HOST, () => {
+  console.log(SERVE_APP ? `Quills & Scrolls → http://localhost:${PORT}` : `Character server → http://localhost:${PORT}`)
+  if (SERVE_APP && lanAtStart) console.log(`Phones and tablets: ${lanAddresses().map(a => `http://${a}:${PORT}`).join(', ')}`)
   console.log(`Characters  → ${CHARS_DIR}`)
   console.log(`Homebrew    → ${HOMEBREW_DIR}/`)
 })

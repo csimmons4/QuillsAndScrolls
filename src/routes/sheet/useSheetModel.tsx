@@ -46,6 +46,10 @@ export function useSheetModel() {
   const [expandedInventoryItem, setExpandedInventoryItem] = useState<number | null>(null)
   const [inventorySearch, setInventorySearch] = useState('')
   const [saveFlash, setSaveFlash] = useState<'idle' | 'saved'>('idle')
+  // A save that didn't reach the server (the app was closed, say): the sheet says so and keeps trying
+  const [saveFailed, setSaveFailed] = useState(false)
+  const persist = useCallback((c: Character, opts?: { keepalive?: boolean }) =>
+    saveCharacterToDisk(c, opts).then(() => { setSaveFailed(false); return true }, () => { setSaveFailed(true); return false }), [])
   const [journeyOpen, setJourneyOpen] = useState(true)
   // Feature descriptions show one line until clicked; "Show all text" flips the default for every card
   const [openFeatures, setOpenFeatures] = useState<Set<string>>(new Set())
@@ -147,9 +151,17 @@ export function useSheetModel() {
     if (diskSaveTimer.current) clearTimeout(diskSaveTimer.current)
     diskSaveTimer.current = setTimeout(() => {
       diskSaveTimer.current = null  // nothing waiting to be saved
-      saveCharacterToDisk(updated).catch(err => console.warn('Auto-save failed:', err))
+      persist(updated)
     }, 800)
-  }, [])
+  }, [persist])
+
+  // While saving fails, try again every few seconds: restarting the app brings the changes in
+  useEffect(() => {
+    if (!saveFailed) return
+    const timer = setInterval(() => { if (charRef.current && !diskSaveTimer.current) persist(charRef.current) }, 5000)
+    return () => clearInterval(timer)
+  }, [saveFailed, persist])
+  const retrySave = () => { if (charRef.current) persist(charRef.current) }
 
   // Escape closes the rest and Add Feat windows, like their Cancel buttons (a confirmation on top
   // takes the Escape itself)
@@ -171,7 +183,7 @@ export function useSheetModel() {
       if (!diskSaveTimer.current || !charRef.current) return
       clearTimeout(diskSaveTimer.current)
       diskSaveTimer.current = null
-      saveCharacterToDisk(charRef.current, { keepalive: true }).catch(err => console.warn('Auto-save failed:', err))
+      persist(charRef.current, { keepalive: true })
     }
     const onHide = () => { if (document.visibilityState === 'hidden') flush() }
     window.addEventListener('pagehide', flush)
@@ -209,13 +221,12 @@ export function useSheetModel() {
 
   function saveToFile() {
     if (!charRef.current) return
-    saveCharacterToDisk(charRef.current)
-      .then(() => {
-        setSaveFlash('saved')
-        if (saveFlashTimer.current) clearTimeout(saveFlashTimer.current)
-        saveFlashTimer.current = setTimeout(() => setSaveFlash('idle'), 2500)
-      })
-      .catch(err => console.warn('Manual save failed:', err))
+    persist(charRef.current).then(ok => {
+      if (!ok) return
+      setSaveFlash('saved')
+      if (saveFlashTimer.current) clearTimeout(saveFlashTimer.current)
+      saveFlashTimer.current = setTimeout(() => setSaveFlash('idle'), 2500)
+    })
   }
 
   useEffect(() => {
@@ -1007,6 +1018,8 @@ export function useSheetModel() {
     inventorySearch,
     setInventorySearch,
     saveFlash,
+    saveFailed,
+    retrySave,
     setSaveFlash,
     journeyOpen,
     setJourneyOpen,

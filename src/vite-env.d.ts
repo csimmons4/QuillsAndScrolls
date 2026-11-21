@@ -1,4 +1,4 @@
 /// <reference types="vite/client" />
 
-/** True when the app was started with phone/tablet access on (Settings → Phones & Tablets) */
-declare const __QS_LAN__: boolean
+/** The app's version, from package.json (shown in Settings) */
+declare const __APP_VERSION__: string

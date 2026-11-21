@@ -1,3 +1,18 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <text y=".9em" font-size="90">📜</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Quills & Scrolls: a parchment scroll and a gold quill on the app's header brown -->
+  <rect width="512" height="512" rx="112" fill="#5a4022"/>
+  <g transform="rotate(-8 246 276)">
+    <rect x="136" y="140" width="220" height="276" rx="14" fill="#faf3e0"/>
+    <rect x="116" y="112" width="260" height="44" rx="22" fill="#e6cf9f"/>
+    <rect x="116" y="398" width="260" height="44" rx="22" fill="#e6cf9f"/>
+    <g stroke="#b8883a" stroke-width="12" stroke-linecap="round">
+      <line x1="174" y1="206" x2="318" y2="206"/>
+      <line x1="174" y1="250" x2="318" y2="250"/>
+      <line x1="174" y1="294" x2="292" y2="294"/>
+      <line x1="174" y1="338" x2="262" y2="338"/>
+    </g>
+  </g>
+  <path d="M432 64 C340 88 262 162 222 268 L196 336 L224 318 C310 262 392 170 432 64 Z" fill="#e0b25c" stroke="#7a5418" stroke-width="8" stroke-linejoin="round"/>
+  <path d="M432 64 L178 404" stroke="#7a5418" stroke-width="10" stroke-linecap="round"/>
+  <path d="M196 372 L162 434 L184 424 Z" fill="#2b1d10"/>
 </svg>

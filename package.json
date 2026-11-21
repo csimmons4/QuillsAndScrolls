@@ -1,12 +1,13 @@
 {
   "name": "quills-and-scrolls",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "engines": {
     "node": ">=22.12.0"
   },
   "scripts": {
+    "start": "node scripts/build-if-needed.mjs && tsx server.ts --serve",
     "dev": "concurrently -n \"app,server\" -c \"cyan,yellow\" \"vite\" \"tsx server.ts\"",
     "build": "tsc && vite build",
     "preview": "vite preview",

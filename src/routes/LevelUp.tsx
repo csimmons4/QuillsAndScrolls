@@ -179,6 +179,7 @@ export default function LevelUp() {
   }, [char])
   const [hpRoll, setHpRoll] = useState<number | null>(null)
   const [useAverage, setUseAverage] = useState(true)
+  const [saveError, setSaveError] = useState('')   // Apply couldn't reach the server
   const [asiChoice, setAsiChoice] = useState<'asi' | 'feat'>('asi')
   const [ability1, setAbility1] = useState('str')
   const [ability2, setAbility2] = useState('str')
@@ -593,7 +594,12 @@ export default function LevelUp() {
 
     // Keep the character as it was, so the level-up can be undone from the sheet's History
     await takeSnapshot(char.id, `Before level ${newTotalLevel}`).catch(() => {})
-    await saveCharacterToDisk(updated)
+    try {
+      await saveCharacterToDisk(updated)
+    } catch {
+      setSaveError(`Couldn’t save the level-up: the app isn’t answering. Start it again (double-click Start) and try once more.`)
+      return
+    }
     navigate(`/c/${char.id}`)
   }
 
@@ -643,6 +649,11 @@ export default function LevelUp() {
 
   return (
     <div ref={pageRef} className="max-w-4xl mx-auto">
+      {saveError && (
+        <div role="alert" className="fixed top-3 left-1/2 -translate-x-1/2 z-[60] w-[min(36rem,calc(100%-1.5rem))] rounded-lg border border-red-300 bg-red-50 shadow-lg px-4 py-3 text-sm text-red-800">
+          {saveError}
+        </div>
+      )}
       <div className="flex items-center gap-3 mb-6">
         <Link to={`/c/${char.id}`} className="btn-ghost text-sm">← Back to Sheet</Link>
         <h1 className="text-2xl font-bold text-parchment-800">Level Up: {char.name}</h1>

@@ -304,7 +304,7 @@ export default function Settings() {
                 onChange={e => { setNetworkAccess(e.target.checked).then(setNetwork, () => setNetwork('old-server')) }} />
               Let phones and tablets on my Wi-Fi open the app
             </label>
-            {network.lan !== __QS_LAN__ ? (
+            {network.lan !== network.running ? (
               <p className="mt-2 text-sm text-amber-800">
                 Restart the app to switch this {network.lan ? 'on' : 'off'}: close the Start window and double-click Start again.
               </p>
@@ -402,6 +402,7 @@ export default function Settings() {
         <p className="text-sm text-parchment-500 mt-2">
           Quills &amp; Scrolls is an unofficial fan tool, not affiliated with Wizards of the Coast.
         </p>
+        <p className="text-xs text-parchment-500 mt-3">Version {__APP_VERSION__}</p>
       </div>
     </div>
   )

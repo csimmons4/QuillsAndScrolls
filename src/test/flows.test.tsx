@@ -204,6 +204,21 @@ describe('Sheet', () => {
     expect(screen.queryByRole('dialog', { name: /history/ })).toBeNull()
   }, SLOW.timeout)
 
+  it('says so when saving fails, and saves once the app is back', async () => {
+    const char = wizard(1, { hp: { current: 6, temp: 0 } })
+    const server = fakeServer([char])
+    const user = userEvent.setup()
+    renderApp(`/c/${char.id}`)
+    server.failSaves = true
+    await user.type(await screen.findByLabelText(/Amount to damage/, undefined, find), '2')
+    await user.click(screen.getByRole('button', { name: /^Damage/ }))
+    expect((await screen.findByRole('alert', undefined, find)).textContent).toMatch(/aren’t being saved/)
+    server.failSaves = false
+    await user.click(screen.getByRole('button', { name: 'Try again' }))
+    await waitFor(() => expect(screen.queryByText(/aren’t being saved/)).toBeNull())
+    expect(server.characters.get(char.id)!.hp.current).toBe(4)
+  }, SLOW.timeout)
+
   it('fight effects survive a page refresh', async () => {
     const char = wizard(1, { hp: { current: 6, temp: 0 } })
     fakeServer([char])
@@ -384,6 +399,18 @@ describe('Level Up', () => {
     const after = await saved(server, char.id, c => c.classes[0].level === 2)
     expect(after.classes[0].level).toBe(2)
     expect(server.snapshots.map(sn => [sn.id, sn.label])).toEqual([[char.id, 'Before level 2']])
+  }, SLOW.timeout)
+
+  it('says so when the level-up can’t be saved, and stays on the page', async () => {
+    const char = makeChar([{ classSlug: 'fighter', level: 1 }], { str: 16, con: 14 }, { name: 'Test Fighter', hp: { current: 12, temp: 0 } })
+    const server = fakeServer([char])
+    server.failSaves = true
+    const user = userEvent.setup()
+    renderApp(`/c/${char.id}/level-up`)
+    const apply = await screen.findAllByRole('button', { name: 'Apply Level Up' }, find)
+    await user.click(apply[apply.length - 1])
+    expect((await screen.findByRole('alert')).textContent).toMatch(/Couldn’t save the level-up/)
+    expect(server.characters.get(char.id)!.classes[0].level).toBe(1)
   }, SLOW.timeout)
 })
 

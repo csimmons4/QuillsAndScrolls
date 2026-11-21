@@ -136,7 +136,8 @@ export async function forgetDeleted(id: string): Promise<void> {
 
 // ── Phones and tablets ───────────────────────────────────────────────────────
 
-export interface NetworkSettings { lan: boolean; addresses: string[] }
+/** `lan`: the saved choice; `running`: whether the app was started with it on (it takes a restart) */
+export interface NetworkSettings { lan: boolean; running: boolean; addresses: string[] }
 
 export async function getNetworkSettings(): Promise<NetworkSettings> {
   return apiFetch('/api/settings/network')

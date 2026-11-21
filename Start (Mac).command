@@ -67,11 +67,12 @@ lsof -ti:5174 | xargs kill -9 2>/dev/null
 sleep 1
 
 echo "Starting Quills & Scrolls..."
-npm run dev &
+# npm start builds the app first when it has changed (a few seconds), then serves it on port 5173
+npm start &
 
 echo "Waiting for the app to be ready..."
-# The app may listen on IPv6 localhost (::1) only, so ask for "localhost", which curl tries both ways
-until curl -s http://localhost:5173 > /dev/null && curl -s http://127.0.0.1:5174/api/characters > /dev/null; do
+# "localhost", which curl tries over IPv6 and IPv4
+until curl -s http://localhost:5173/api/characters > /dev/null; do
   sleep 1
 done
 

@@ -77,15 +77,14 @@ powershell -NoProfile -Command "Get-NetTCPConnection -LocalPort 5173,5174 -State
 timeout /t 1 /nobreak >nul
 
 echo Starting Quills ^& Scrolls...
-start "" npm run dev
+REM npm start builds the app first when it has changed (a few seconds), then serves it on port 5173
+start "" npm start
 
 echo Waiting for the app to be ready...
 :wait_loop
 timeout /t 2 /nobreak >nul
-REM "localhost", which curl tries over IPv6 and IPv4: the app page may only listen on ::1
-curl -s http://localhost:5173 >nul 2>&1
-if errorlevel 1 goto wait_loop
-curl -s http://127.0.0.1:5174/api/characters >nul 2>&1
+REM "localhost", which curl tries over IPv6 and IPv4
+curl -s http://localhost:5173/api/characters >nul 2>&1
 if errorlevel 1 goto wait_loop
 
 echo Ready! Opening your browser...

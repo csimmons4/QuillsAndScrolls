@@ -48,6 +48,8 @@ export default function Sheet() {
     setExpandedInventoryItem,
     setInventorySearch,
     saveFlash,
+    saveFailed,
+    retrySave,
     damageInput,
     setDamageInput,
     tabsAnchor,
@@ -734,6 +736,16 @@ export default function Sheet() {
       )}
 
       {confirmDialog}
+      {/* Saving isn't reaching the app's server: say so plainly, and keep trying (useSheetModel) */}
+      {saveFailed && (
+        <div role="alert" className="fixed top-3 left-1/2 -translate-x-1/2 z-[60] w-[min(36rem,calc(100%-1.5rem))] rounded-lg border border-red-300 bg-red-50 shadow-lg px-4 py-3 text-sm text-red-800 flex flex-wrap items-center gap-x-3 gap-y-2">
+          <div className="flex-1 min-w-[14rem]">
+            <div className="font-semibold">Your changes aren’t being saved</div>
+            <div className="text-xs text-red-700">The app isn’t answering. Keep this page open and start the app again (double-click Start): your changes save as soon as it’s back.</div>
+          </div>
+          <button type="button" onClick={retrySave} className="rounded-full border border-red-400 px-3 py-1 text-xs font-semibold hover:bg-red-100">Try again</button>
+        </div>
+      )}
       {findOpen && (() => {
         // Everything on the sheet you might want to get to
         type Hit = { key: string; label: string; kind: string; sub?: string; go: () => void }

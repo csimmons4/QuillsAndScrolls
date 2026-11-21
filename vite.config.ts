@@ -3,17 +3,20 @@ import react from '@vitejs/plugin-react'
 import path from 'path'
 import fs from 'fs'
 
-// Phones and tablets on your Wi-Fi: only when switched on in Settings (kept in .local-settings.json,
-// read once at start-up). Otherwise the app listens on this computer alone.
+// Phones and tablets on your Wi-Fi, in development (`npm run dev`): only when switched on in Settings
+// (kept in .local-settings.json, read once at start-up). `npm start` serves the app through server.ts,
+// which reads the same setting.
 const dataDir = process.env.QS_DATA_DIR ? path.resolve(process.env.QS_DATA_DIR) : import.meta.dirname
 const lan = (() => {
   try { return !!JSON.parse(fs.readFileSync(path.join(dataDir, '.local-settings.json'), 'utf8')).lan } catch { return false }
 })()
 
+// Shown in Settings
+const appVersion = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, 'package.json'), 'utf8')).version
+
 export default defineConfig({
   plugins: [react()],
-  // Lets Settings tell whether the running app was started with network access
-  define: { __QS_LAN__: JSON.stringify(lan) },
+  define: { __APP_VERSION__: JSON.stringify(appVersion) },
   resolve: {
     alias: {
       '@': path.resolve(import.meta.dirname, './src'),

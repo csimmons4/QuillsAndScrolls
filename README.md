@@ -46,7 +46,7 @@ There is **nothing to install by hand** — no Node.js download, no Terminal com
 
 The **first time** you run it, the launcher automatically installs everything it needs (a private copy of Node.js if your computer doesn't have a recent enough one, then the app files) and then opens the app in your browser. This first run takes a minute or two; after that it starts in seconds.
 
-After you update the app (for example by downloading a newer copy), the launcher notices and reinstalls the app files, and Node.js too if the app now needs a newer one. That launch takes a minute again.
+After you update the app (for example by downloading a newer copy), the launcher notices and reinstalls the app files, and Node.js too if the app now needs a newer one. That launch takes a minute again. Whenever something has changed, the window also says **"Preparing the app…"** for a few seconds while it gets the app ready.
 
 Keep the launcher's window open while you're using the app — closing it stops the server. To stop, close that window; to use it again later, just double-click the launcher.
 
@@ -55,9 +55,18 @@ Keep the launcher's window open while you're using the app — closing it stops 
 - **Mac:** The Mac may warn the file is from an unidentified developer. Right-click **`Start (Mac).command`** → **Open** → **Open**. After that it opens normally on a plain double-click.
 - **Windows:** If a firewall popup appears, click **Allow access**. It's just Node.js opening a local port on your own machine.
 - You need to be **online** the first time so the launcher can download what it needs. After that it works offline.
-- While installing, the window may print something like **"13 high severity vulnerabilities"**. That's normal and the app is fine to use. See [About the security warnings](#about-the-security-warnings-npm-audit).
+- If the install ever prints a line about "vulnerabilities", see [About the security warnings](#about-the-security-warnings-npm-audit).
 
-> Prefer the command line? With Node.js 22.12 or newer installed, run `npm install` once and then `npm run dev`, opening **http://localhost:5173** yourself.
+> Prefer the command line? With Node.js 22.12 or newer installed, run `npm install` once and then `npm start`, opening **http://localhost:5173** yourself.
+
+### If something goes wrong
+
+- **The browser didn't open:** go to **http://localhost:5173** yourself while the launcher's window is open.
+- **"Your changes aren't being saved"** on a character sheet: the app has stopped (usually because its window was closed). Leave the page open, double-click the launcher again, and the changes save as soon as it's back.
+- **A character is missing from the Vault:** look under **Recently deleted** at the bottom, and for a red box at the top listing files that couldn't be loaded. Every character also has its **History** (the clock button on the sheet).
+- **"Something went wrong on this page":** click **Back to the Vault** or **Reload**. Your characters are saved as you play.
+- **Port already in use / it won't start:** close every Quills & Scrolls window and double-click the launcher again (it stops an old copy first).
+- **A phone or tablet can't connect:** check Settings → Phones & Tablets is on and the app was restarted after switching it on, that both are on the same Wi-Fi, and that your computer allowed "node" through its firewall.
 
 ### Using it on a phone or tablet
 
@@ -85,7 +94,7 @@ npm run scrape -- --only spells,items
 
 Available categories: `spells`, `items`, `races`, `classes`, `backgrounds`, `feats`
 
-After scraping, refresh your browser to pick up the new data.
+After scraping, restart the app (close its window and double-click the launcher): it gets itself ready with the new data on start.
 
 ---
 
@@ -216,19 +225,15 @@ A summary afterwards says what came back. Restoring the same backup twice adds n
 
 ## About the security warnings (npm audit)
 
-When the launcher (or `npm install`) installs the app's files, npm checks every package the app is built from against a public list of known problems and prints a summary such as *"13 high severity vulnerabilities"*.
+When the launcher (or `npm install`) installs the app's files, npm checks every package the app is built from against a public list of known problems and prints a summary, such as *"found 0 vulnerabilities"*.
 
 **It's not just your computer.** Everyone who installs this app sees the same message, because it comes from the list of packages that ships with the app (`package-lock.json`). The number can also go up over time without anything changing here, as new problems are published.
 
-**Where things stand (17 November 2026):**
-- The app's own libraries (React, Express, Zod and the rest) have **no known problems**: `npm audit --omit=dev`, which checks just those, reports 0.
-- All 13 warnings are **one problem in one small package**, *picomatch*, which matches file-name patterns for the tools around the app: Vite (which also serves the app while you play), Vitest (tests) and Tailwind (styles). Everything that uses it gets counted separately, which is why the number looks big.
-- **No fixed version of picomatch exists yet.** When one is released, `npm audit fix` should pick it up.
-- It needs specially crafted file-name patterns to slow things down, and the only patterns involved are the app's own settings, so nothing a visitor or another device sends can trigger it. That holds while phone/tablet access is on, too.
+**Where things stand (21 November 2026):** `npm audit` reports **0 vulnerabilities**. The packages were brought up to date in November 2026 (Express, React Router 7, Vite 8, Vitest 5, Zod 4), and the app you play now runs as a built version served by its own small server, without the developer tools in the way.
 
 **What to do (and not do):**
 - `npm audit fix` is safe to run. It only takes small, compatible updates.
-- **Don't run `npm audit fix --force`.** For this problem npm's suggested "fix" actually downgrades Vite to an older version, and it would also try a major Tailwind upgrade. Both would break the app.
+- **Don't run `npm audit fix --force`.** It jumps packages to new major versions (or even back to old ones), which can break the app. Big upgrades are best done as a planned change.
 
 ---
 
@@ -237,8 +242,10 @@ When the launcher (or `npm install`) installs the app's files, npm checks every 
 Needs Node.js 22.12 or newer (the launchers use Node 24).
 
 ```bash
-npm run dev          # the app (5173) + the file server (5174)
+npm start            # what the launchers run: build if needed, then serve the app + API on 5173
+npm run dev          # development: Vite with live reload (5173) + the API (5174)
 npm test             # game-math tests + flow tests that click through the app
+npm run test:sweep   # slow, broad checks over every class, page and button (~6 minutes)
 npx tsc --noEmit     # type-check
 npm run build        # production build
 npm run audit:content   # compare the curated data with the scraped data

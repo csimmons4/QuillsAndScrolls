@@ -629,7 +629,12 @@ export default function Creator() {
     finalChar.saveBaseline = [...finalChar.saveProficiencies]
 
     const final = touchUpdated(finalChar)
-    await saveCharacterToDisk(final)
+    try {
+      await saveCharacterToDisk(final)
+    } catch {
+      setErrors([`Couldn’t save the character: the app isn’t answering. Start it again (double-click Start) and try once more.`])
+      return
+    }
     navigate(`/c/${final.id}`)
   }
 

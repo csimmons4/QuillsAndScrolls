@@ -71,7 +71,7 @@ export default function Vault() {
 
   async function handleDelete(id: string, name: string) {
     if (!(await askConfirm({ title: 'Delete Character', message: `Delete “${name}”? You can bring it back from Recently deleted at the bottom of the Vault.`, confirmLabel: 'Delete', danger: true }))) return
-    await deleteCharacterFromDisk(id)
+    try { await deleteCharacterFromDisk(id) } catch { setError(`Couldn’t delete ${name}: the app isn’t answering. Start it again (double-click Start) and try once more.`); return }
     if (recent?.id === id) setRecent(null)
     await refresh()
   }
@@ -88,7 +88,7 @@ export default function Vault() {
   async function handleForget(d: DeletedCharacter) {
     const name = d.name ?? 'this character'
     if (!(await askConfirm({ title: 'Delete Forever', message: `Delete “${name}” for good? Its earlier versions are removed too, and this can't be undone.`, confirmLabel: 'Delete forever', danger: true }))) return
-    await forgetDeleted(d.id)
+    try { await forgetDeleted(d.id) } catch { setError(`Couldn’t delete ${name}: the app isn’t answering. Start it again (double-click Start) and try once more.`); return }
     await refresh()
   }
 
@@ -101,7 +101,7 @@ export default function Vault() {
       createdAt: now,
       updatedAt: now,
     }
-    await saveCharacterToDisk(copy)
+    try { await saveCharacterToDisk(copy) } catch { setError(`Couldn’t duplicate ${char.name}: the app isn’t answering. Start it again (double-click Start) and try once more.`); return }
     await refresh()
   }
 

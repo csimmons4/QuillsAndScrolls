@@ -39,6 +39,8 @@ export interface FakeServer {
   snapshots: FakeSnapshot[]
   /** Homebrew by category */
   homebrew: Record<string, Record<string, unknown>[]>
+  /** While true, saving a character fails (as when the app's server has been closed) */
+  failSaves: boolean
 }
 
 /** Answers the app's fetches: /data/wikidot from public/, the /api routes from memory */
@@ -47,6 +49,7 @@ export function fakeServer(chars: Character[]): FakeServer {
     characters: new Map(chars.map(c => [c.id, structuredClone(c)])),
     snapshots: [],
     homebrew: { spells: [], items: [], feats: [], races: [], classes: [], backgrounds: [] },
+    failSaves: false,
   }
   let clock = 0
   const snapshot = (id: string, label: string) => {
@@ -72,7 +75,11 @@ export function fakeServer(chars: Character[]): FakeServer {
     }
     if (pathname === '/api/characters') return reply([...server.characters.values()])
     let m = pathname.match(/^\/api\/characters\/([^/]+)$/)
-    if (m && method === 'PUT') { server.characters.set(m[1], body()); return reply({ ok: true }) }
+    if (m && method === 'PUT') {
+      if (server.failSaves) return reply({ error: 'server gone' }, 503)
+      server.characters.set(m[1], body())
+      return reply({ ok: true })
+    }
     if (m && method === 'DELETE') {
       if (snapshot(m[1], 'Deleted')) server.characters.delete(m[1])
       return reply({ ok: true })
@@ -120,7 +127,7 @@ export function fakeServer(chars: Character[]): FakeServer {
       server.homebrew[m[1]] = method === 'PUT' ? [...list, { ...body(), slug: m[2] }] : list
       return reply({ ok: true })
     }
-    if (pathname === '/api/settings/network') return reply({ lan: false, addresses: [] })
+    if (pathname === '/api/settings/network') return reply({ lan: false, running: false, addresses: [] })
     return reply({ error: 'not found' }, 404)
   })
   return server

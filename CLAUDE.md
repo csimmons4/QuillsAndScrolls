@@ -8,7 +8,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```bash
 npm install               # install dependencies (first time)
-npm run dev               # start both servers concurrently (see below)
+npm start                 # what the launchers run: build into dist/ if needed, then serve app + API on 5173
+npm run dev               # development: Vite (live reload) + the API server, concurrently (see below)
 npm run build             # tsc + vite build
 npx tsc --noEmit          # type-check
 npm test                  # Vitest: game-math tests (src/**/*.test.ts) + flow tests (src/test/flows.test.tsx)
@@ -19,7 +20,7 @@ npm run scrape -- --only spells    # scrape a single category (comma-separate fo
 npm run audit:content     # check overlays vs scraped data for gaps/mismatches
 ```
 
-`npm audit` (the same for everyone who installs: it comes from `package-lock.json`): on 2026-11-17, after upgrading to Express 4.22.3, uuid 14, React Router 7, Vite 8, Vitest 5 and Zod 4, `npm audit --omit=dev` is 0. The full audit's 13 are all one picomatch ReDoS advisory (GHSA-fc5q-39xc-vjpf, affects ≤ 4.0.7, the newest release) reaching vite, vitest, @vitejs/plugin-react and Tailwind 3's file watchers; no fixed release exists yet. npm's suggested fix is a *downgrade* to vite 6.2.7: ignore it, and never run `npm audit fix --force`; plain `npm audit fix` is fine and will pick up a fixed picomatch. Tailwind 4 is deliberately not done: it changes how things look and needs Safari 16.4+, which matters for older iPads on phone access. The README's "About the security warnings" section explains this for players; keep its numbers in step. Keep `uuid` rather than `crypto.randomUUID()`, which needs a secure context and so fails over plain-HTTP phone/tablet access.
+`npm audit` (the same for everyone who installs: it comes from `package-lock.json`) reports 0 as of 2026-11-21, after the November upgrades (Express 4.22.3, uuid 14, React Router 7, Vite 8, Vitest 5, Zod 4) and once the picomatch advisory GHSA-fc5q-39xc-vjpf was revised. Never run `npm audit fix --force` (it jumps majors, sometimes backwards); plain `npm audit fix` is fine. Tailwind 4 is deliberately not done: it changes how things look and needs Safari 16.4+, which matters for older iPads on phone access. The README's "About the security warnings" section explains this for players; keep its numbers in step. Keep `uuid` rather than `crypto.randomUUID()`, which needs a secure context and so fails over plain-HTTP phone/tablet access.
 
 Tests live next to the code (`derive.test.ts`, `classData.test.ts`, `sheet/helpers.test.ts`, `currency.test.ts`, `localStore.test.ts`, `wildShapeBeasts.test.ts`) and check the rules math against PHB values: modifiers, proficiency, HP, skills/saves/initiative, spell DC, class resources, multiclass and pact slots, AC, weapon attacks, the purse, save migrations and Wild Shape limits. `src/test/fixtures.ts` builds the merged reference data from `public/data/wikidot` + overlays and a `makeChar()` helper. Add a test when you change a rule.
 
@@ -30,26 +31,26 @@ Confirm dialogs are `role="alertdialog"`: click their buttons `within()` it, sin
 **Launchers:** `Start (Mac).command` / `Start (Windows).bat` are the double-click entry point for non-technical users. They:
 - use the computer's own Node only if it's 22.12+ (a `node -e` version check), else a private Node (`NODE_VERSION`, now v24.22.3) in `.runtime/node` (gitignored), downloaded again if its `node -v` differs;
 - run `npm install` when `node_modules` is missing or `package-lock.json` differs from `node_modules/.qs-installed-lock` (copied after each successful install), so an updated app reinstalls itself;
-- then stop anything listening on ports 5173/5174 (Mac `lsof`/`kill`, Windows PowerShell `Get-NetTCPConnection`, which unlike `netstat` doesn't depend on the system language), `npm run dev`, wait until both answer and open the browser. The wait checks `http://localhost:5173`, not `127.0.0.1`: Vite listens on `::1` only.
+- then stop anything listening on ports 5173/5174 (Mac `lsof`/`kill`, Windows PowerShell `Get-NetTCPConnection`, which unlike `netstat` doesn't depend on the system language), run `npm start`, wait until `http://localhost:5173/api/characters` answers ("localhost", which curl tries over IPv6 and IPv4) and open the browser.
 
 The `.bat` is written with `goto` labels (cmd mis-parses brackets inside if-blocks) and must keep CRLF line endings (`.gitattributes`). Keep the two scripts and the README's Setup section in sync. Node ≥ 22.12 is also in `package.json` `engines` (Vite 8 and Vitest 5 need it).
 
 ## Architecture
 
-`npm run dev` starts **two processes in parallel**:
+Two ways to run, both on http://localhost:5173:
 
-| Process | Port | Role |
+| Command | Who uses it | What runs |
 |---|---|---|
-| Vite (React app) | 5173 | Frontend dev server; proxies `/api` → `127.0.0.1:5174` (`vite.config.ts`) |
-| Express (`server.ts`) | 5174 | Local filesystem API |
+| `npm start` | the launchers (players) | `scripts/build-if-needed.mjs` builds into `dist/` unless `dist/.source-hash` matches a fingerprint of `src/`, `public/`, `index.html`, the configs and `package-lock.json` (so an update or a fresh scrape rebuilds on the next start, in ~3 s), then `tsx server.ts --serve` serves `dist/` (hashed `assets/` cached for a year, everything else `no-cache`, any non-`/api` path → `index.html`) **and** the API on 5173 |
+| `npm run dev` | development | Vite on 5173 (live reload; proxies `/api` → `127.0.0.1:5174`, `vite.config.ts`) + `tsx server.ts` as the API only on 5174 |
 
-The Express server exists solely to read/write JSON files on disk — the browser cannot access the filesystem directly. All API calls in `src/storage/charApi.ts` use relative `/api/...` paths and go through the Vite proxy.
+The Express server exists to read/write JSON files on disk — the browser cannot access the filesystem directly. All API calls in `src/storage/charApi.ts` use relative `/api/...` paths, so they work the same in both modes. `__APP_VERSION__` (from `package.json`, via `define` in `vite.config.ts`) is shown at the bottom of Settings. `public/` holds the icon (`favicon.svg`, plus `apple-touch-icon.png` / `icon-192.png` / `icon-512.png` rendered from it, full-bleed brown so phones can round the corners) and `manifest.webmanifest` for "Add to Home Screen".
 
 **Ids and slugs become file names, so the server refuses anything else** (with phone access on, other devices on the Wi-Fi reach it): `isId()` (8–64 letters, digits, dashes) via `app.param('id')` on every `:id` route and on a saved character's `id` (which must match the URL), `isSlug()` plus a known category for homebrew. `historyDir()` throws on a bad id rather than falling back to the whole history folder. `findFileById()` matches the `_<id8>.json` ending only. A new route that takes an id or slug must check it the same way. `importCharacter()` / backup restore give a character with an unusable id a fresh uuid.
 
 `QS_DATA_DIR` (where `characters/`, `homebrew/` and `.local-settings.json` live; default the repo) and `QS_API_PORT` (default 5174, read by both `server.ts` and the Vite proxy) let a second copy run against a throwaway folder, e.g. `QS_DATA_DIR=/tmp/qs QS_API_PORT=5185 npx tsx server.ts` plus `QS_DATA_DIR=/tmp/qs QS_API_PORT=5185 npx vite --port 5186`.
 
-**Phones and tablets (opt-in):** Settings → Phones & Tablets calls `PUT /api/settings/network`, which writes `{ lan }` to `.local-settings.json` (gitignored). `vite.config.ts` reads it at start-up: when on, `server.host = true` (listen on the network) and `__QS_LAN__` (declared in `vite-env.d.ts`) is true, so Settings can say "restart the app" when the saved choice and the running mode differ, and list the addresses from `GET /api/settings/network` (`os.networkInterfaces()`). Express always listens on 127.0.0.1 only; other devices reach it through Vite's proxy. Off is the default; there is no password, so the Settings card warns about that.
+**Phones and tablets (opt-in):** Settings → Phones & Tablets calls `PUT /api/settings/network`, which writes `{ lan }` to `.local-settings.json` (gitignored). It's read once at start-up: with `npm start` the server listens on `0.0.0.0` (else `127.0.0.1`); with `npm run dev` Vite gets `server.host = true` and Express stays local behind its proxy. `GET /api/settings/network` returns `{ lan, running, addresses }` (`running` = the setting when the server started, `addresses` from `os.networkInterfaces()`), so Settings can say "restart the app" when they differ and list the addresses. Off is the default; there is no password, so the Settings card warns about that.
 
 **What's committed:** `public/data/wikidot/*.json` (scraped content ships with the app). `characters/*.json` and `homebrew/**/*.json` are gitignored user data.
 
@@ -195,7 +196,7 @@ To give a tab something new: compute it at the top level of `useSheetModel()` an
 - Inventory tab: item rows are one line (`itemRow`); the open item is a card (header washed with the rarity colour) that `itemRow` stores in `selectedItemCard` while the lists render, shown in a sticky panel beside the lists on wide screens and under the row on narrow ones; rarity shows once (the right-hand badge for magic items, inline when the badge shows stats). The search box filters every section (`shown` instead of `grouped`). With the ledger open the purse card stretches to its column, so the ruled page fills the space.
 - Damage while concentrating opens the in-app Concentration Save dialog (`concCheck`: DC, CON save, War Caster advantage); the player reports Made it / Failed. Pop-ups are `role="dialog" aria-modal`; the rest windows, Add Feat and History close on Escape (unless a confirmation is on top), the Concentration Save needs an answer. Never use native `confirm`/`alert`/`prompt` (they freeze the page until answered): use `useConfirm()` from `components/ConfirmDialog` (`if (!(await askConfirm({ title, message, confirmLabel, danger })) ) return`, render `{confirmDialog}` once) or an inline input.
 - At 0 HP the death screen replaces the tabs and is a fixed, full-window overlay (`z-50`, covers the nav too); page scrolling is locked while it's up. Death saves are marked by clicking pips — never rolled in-app.
-- `patch(partial)` → `save(next)` — updates state immediately and debounces a disk write (800 ms). `save()` also applies rules side effects: healing from 0 HP resets death saves; dropping to 0 HP ends concentration. Cmd/Ctrl+S forces an immediate save, and so does hiding or closing the tab while a save is waiting (`pagehide` / `visibilitychange`, sent with `keepalive` when the body is under 64 KB).
+- `patch(partial)` → `save(next)` — updates state immediately and debounces a disk write (800 ms). `save()` also applies rules side effects: healing from 0 HP resets death saves; dropping to 0 HP ends concentration. If a save doesn't reach the server (`persist()` → `saveFailed`), a red banner on the sheet says so, retries every 5 s and has Try again; Level Up, the Creator and the Vault's Duplicate/Delete show their own message instead of failing silently. Cmd/Ctrl+S forces an immediate save, and so does hiding or closing the tab while a save is waiting (`pagehide` / `visibilitychange`, sent with `keepalive` when the body is under 64 KB).
 - `raceDef` — the merged `RaceDef` from `useContent()` for the current character's race; same object accessed as `race` inside the Features tab
 - `featSlugs` / `featBonuses` — feat slugs from `featuresChosen` and `sumFeatBonuses()`, used for initiative, speed, HP, AC, resistances, and granted spells throughout the sheet
 - `itemBonuses` — result of `sumItemBonuses()`, used for AC, saving throws, spell DC/attack, ability score overrides
