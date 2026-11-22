@@ -16,7 +16,8 @@
       // Keep these lists in step with THEMES in src/theme/theme.tsx.
       try {
         var t = localStorage.getItem('qs:theme');
-        if (['parchment', 'light', 'dark', 'forest', 'frost', 'arcane', 'ember'].indexOf(t) < 0) t = 'parchment';
+        if (t === 'frost') t = 'light';   // Frost was folded into Light
+        if (['parchment', 'light', 'dark', 'forest', 'feywild', 'arcane', 'ember'].indexOf(t) < 0) t = 'parchment';
         document.documentElement.setAttribute('data-theme', t);
         document.documentElement.setAttribute('data-tone', ['dark', 'arcane', 'ember'].indexOf(t) < 0 ? 'light' : 'dark');
       } catch (e) {}

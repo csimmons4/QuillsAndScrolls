@@ -95,26 +95,25 @@
   color-scheme: light;
 }
 
-[data-theme='frost'] {
-  /* Ice blue throughout (tinted page and cards, a deep-sea header, a glacier-teal accent), so it
-     reads nothing like the neutral grey Light theme */
-  --p-50: 240 248 253;
-  --p-100: 214 234 248;
-  --p-200: 190 220 241;
-  --p-300: 152 196 228;
-  --p-400: 86 140 176;
-  --p-500: 36 96 138;
-  --p-600: 28 82 122;
-  --p-700: 20 68 106;
-  --p-800: 14 54 88;
-  --p-900: 9 40 66;
-  --d-800: 14 50 82;
-  --d-900: 8 32 56;
-  --accent: 14 116 144;
-  --accent-hover: 21 94 117;
+[data-theme='feywild'] {
+  /* Rose petals and plum: blush page and cards, a deep plum header, a rose-magenta accent */
+  --p-50: 254 248 251;
+  --p-100: 250 234 243;
+  --p-200: 244 214 231;
+  --p-300: 232 184 211;
+  --p-400: 186 104 150;
+  --p-500: 146 56 110;
+  --p-600: 124 46 94;
+  --p-700: 104 36 80;
+  --p-800: 84 28 66;
+  --p-900: 64 20 52;
+  --d-800: 70 24 58;
+  --d-900: 46 14 38;
+  --accent: 176 52 122;
+  --accent-hover: 146 40 100;
   --accent-fg: 255 255 255;
-  --header-bg: 16 74 112;
-  --header-fg: 224 242 254;
+  --header-bg: 88 30 78;
+  --header-fg: 252 236 246;
   color-scheme: light;
 }
 

@@ -179,7 +179,7 @@ Each entry is saved as its own `.json` file so you can share individual pieces w
 A searchable, filterable reference browser for **all** game content — spells, items, feats, races, backgrounds, and classes (official plus your homebrew). Filter by category and search by name or description without opening a character.
 
 ### Settings
-- Choose a display theme: **Parchment** (warm classic), **Light** (clean white), **Forest** (mossy greens), **Frost** (ice blue), **Dark** (warm dungeon), **Arcane** (starlit violet) or **Ember** (smoke and embers)
+- Choose a display theme: **Parchment** (warm classic), **Light** (clean white), **Forest** (mossy greens), **Feywild** (rose and plum), **Dark** (warm dungeon), **Arcane** (starlit violet) or **Ember** (smoke and embers)
 - See when data was last scraped and how many entries exist
 - Download a full backup `.zip` of all characters + homebrew (and each character's History, unless you untick it), and restore from one
 - Let phones and tablets on your Wi-Fi open the app (off by default, see Setup)
