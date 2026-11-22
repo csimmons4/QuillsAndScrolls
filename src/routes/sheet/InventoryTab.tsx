@@ -5,7 +5,7 @@ import { CLASS_OPTIONS, findInfusion } from '../../data/classData'
 import { WeaponStatBlock, ArmorStatBlock, MagicItemStatBlock } from '../../components/ItemStatBlock'
 import { type Coin, COIN_CP, normalizePurse, addValue, spendValue, formatPurse } from '../../character/currency'
 import { RollingNumber } from '../../components/RollingNumber'
-import { CoinEmblem, PouchIcon, ScaleIcon, QuillIcon } from '../../components/PurseIcons'
+import { CoinEmblem, COIN_MARK, PouchIcon, ScaleIcon, QuillIcon } from '../../components/PurseIcons'
 import type { ItemDef } from '../../content/loaders'
 import { ABILITY_FULL, BodySlotKey, detectBodySlot, isArmorProficient, magicBonus, resolveArmor, resolveWeapon, weaponAttackBonus, weaponDamageMod } from './helpers'
 import { useSheet } from './SheetContext'
@@ -140,7 +140,7 @@ export function InventoryTab() {
                 const selected = txCoin === coin
                 return (
                   <button key={coin} type="button" role="radio" aria-checked={selected} onClick={() => setTxCoin(coin)}
-                    title={m.name}
+                    title={`${m.name}: struck with ${COIN_MARK[coin]}`}
                     className={`group flex flex-col items-center gap-0.5 transition-transform ${selected ? '-translate-y-1' : ''}`}>
                     <span key={selected ? `on-${coin}` : coin}
                       className={`w-9 h-9 rounded-full flex items-center justify-center transition-opacity ${selected ? 'coin-flip' : 'opacity-70 group-hover:opacity-100'}`}
@@ -150,8 +150,8 @@ export function InventoryTab() {
                         boxShadow: selected
                           ? `0 0 0 2px rgb(var(--accent)), 0 3px 8px rgba(0,0,0,0.35), inset 0 0 0 2px rgba(255,255,255,0.3)`
                           : `0 1px 3px rgba(0,0,0,0.3), inset 0 0 0 2px rgba(255,255,255,0.25)`,
-                      }}><CoinEmblem coin={coin} className="coin-emblem w-[18px] h-[18px] opacity-80" /></span>
-                    <span className={`text-[9px] uppercase tracking-wide ${selected ? 'font-bold text-parchment-800' : 'text-parchment-700'}`}>{m.name}</span>
+                      }}><CoinEmblem coin={coin} className="coin-emblem w-5 h-5 opacity-80" /></span>
+                    <span className={`text-[10px] uppercase tracking-wide ${selected ? 'font-bold text-parchment-800' : 'text-parchment-700'}`}>{m.name}</span>
                   </button>
                 )
               })}
@@ -870,7 +870,7 @@ export function InventoryTab() {
                               }}
                             >{inOff ? '✓ Off Hand' : 'Off Hand'}</button>
                             {canDualWield && item.equipped && !isDual && (
-                              <span className="text-[9px] text-parchment-400 self-center italic">equip both to dual-wield</span>
+                              <span className="text-[10px] text-parchment-400 self-center italic">equip both to dual-wield</span>
                             )}
                           </>
                         )
@@ -1121,20 +1121,20 @@ export function InventoryTab() {
                   {equippedArmor ? (
                     <div className="flex flex-col gap-1 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2.5">
                       <div className="flex items-center justify-between gap-1">
-                        <span className="text-[9px] font-bold text-blue-400 uppercase tracking-widest">Armor</span>
-                        <span className="text-[9px] text-blue-400 capitalize">{equippedArmor.as_?.type}</span>
+                        <span className="text-[10px] font-bold text-blue-400 uppercase tracking-widest">Armor</span>
+                        <span className="text-[10px] text-blue-400 capitalize">{equippedArmor.as_?.type}</span>
                       </div>
                       <span className="text-sm font-semibold text-blue-900 leading-tight truncate">{equippedArmor.item.name}</span>
                       <div className="flex items-center gap-2 mt-0.5">
                         <span className="text-xs font-bold text-blue-700">AC {currentAC ?? equippedArmor.as_?.acBase}</span>
                         {equippedArmor.as_?.stealthDisadvantage && (
-                          <span className="text-[9px] text-amber-600 bg-amber-50 border border-amber-200 rounded px-1">Disadv. Stealth</span>
+                          <span className="text-[10px] text-amber-600 bg-amber-50 border border-amber-200 rounded px-1">Disadv. Stealth</span>
                         )}
                       </div>
                     </div>
                   ) : (
                     <div className="flex flex-col gap-1 rounded-lg border border-dashed border-parchment-200 bg-parchment-50 px-3 py-2.5 opacity-50">
-                      <span className="text-[9px] font-bold text-parchment-400 uppercase tracking-widest">Armor</span>
+                      <span className="text-[10px] font-bold text-parchment-400 uppercase tracking-widest">Armor</span>
                       <span className="text-xs text-parchment-400 italic">None</span>
                     </div>
                   )}
@@ -1153,11 +1153,11 @@ export function InventoryTab() {
                     return (
                       <div key={slot.key} className={`flex flex-col gap-1 rounded-lg border px-3 py-2.5 ${slot.color}`}>
                         <div className="flex items-center justify-between gap-1">
-                          <span className={`text-[9px] font-bold uppercase tracking-widest ${slot.head}`}>{slot.label}</span>
-                          {worn.attuned && <span className="text-[9px] text-indigo-500">✦ Attuned</span>}
+                          <span className={`text-[10px] font-bold uppercase tracking-widest ${slot.head}`}>{slot.label}</span>
+                          {worn.attuned && <span className="text-[10px] text-indigo-500">✦ Attuned</span>}
                         </div>
                         <span className={`text-sm font-semibold leading-tight truncate ${slot.text}`}>{worn.name}</span>
-                        {bonuses.length > 0 && <span className={`text-[9px] mt-0.5 ${slot.bonus}`}>{bonuses.join(' · ')}</span>}
+                        {bonuses.length > 0 && <span className={`text-[10px] mt-0.5 ${slot.bonus}`}>{bonuses.join(' · ')}</span>}
                       </div>
                     )
                   })}
@@ -1171,8 +1171,8 @@ export function InventoryTab() {
                       return (
                         <div className="col-span-1 sm:col-span-2 flex flex-col gap-1 rounded-lg border border-green-200 bg-green-50 px-3 py-2.5">
                           <div className="flex items-center justify-between">
-                            <span className="text-[9px] font-bold text-green-500 uppercase tracking-widest">Dual Wield</span>
-                            {w.ws!.finesse && <span className="text-[9px] text-green-500 bg-green-100 border border-green-200 rounded px-1">Finesse</span>}
+                            <span className="text-[10px] font-bold text-green-500 uppercase tracking-widest">Dual Wield</span>
+                            {w.ws!.finesse && <span className="text-[10px] text-green-500 bg-green-100 border border-green-200 rounded px-1">Finesse</span>}
                           </div>
                           <span className="text-sm font-semibold text-green-900 truncate">{w.item.name} × 2</span>
                           <div className="flex items-center gap-3 mt-0.5">
@@ -1190,8 +1190,8 @@ export function InventoryTab() {
                       return (
                         <div className="col-span-1 sm:col-span-2 flex flex-col gap-1 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2.5">
                           <div className="flex items-center justify-between">
-                            <span className="text-[9px] font-bold text-violet-500 uppercase tracking-widest">Two-Handed</span>
-                            {item.attuned && <span className="text-[9px] text-indigo-500">✦ Attuned</span>}
+                            <span className="text-[10px] font-bold text-violet-500 uppercase tracking-widest">Two-Handed</span>
+                            {item.attuned && <span className="text-[10px] text-indigo-500">✦ Attuned</span>}
                           </div>
                           <span className="text-sm font-semibold text-violet-900 truncate">{item.name}</span>
                           {bonuses.length > 0 && <span className="text-xs text-violet-600 mt-0.5">{bonuses.join(' · ')}</span>}
@@ -1206,8 +1206,8 @@ export function InventoryTab() {
                       return (
                         <div className="col-span-1 sm:col-span-2 flex flex-col gap-1 rounded-lg border border-green-200 bg-green-50 px-3 py-2.5">
                           <div className="flex items-center justify-between">
-                            <span className="text-[9px] font-bold text-green-500 uppercase tracking-widest">Two-Handed</span>
-                            {w.ws!.ranged && <span className="text-[9px] text-green-500 bg-green-100 border border-green-200 rounded px-1">Ranged</span>}
+                            <span className="text-[10px] font-bold text-green-500 uppercase tracking-widest">Two-Handed</span>
+                            {w.ws!.ranged && <span className="text-[10px] text-green-500 bg-green-100 border border-green-200 rounded px-1">Ranged</span>}
                           </div>
                           <span className="text-sm font-semibold text-green-900 truncate">{w.item.name}</span>
                           <div className="flex items-center gap-3 mt-0.5">
@@ -1228,9 +1228,9 @@ export function InventoryTab() {
                           return (
                             <div className="flex flex-col gap-1 rounded-lg border border-green-200 bg-green-50 px-3 py-2.5">
                               <div className="flex items-center justify-between">
-                                <span className="text-[9px] font-bold text-green-500 uppercase tracking-widest">Main Hand</span>
-                                {w.ws!.ranged && <span className="text-[9px] text-green-500 bg-green-100 border border-green-200 rounded px-1">Ranged</span>}
-                                {w.ws!.finesse && <span className="text-[9px] text-green-500 bg-green-100 border border-green-200 rounded px-1">Finesse</span>}
+                                <span className="text-[10px] font-bold text-green-500 uppercase tracking-widest">Main Hand</span>
+                                {w.ws!.ranged && <span className="text-[10px] text-green-500 bg-green-100 border border-green-200 rounded px-1">Ranged</span>}
+                                {w.ws!.finesse && <span className="text-[10px] text-green-500 bg-green-100 border border-green-200 rounded px-1">Finesse</span>}
                               </div>
                               <span className="text-sm font-semibold text-green-900 truncate">{w.item.name}</span>
                               <div className="flex items-center gap-3 mt-0.5">
@@ -1248,8 +1248,8 @@ export function InventoryTab() {
                           return (
                             <div className="flex flex-col gap-1 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2.5">
                               <div className="flex items-center justify-between">
-                                <span className="text-[9px] font-bold text-violet-500 uppercase tracking-widest">Main Hand</span>
-                                {item.attuned && <span className="text-[9px] text-indigo-500">✦ Attuned</span>}
+                                <span className="text-[10px] font-bold text-violet-500 uppercase tracking-widest">Main Hand</span>
+                                {item.attuned && <span className="text-[10px] text-indigo-500">✦ Attuned</span>}
                               </div>
                               <span className="text-sm font-semibold text-violet-900 truncate">{item.name}</span>
                               {bonuses.length > 0 && <span className="text-xs text-violet-600 mt-0.5">{bonuses.join(' · ')}</span>}
@@ -1267,9 +1267,9 @@ export function InventoryTab() {
                           return (
                             <div className="flex flex-col gap-1 rounded-lg border border-green-200 bg-green-50 px-3 py-2.5">
                               <div className="flex items-center justify-between">
-                                <span className="text-[9px] font-bold text-green-500 uppercase tracking-widest">Off Hand</span>
-                                {w.ws!.ranged && <span className="text-[9px] text-green-500 bg-green-100 border border-green-200 rounded px-1">Ranged</span>}
-                                {w.ws!.finesse && <span className="text-[9px] text-green-500 bg-green-100 border border-green-200 rounded px-1">Finesse</span>}
+                                <span className="text-[10px] font-bold text-green-500 uppercase tracking-widest">Off Hand</span>
+                                {w.ws!.ranged && <span className="text-[10px] text-green-500 bg-green-100 border border-green-200 rounded px-1">Ranged</span>}
+                                {w.ws!.finesse && <span className="text-[10px] text-green-500 bg-green-100 border border-green-200 rounded px-1">Finesse</span>}
                               </div>
                               <span className="text-sm font-semibold text-green-900 truncate">{w.item.name}</span>
                               <div className="flex items-center gap-3 mt-0.5">
@@ -1281,7 +1281,7 @@ export function InventoryTab() {
                         })()
                       ) : equippedShield ? (
                         <div className="flex flex-col gap-1 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2.5">
-                          <span className="text-[9px] font-bold text-blue-400 uppercase tracking-widest">Off Hand — Shield</span>
+                          <span className="text-[10px] font-bold text-blue-400 uppercase tracking-widest">Off Hand — Shield</span>
                           <span className="text-sm font-semibold text-blue-900 truncate">{equippedShield.item.name}</span>
                           <span className="text-xs font-bold text-blue-700 mt-0.5">+{(equippedShield.as_?.acBase ?? 2) + magicBonus(equippedShield.item, artificerLevel)} AC</span>
                         </div>
@@ -1293,8 +1293,8 @@ export function InventoryTab() {
                           return (
                             <div className="flex flex-col gap-1 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2.5">
                               <div className="flex items-center justify-between">
-                                <span className="text-[9px] font-bold text-violet-500 uppercase tracking-widest">Off Hand</span>
-                                {item.attuned && <span className="text-[9px] text-indigo-500">✦ Attuned</span>}
+                                <span className="text-[10px] font-bold text-violet-500 uppercase tracking-widest">Off Hand</span>
+                                {item.attuned && <span className="text-[10px] text-indigo-500">✦ Attuned</span>}
                               </div>
                               <span className="text-sm font-semibold text-violet-900 truncate">{item.name}</span>
                               {bonuses.length > 0 && <span className="text-xs text-violet-600 mt-0.5">{bonuses.join(' · ')}</span>}
@@ -1316,11 +1316,11 @@ export function InventoryTab() {
                     return (
                       <div key={i} className="flex flex-col gap-1 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5">
                         <div className="flex items-center justify-between gap-1">
-                          <span className="text-[9px] font-bold uppercase tracking-widest text-amber-500">Ring</span>
-                          {item.attuned && <span className="text-[9px] text-indigo-500">✦ Attuned</span>}
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-amber-500">Ring</span>
+                          {item.attuned && <span className="text-[10px] text-indigo-500">✦ Attuned</span>}
                         </div>
                         <span className="text-sm font-semibold leading-tight truncate text-amber-900">{item.name}</span>
-                        {bonuses.length > 0 && <span className="text-[9px] mt-0.5 text-amber-600">{bonuses.join(' · ')}</span>}
+                        {bonuses.length > 0 && <span className="text-[10px] mt-0.5 text-amber-600">{bonuses.join(' · ')}</span>}
                       </div>
                     )
                   })}
@@ -1328,9 +1328,9 @@ export function InventoryTab() {
                   {/* Other equipped items */}
                   {equippedOther.map((item, i) => (
                     <div key={i} className="flex flex-col gap-1 rounded-lg border border-parchment-200 bg-parchment-50 px-3 py-2.5">
-                      <span className="text-[9px] font-bold text-parchment-400 uppercase tracking-widest">Equipped</span>
+                      <span className="text-[10px] font-bold text-parchment-400 uppercase tracking-widest">Equipped</span>
                       <span className="text-sm font-semibold text-parchment-800 truncate">{item.name}</span>
-                      {item.attuned && <span className="text-[9px] text-indigo-500">✦ Attuned</span>}
+                      {item.attuned && <span className="text-[10px] text-indigo-500">✦ Attuned</span>}
                     </div>
                   ))}
                 </div>
@@ -1348,18 +1348,18 @@ export function InventoryTab() {
                   return (
                     <div className="col-span-2 sm:col-span-3 flex items-center gap-3 px-3 py-2 rounded-lg border border-amber-200 bg-amber-50">
                       <div className="flex flex-col">
-                        <span className="text-[9px] font-bold text-amber-600 uppercase tracking-widest">Bonus Action</span>
+                        <span className="text-[10px] font-bold text-amber-600 uppercase tracking-widest">Bonus Action</span>
                         <span className="text-xs font-semibold text-amber-900">Two-Weapon Fighting</span>
                       </div>
                       <div className="h-6 w-px bg-amber-200" />
                       <div className="flex flex-col">
-                        <span className="text-[9px] text-amber-500 uppercase tracking-wide">Off-hand damage</span>
+                        <span className="text-[10px] text-amber-500 uppercase tracking-wide">Off-hand damage</span>
                         <span className="text-xs font-bold text-amber-800">
                           {offWs.damage}{effectiveMod !== 0 ? ` ${formatMod(effectiveMod)}` : ''} {offWs.damageType}
                         </span>
                       </div>
                       {!hasTWFStyle && (
-                        <span className="ml-auto text-[9px] text-amber-500 italic">No ability mod to off-hand dmg<br/>unless negative · TWF style removes this</span>
+                        <span className="ml-auto text-[10px] text-amber-500 italic">No ability mod to off-hand dmg<br/>unless negative · TWF style removes this</span>
                       )}
                     </div>
                   )

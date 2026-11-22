@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-theme="parchment">
+<html lang="en" data-theme="parchment" data-tone="light">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
@@ -13,10 +13,12 @@
     <title>Quills &amp; Scrolls — D&amp;D 5e Character App</title>
     <script>
       // Apply the saved theme before first paint to avoid a flash of the default.
+      // Keep these lists in step with THEMES in src/theme/theme.tsx.
       try {
         var t = localStorage.getItem('qs:theme');
-        document.documentElement.setAttribute('data-theme',
-          (t === 'light' || t === 'dark' || t === 'parchment') ? t : 'parchment');
+        if (['parchment', 'light', 'dark', 'forest', 'frost', 'arcane', 'ember'].indexOf(t) < 0) t = 'parchment';
+        document.documentElement.setAttribute('data-theme', t);
+        document.documentElement.setAttribute('data-tone', ['dark', 'arcane', 'ember'].indexOf(t) < 0 ? 'light' : 'dark');
       } catch (e) {}
     </script>
   </head>

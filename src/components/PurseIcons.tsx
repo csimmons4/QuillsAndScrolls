@@ -3,15 +3,23 @@ import type { Coin } from '../character/currency'
 
 type IconProps = { className?: string }
 
-/** The emblem struck on each coin: tower (copper), moon (silver), star (electrum), crown (gold), gem (platinum). */
+/** The old alchemists' mark for each coin's metal, struck on the coin. */
+export const COIN_MARK: Record<Coin, string> = {
+  cp: 'Venus, the mark for copper',
+  sp: 'the Moon, the mark for silver',
+  ep: 'Jupiter, the old mark for electrum',
+  gp: 'the Sun, the mark for gold',
+  pp: 'the Sun and Moon joined, the mark for platinum',
+}
+
 export function CoinEmblem({ coin, className }: IconProps & { coin: Coin }) {
   return (
-    <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden>
-      {coin === 'cp' && <path d="M5 21V8h2V5h2v3h2V5h2v3h2V5h2v3h2v13h-5v-5a2 2 0 0 0-4 0v5z" />}
-      {coin === 'sp' && <path d="M15 3a9 9 0 1 0 6 15.5A7.5 7.5 0 0 1 15 3z" />}
-      {coin === 'ep' && <path d="M12 2.5l2.9 6.1 6.6.8-4.9 4.6 1.3 6.6L12 17.3l-5.9 3.3 1.3-6.6-4.9-4.6 6.6-.8z" />}
-      {coin === 'gp' && <><path d="M3 17L4.8 7.5l4.4 4L12 4.5l2.8 7 4.4-4L21 17z" /><rect x="3" y="18.5" width="18" height="2.5" rx="0.8" /></>}
-      {coin === 'pp' && <><path d="M6.5 3.5h11L22 9.5 12 21 2 9.5z" /><path d="M2 9.5h20M8.5 3.5L12 21l3.5-17.5" fill="none" stroke="rgba(255,255,255,0.45)" strokeWidth="1" /></>}
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      {coin === 'cp' && <><circle cx="12" cy="8.5" r="5" /><path d="M12 13.5v8M8.5 18h7" /></>}
+      {coin === 'sp' && <path d="M15 3a9 9 0 1 0 6 15.5A7.5 7.5 0 0 1 15 3z" fill="currentColor" stroke="none" />}
+      {coin === 'ep' && <path d="M5 8.5c0-3.4 5.6-4.4 6.6-1 .9 3-2.4 6.4-6.6 9.6h14M15.5 9.5v12" />}
+      {coin === 'gp' && <><circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="2.2" fill="currentColor" stroke="none" /></>}
+      {coin === 'pp' && <><circle cx="14.5" cy="12" r="5.5" /><circle cx="14.5" cy="12" r="1.6" fill="currentColor" stroke="none" /><path d="M9 3.5a8.5 8.5 0 0 0 0 17" /></>}
     </svg>
   )
 }

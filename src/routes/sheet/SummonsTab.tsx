@@ -1,5 +1,6 @@
 import { Summon } from '../../character/model'
 import { useSheet } from './SheetContext'
+import { NumberInput } from '../../components/NumberInput'
 
 // Summons share one colour: amber, like a conjured spark
 const SUMMON_HEX = '#d97706'
@@ -90,10 +91,10 @@ export function SummonsTab() {
                 className="px-2 py-1 text-xs rounded border border-parchment-200 hover:border-parchment-400 text-parchment-600 transition-colors">
                 Full
               </button>
-              <input type="number" min={0} max={s.hp.max}
+              <NumberInput min={0} max={s.hp.max} aria-label={`${s.name} hit points`}
                 className="input text-xs py-1 w-16 text-center"
                 value={s.hp.current}
-                onChange={e => updateSummon(s.id, { hp: { ...s.hp, current: Math.max(0, Math.min(s.hp.max, parseInt(e.target.value) || 0)) } })}
+                onValue={n => updateSummon(s.id, { hp: { ...s.hp, current: n } })}
               />
             </div>
             </div>
@@ -256,7 +257,7 @@ export function SummonsTab() {
                       <div className="grid grid-cols-6 gap-1.5">
                         {ABILITY_SHORT.map(a => (
                           <div key={a} className="flex flex-col items-center py-1 rounded bg-parchment-100/60 border border-parchment-200">
-                            <span className="text-[9px] font-bold text-parchment-500 uppercase">{a}</span>
+                            <span className="text-[10px] font-bold text-parchment-500 uppercase">{a}</span>
                             <span className="text-sm font-bold text-parchment-800 leading-none">{s.abilityScores![a]}</span>
                             <span className="text-[10px] text-parchment-500">{fmtMod(modOf(s.abilityScores![a]))}</span>
                           </div>

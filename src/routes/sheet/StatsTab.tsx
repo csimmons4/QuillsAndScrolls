@@ -8,6 +8,7 @@ import { describePotionEffects } from '../../character/potionEffects'
 import { ABILITY_FULL, ABILITY_LABELS, CONDITIONS, SIMPLE_WEAPON_SLUGS, SkillSourceTag, fightingStyles, isArmorProficient, isMonkWeapon, isWeaponProficient, magicBonus, resolveArmor, resolveWeapon, weaponAttackBonus, weaponDamageMod } from './helpers'
 import { useSheet } from './SheetContext'
 import { WILD_SHAPE_BEASTS, ELEMENTAL_FORMS, canElementalWildShape, wildShapeLimits, wildShapeBlocked, formatCr } from '../../data/wildShapeBeasts'
+import { NumberInput } from '../../components/NumberInput'
 
 /** The Stats tab: attacks, ability scores, saves, skills, status and proficiencies */
 export function StatsTab() {
@@ -103,11 +104,11 @@ export function StatsTab() {
                         : <span className="text-[10px] bg-green-100 text-green-700 rounded px-1.5 py-0.5">Ready</span>}
                     </div>
                   </td>
-                  <td className="py-1.5 pr-4 text-parchment-500 text-xs">{row.toHit}</td>
+                  <td className="py-1.5 pr-4 text-parchment-500">{row.toHit}</td>
                   <td className="py-1.5 pr-4">{row.damage}</td>
-                  <td className="py-1.5 text-xs">
+                  <td className="py-1.5">
                     <div className="flex items-center gap-2">
-                      <span className="text-parchment-400">{row.notes}</span>
+                      <span className="text-parchment-500">{row.notes}</span>
                       <button type="button"
                         className={`text-[10px] rounded px-1.5 py-0.5 border transition-colors ${row.breath.used ? 'border-green-300 text-green-600 hover:bg-green-50' : 'border-parchment-200 text-parchment-500 hover:border-parchment-400'}`}
                         onClick={() => patch({ classResources: { ...char.classResources, 'breath-weapon-used': row.breath!.used ? 0 : 1 } })}>
@@ -119,15 +120,15 @@ export function StatsTab() {
               ) : (
                 <tr key={row.key} className={row.tone === 'attuned' ? 'bg-indigo-50' : row.tone === 'unproficient' ? 'bg-red-50' : ''}>
                   <td className="py-1.5 pr-4 font-medium">{row.name}</td>
-                  <td className="py-1.5 pr-4 font-mono">
+                  <td className="py-1.5 pr-4 font-semibold tabular-nums">
                     {row.toHit}
-                    {row.tone === 'unproficient' && <span className="text-red-500 ml-1 text-xs">(no prof)</span>}
+                    {row.tone === 'unproficient' && <span className="text-red-500 ml-1 text-xs font-normal">(no prof)</span>}
                   </td>
-                  <td className={`py-1.5 pr-4 ${row.key === 'spell-attack' ? 'text-parchment-400' : ''}`}>
+                  <td className={`py-1.5 pr-4 ${row.key === 'spell-attack' ? 'text-parchment-500' : ''}`}>
                     {row.damage}
                     {row.rider && <span className="text-violet-700 font-semibold" title={`${concRider?.label}: against its target`}> + {row.rider}</span>}
                   </td>
-                  <td className="py-1.5 text-parchment-400 text-xs">{row.notes || '—'}</td>
+                  <td className="py-1.5 text-parchment-500">{row.notes || '—'}</td>
                 </tr>
               ))}
             </tbody>
@@ -153,17 +154,13 @@ export function StatsTab() {
               {ABILITIES.map(a => (
                 <div key={a} className="stat-box relative">
                   <div className="text-xs text-parchment-500 uppercase">{ABILITY_LABELS[a]}</div>
-                  <input
-                    type="number"
+                  <NumberInput
                     min={1}
                     max={30}
                     className="text-2xl font-bold w-12 text-center bg-transparent border-none outline-none focus:bg-parchment-50 rounded"
                     aria-label={`${ABILITY_FULL[a]} score`}
                     value={char.abilityScores[a]}
-                    onChange={e => {
-                      const scores = { ...char.abilityScores, [a]: parseInt(e.target.value, 10) || 10 }
-                      patch({ abilityScores: scores as Character['abilityScores'] })
-                    }}
+                    onValue={n => patch({ abilityScores: { ...char.abilityScores, [a]: n } as Character['abilityScores'] })}
                   />
                   <div className="text-sm font-semibold text-parchment-600">
                     {formatMod(abilityModFor(effectiveChar, a))}
@@ -209,7 +206,7 @@ export function StatsTab() {
                       patch({ saveProficiencies: [...s] })
                     }}
                   />
-                  <span className="w-10 font-mono text-right text-parchment-700">{formatMod(saveMod(effectiveChar, a) + itemBonuses.savingThrowBonus + paladinAura)}</span>
+                  <span className="w-10 font-semibold tabular-nums text-right text-parchment-700">{formatMod(saveMod(effectiveChar, a) + itemBonuses.savingThrowBonus + paladinAura)}</span>
                   <span className="flex-1">{ABILITY_FULL[a]}</span>
                   {savesChanged.includes(a) && (
                     <button type="button" onClick={() => resetSave(a)}
@@ -424,7 +421,7 @@ export function StatsTab() {
                         patch({ skillExpertise: [...s] })
                       }}
                     />
-                    <span className="w-8 font-mono text-right text-xs text-parchment-700 shrink-0">{formatMod(skillMod(effectiveCharSkills, skill) + itemBonuses.abilityCheckBonus)}</span>
+                    <span className="w-8 font-semibold tabular-nums text-right text-parchment-700 shrink-0">{formatMod(skillMod(effectiveCharSkills, skill) + itemBonuses.abilityCheckBonus)}</span>
                     <span className={`flex-1 min-w-0 ${effectiveExpert ? 'font-semibold' : ''}`}>{SKILL_LABELS[skill]}</span>
                     {(() => {
                       // Active potions giving advantage/disadvantage on this skill's ability checks

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeFullAC, resolveWeapon, weaponAttackBonus, weaponDamageMod, isMonkWeapon, isWeaponProficient } from './helpers'
+import { computeFullAC, resolveWeapon, weaponAttackBonus, weaponDamageMod, isMonkWeapon, isWeaponProficient, spellRole, spellHealing } from './helpers'
 import { content, makeChar, equipped } from '../../test/fixtures'
 
 const ac = (c: ReturnType<typeof makeChar>) => computeFullAC(c, 0, content().items, undefined).ac
@@ -64,5 +64,30 @@ describe('weapon attacks', () => {
     const c = makeChar([{ classSlug: 'wizard', level: 1 }], {}, { weaponProficiencies: ['simple', 'Pistol'] })
     expect(isWeaponProficient(c, equipped('dagger'))).toBe(true)
     expect(isWeaponProficient(c, equipped('longsword'))).toBe(false)
+  })
+})
+
+describe('spell role (the coloured mark on a spell row)', () => {
+  const role = (slug: string) => spellRole(content().spells.find(s => s.slug === slug)!)
+  it('puts damage first, then healing, control, protection and the rest', () => {
+    expect(role('fire-bolt')).toBe('damage')
+    expect(role('vampiric-touch')).toBe('damage')       // heals too, but it's an attack
+    expect(role('cure-wounds')).toBe('heal')
+    expect(role('healing-word')).toBe('heal')
+    expect(role('revivify')).toBe('heal')
+    expect(role('lesser-restoration')).toBe('heal')
+    expect(role('hold-person')).toBe('control')
+    expect(role('sleep')).toBe('control')
+    expect(role('shield')).toBe('ward')
+    expect(role('counterspell')).toBe('ward')
+    expect(role('detect-magic')).toBe('utility')
+    expect(role('light')).toBe('utility')
+    expect(role('wish')).toBe('utility')
+  })
+  it('reads how much a healing spell heals', () => {
+    const heal = (slug: string) => spellHealing(content().spells.find(s => s.slug === slug)!)
+    expect(heal('cure-wounds')).toEqual({ dice: '1d8', addMod: true })
+    expect(heal('heal')).toEqual({ dice: '70', addMod: false })
+    expect(heal('revivify')).toBeNull()
   })
 })

@@ -12,6 +12,9 @@ import { useRecentCharacter } from '../storage/recentCharacter'
 import { useConfirm } from '../components/ConfirmDialog'
 import { v4 as uuidv4 } from 'uuid'
 
+// Phones and tablets save to the same server, so the Vault asks again every few seconds
+const REFRESH_MS = 5000
+
 export default function Vault() {
   const [characters, setCharacters] = useState<Character[]>([])
   const [failures, setFailures] = useState<CharacterLoadFailure[]>([])
@@ -26,22 +29,37 @@ export default function Vault() {
   const { recent, setRecent } = useRecentCharacter()
   const navigate = useNavigate()
   const { askConfirm, confirmDialog } = useConfirm()
+  // Only the most recently started load is shown, so a slow one can't bring back a deleted card
+  const loadSeq = useRef(0)
 
   async function refresh() {
+    const seq = ++loadSeq.current
     try {
       const { characters, failures } = await listCharactersFromDisk()
+      if (seq !== loadSeq.current) return
       setCharacters(characters)
       setFailures(failures)
       // An app started before Recently deleted existed has no such route: show none
       setDeleted(await listDeleted().catch(() => []))
     } catch {
-      setError('Could not reach the character server. Make sure you started the app with "npm run dev".')
+      setError('Can’t reach the app’s server. Start the app again (double-click Start), then reload this page.')
     } finally {
       setLoading(false)
     }
   }
 
-  useEffect(() => { refresh() }, [])
+  useEffect(() => {
+    refresh()
+    // Changes made on other devices (or another tab) show up without a reload
+    const timer = setInterval(() => {
+      if (document.visibilityState !== 'visible') return
+      const seq = ++loadSeq.current
+      listCharactersFromDisk()
+        .then(({ characters, failures }) => { if (seq === loadSeq.current) { setCharacters(characters); setFailures(failures) } })
+        .catch(() => { /* the next try may reach it */ })
+    }, REFRESH_MS)
+    return () => clearInterval(timer)
+  }, [])
 
   // Close the ⋯ menu on a click elsewhere or Escape
   useEffect(() => {
@@ -119,9 +137,6 @@ export default function Vault() {
       .join(' / ')
   }
 
-  /** Hit point maximum the way the sheet works it out (items, feats, running potions) */
-  const maxHpOf = (char: Character) => restingVitals(char, content).maxHp
-
   // At 0 HP with three failed death saves the sheet shows "You have died", and the Vault lays the
   // character to rest. Healing on the sheet clears the saves, which brings them back.
   const isFallen = (c: Character) => c.hp.current <= 0 && c.deathSaves.failures >= 3
@@ -146,11 +161,23 @@ export default function Vault() {
   )
 
   const livingCard = (char: Character) => {
-    const maxHp = maxHpOf(char)
+    // The numbers the sheet works out (items, feats, running potions), for the card and its stat row
+    const v = restingVitals(char, content)
+    const maxHp = v.maxHp
     const hpPct = maxHp > 0 ? Math.max(0, Math.min(100, Math.round(char.hp.current / maxHp * 100))) : 0
     // At 0 HP but not yet fallen: making death saves, or stable after three successes
     const down = char.hp.current <= 0
     const stable = down && char.deathSaves.successes >= 3
+    const form = char.summons.find(s => s.templateKey === 'wild-shape')
+    const concentrating = char.concentratingOn ? content.spells.find(s => s.slug === char.concentratingOn)?.name ?? char.concentratingOn : null
+    // What's affecting them right now
+    const chips: { text: string; tone: string; title?: string }[] = [
+      ...(form ? [{ text: `${form.name} ${form.hp.current}/${form.hp.max}`, tone: 'border-green-300 bg-green-50 text-green-800', title: 'Wild Shape' }] : []),
+      ...(concentrating ? [{ text: `Concentrating: ${concentrating}`, tone: 'border-amber-300 bg-amber-50 text-amber-800' }] : []),
+      ...char.conditions.map(cond => ({ text: cond, tone: 'border-red-300 bg-red-50 text-red-800' })),
+      ...(char.exhaustionLevel > 0 ? [{ text: `Exhaustion ${char.exhaustionLevel}`, tone: 'border-red-300 bg-red-50 text-red-800' }] : []),
+      ...char.activePotions.map(p => ({ text: p.name, tone: 'border-violet-300 bg-violet-50 text-violet-800', title: p.effect })),
+    ]
     return (
     <div key={char.id} className={`card hover:shadow-md transition-shadow flex flex-col ${down ? (stable ? 'ring-2 ring-green-300' : 'ring-2 ring-red-300') : ''}`}>
       <div className="flex items-start gap-4">
@@ -167,6 +194,7 @@ export default function Vault() {
           <div className="flex items-start gap-2">
             <h2 className="text-xl font-bold text-parchment-900 truncate flex-1">
               <Link to={`/c/${char.id}`} className="hover:underline decoration-parchment-300 underline-offset-4">{char.name}</Link>
+              {char.inspiration && <span className="inline-block w-2.5 h-2.5 rotate-45 bg-amber-400 border border-amber-500 ml-2 align-middle" title="Inspired" />}
             </h2>
             {cardMenu(char, false)}
           </div>
@@ -204,6 +232,29 @@ export default function Vault() {
         </div>
       </div>
       )}
+      {/* The numbers a DM asks for */}
+      <div className="grid grid-cols-5 gap-1 text-center mt-3">
+        {[
+          { label: 'AC', value: v.ac, title: v.acSource },
+          { label: 'Perc.', value: v.passivePerception, title: 'Passive Perception' },
+          { label: 'Insight', value: v.passiveInsight, title: 'Passive Insight' },
+          { label: 'Invest.', value: v.passiveInvestigation, title: 'Passive Investigation' },
+          { label: 'Spell DC', value: v.spellSaveDC ?? '—', title: v.spellSaveDC ? 'Spell save DC' : 'No spellcasting' },
+        ].map(s => (
+          <div key={s.label} className="rounded border border-parchment-200 bg-parchment-100 py-1" title={s.title}>
+            <div className="text-[10px] uppercase tracking-wide text-parchment-500 leading-tight">{s.label}</div>
+            <div className="text-base font-bold text-parchment-900 leading-tight tabular-nums">{s.value}</div>
+          </div>
+        ))}
+      </div>
+      {chips.length > 0 && (
+        <div className="flex flex-wrap gap-1 mt-2">
+          {chips.map(ch => (
+            <span key={ch.text} title={ch.title} className={`text-[11px] font-semibold rounded-full border px-2 py-0.5 ${ch.tone}`}>{ch.text}</span>
+          ))}
+        </div>
+      )}
+      <div className="flex-1" />
       <button className="btn-primary text-sm mt-4" onClick={() => navigate(`/c/${char.id}`)}>
         Open
       </button>
@@ -302,6 +353,11 @@ export default function Vault() {
           <p className="text-xl mb-2">No characters yet.</p>
           <p className="text-sm mb-6">Create your first adventurer to get started.</p>
           <Link to="/new" className="btn-primary">+ New Character</Link>
+          <p className="text-sm mt-8 max-w-md mx-auto">
+            Just updated to a new copy of the app? Your characters are still in the old copy’s <span className="font-semibold">characters</span> folder.
+            Copy that folder (and <span className="font-semibold">homebrew</span>) into this copy and start the app again,
+            or use <Link to="/settings" className="underline">Settings → Restore from Backup</Link> with a backup made there.
+          </p>
         </div>
       ) : (
         <>

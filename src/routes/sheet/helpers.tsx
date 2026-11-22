@@ -8,7 +8,7 @@ import { languageChoicePlaceholder, splitRaceLanguages } from '../../data/raceDa
 import { sumFeatBonuses } from '../../character/featBonuses'
 import { itemIsActive } from '../../character/itemBonuses'
 import { armorKindsOf, type ArmorKind } from '../../character/proficiencies'
-import type { WeaponStats, ArmorStats, ItemDef } from '../../content/loaders'
+import type { WeaponStats, ArmorStats, ItemDef, SpellDef } from '../../content/loaders'
 
 // ── Weapon / armor resolution ─────────────────────────────────────────────
 // The lookup tables formerly defined here are now in `src/data/itemOverlay.ts`
@@ -420,6 +420,38 @@ export const DAMAGE_TYPE_STYLE: Record<string, { bg: string; text: string; borde
   bludgeoning: { bg: 'bg-parchment-200', text: 'text-parchment-800', border: 'border-parchment-400' },
   piercing:    { bg: 'bg-parchment-200', text: 'text-parchment-800', border: 'border-parchment-400' },
   slashing:    { bg: 'bg-parchment-200', text: 'text-parchment-800', border: 'border-parchment-400' },
+}
+
+/** What a spell mostly does, for the small coloured mark on its row in the Spells tab: damage
+ *  (coloured by its damage type), healing, control (a condition it inflicts), protection
+ *  (abjuration) or anything else */
+export type SpellRole = 'damage' | 'heal' | 'control' | 'ward' | 'utility'
+const HEALS = /(?<!can['’]t |cannot )\bregains?\b[^.]{0,80}hit points?|\brestores?\b[^.]{0,40}hit points?|\breturns? to life|\bbecomes? stable|\bend either one disease or one condition|\bends? one of the following effects/i
+const INFLICTS = /\b(charmed|frightened|paralyzed|restrained|incapacitated|stunned|blinded|deafened|prone|petrified|poisoned|unconscious)\b/i
+// Spells the wording rules get wrong (they mention hit points or conditions in passing)
+const ROLE_OVERRIDE: Record<string, SpellRole> = { wish: 'utility', 'temple-of-the-gods': 'utility' }
+
+export function spellRole(def: Pick<SpellDef, 'slug' | 'school' | 'description' | 'damage' | 'savingThrow'>): SpellRole {
+  if (ROLE_OVERRIDE[def.slug]) return ROLE_OVERRIDE[def.slug]
+  if (def.damage) return 'damage'
+  if (HEALS.test(def.description)) return 'heal'
+  if (INFLICTS.test(def.description) && (def.savingThrow || /^(Enchantment|Illusion)$/i.test(def.school))) return 'control'
+  if (/^Abjuration$/i.test(def.school)) return 'ward'
+  return 'utility'
+}
+
+/** How much a healing spell heals, read from its text: "1d8 + your spellcasting ability modifier" → { dice: '1d8', addMod: true } */
+export function spellHealing(def: Pick<SpellDef, 'description'>): { dice: string; addMod: boolean } | null {
+  const m = def.description.match(/hit points equal to (\d+d\d+)( \+ your spellcasting ability modifier)?|\bregains? (\d+d\d+|\d+) hit points/i)
+  return m ? { dice: m[1] ?? m[3], addMod: !!m[2] } : null
+}
+
+/** The mark's colours and what its tooltip says. Damage uses DAMAGE_TYPE_STYLE instead. */
+export const SPELL_ROLE_STYLE: Record<Exclude<SpellRole, 'damage'>, { label: string; chip: string }> = {
+  heal:    { label: 'Healing', chip: 'bg-green-100 text-green-700' },
+  control: { label: 'Control', chip: 'bg-pink-100 text-pink-700' },
+  ward:    { label: 'Protection', chip: 'bg-blue-100 text-blue-700' },
+  utility: { label: 'Utility', chip: 'bg-parchment-200 text-parchment-600' },
 }
 
 export const ABILITY_LABELS: Record<string, string> = {

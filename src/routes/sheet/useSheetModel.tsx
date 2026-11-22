@@ -17,6 +17,7 @@ import { runningPotions, sumPotionEffects } from '../../character/potionEffects'
 import type { ArmorStats } from '../../content/loaders'
 import { ABILITY_LABELS, Tab, artificerLevelOf, computeFullAC, deriveResistances, deriveSkillSources, missingProficiencies, resolveArmor, resolveWeapon, magicBonus, isWeaponProficient, fightingStyles, weaponAttackBonus, weaponDamageMod, isMonkWeapon } from './helpers'
 import { DRACONIC_ANCESTRIES } from '../../data/raceData'
+import { NumberInput } from '../../components/NumberInput'
 
 /** Everything the character sheet works from: its state, what follows from the character (AC,
  *  resources, spells…) and the actions that change it. The tabs read it through `useSheet()`. */
@@ -578,11 +579,11 @@ export function useSheetModel() {
                 <div className="res-pool-fill absolute inset-y-0 left-0 rounded-full transition-all duration-200" style={{ width: `${pct}%` }} />
               </div>
               <button className="btn-ghost px-1 py-0 text-sm" onClick={() => setVal(current - 1)} aria-label={`Spend 1 ${r.name}`}>−</button>
-              <input
-                type="number" min={0} max={max ?? 9999} aria-label={`${r.name} remaining`}
+              <NumberInput
+                min={0} max={max ?? 9999} aria-label={`${r.name} remaining`}
                 className="w-11 text-center text-sm font-bold bg-transparent border border-parchment-300 rounded py-0"
                 value={current}
-                onChange={e => setVal(parseInt(e.target.value, 10) || 0)}
+                onValue={setVal}
               />
               <span className="text-xs text-parchment-400">/ {max ?? '∞'}</span>
               <button className="btn-ghost px-1 py-0 text-sm" onClick={() => setVal(current + 1)} aria-label={`Restore 1 ${r.name}`}>+</button>
@@ -605,11 +606,11 @@ export function useSheetModel() {
               </div>
               <div className="flex items-center gap-1 mt-1">
                 <button className="btn-ghost px-1 text-sm" onClick={() => setVal(current - 1)}>−</button>
-                <input
-                  type="number" min={0} max={max ?? 9999}
+                <NumberInput
+                  min={0} max={max ?? 9999} aria-label={`${r.name} remaining`}
                   className="w-12 text-center text-sm font-bold bg-transparent border border-parchment-300 rounded py-0.5"
                   value={current}
-                  onChange={e => setVal(parseInt(e.target.value, 10) || 0)}
+                  onValue={setVal}
                 />
                 <span className="text-xs text-parchment-400">/ {max ?? '∞'}</span>
                 <button className="btn-ghost px-1 text-sm" onClick={() => setVal(current + 1)}>+</button>

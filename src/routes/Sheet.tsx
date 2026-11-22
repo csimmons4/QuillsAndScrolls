@@ -20,6 +20,7 @@ import { InventoryTab } from './sheet/InventoryTab'
 import { FeaturesTab } from './sheet/FeaturesTab'
 import { SummonsTab } from './sheet/SummonsTab'
 import { NotesTab } from './sheet/NotesTab'
+import { NumberInput } from '../components/NumberInput'
 
 export default function Sheet() {
   const model = useSheetModel()
@@ -237,12 +238,14 @@ export default function Sheet() {
           )}
           <div className="flex items-center gap-3 mb-2">
             <div className="flex items-baseline gap-1.5">
-              <input
-                type="number"
+              <NumberInput
+                min={0} max={maxHp}
                 aria-label="Current hit points"
-                className={`text-3xl font-bold w-16 bg-transparent border-none focus:outline-none focus:border-b-2 focus:border-parchment-400 rounded-none pb-0.5 ${hpTextColor}`}
+                className={`text-3xl font-bold bg-transparent border-none focus:outline-none focus:border-b-2 focus:border-parchment-400 rounded-none pb-0.5 ${hpTextColor}`}
+                // As wide as the number, so the "/ max" sits right beside it
+                style={{ width: `${Math.max(2, String(char.hp.current).length) + 0.4}ch` }}
                 value={char.hp.current}
-                onChange={e => patch({ hp: { ...char.hp, current: Math.max(0, Math.min(maxHp, parseInt(e.target.value, 10) || 0)) } })}
+                onValue={n => patch({ hp: { ...char.hp, current: n } })}
               />
               <span className="text-base text-parchment-300 select-none">/</span>
               <span className="text-base font-medium text-parchment-400" title="Hit point maximum">{maxHp}</span>

@@ -46,7 +46,7 @@ There is **nothing to install by hand** — no Node.js download, no Terminal com
 
 The **first time** you run it, the launcher automatically installs everything it needs (a private copy of Node.js if your computer doesn't have a recent enough one, then the app files) and then opens the app in your browser. This first run takes a minute or two; after that it starts in seconds.
 
-After you update the app (for example by downloading a newer copy), the launcher notices and reinstalls the app files, and Node.js too if the app now needs a newer one. That launch takes a minute again. Whenever something has changed, the window also says **"Preparing the app…"** for a few seconds while it gets the app ready.
+After you update the app (see [Updating to a new version](#updating-to-a-new-version)), the launcher notices and reinstalls the app files, and Node.js too if the app now needs a newer one. That launch takes a minute again. Whenever something has changed, the window also says **"Preparing the app…"** for a few seconds while it gets the app ready.
 
 Keep the launcher's window open while you're using the app — closing it stops the server. To stop, close that window; to use it again later, just double-click the launcher.
 
@@ -58,6 +58,17 @@ Keep the launcher's window open while you're using the app — closing it stops 
 - If the install ever prints a line about "vulnerabilities", see [About the security warnings](#about-the-security-warnings-npm-audit).
 
 > Prefer the command line? With Node.js 22.12 or newer installed, run `npm install` once and then `npm start`, opening **http://localhost:5173** yourself.
+
+### Updating to a new version
+
+Your characters and homebrew live in the app's own folder (`characters` and `homebrew`), so **a newly downloaded copy starts empty**. Bring them across in either of these ways:
+
+- **Copy the folders:** close the old app's launcher window, then copy the `characters` and `homebrew` folders from the old copy into the new one (replace the empty ones). On a Mac, show hidden files first (**Cmd+Shift+.** in Finder) so the hidden History folder inside `characters` comes too. Then double-click Start in the new copy.
+- **Backup and restore:** in the old copy, Settings → **Download Backup (.zip)**. In the new copy, Settings → **Restore from Backup…** and pick that file.
+
+If you got the app with `git clone`, `git pull` updates it in place and your characters stay where they are.
+
+Keep the old copy until you've seen your characters in the new one. An empty Vault in a new copy reminds you of this too.
 
 ### If something goes wrong
 
@@ -107,7 +118,7 @@ The home screen. Lists all your saved characters. From here you can:
 - **Duplicate or delete a character** — in each card's **⋯** menu (deleting asks first)
 - **Bring back a deleted character** — open **Recently deleted** at the bottom and click **Restore**. It comes back as it was just before it was deleted, with its History. **Delete forever** removes it for good.
 
-Each card shows the portrait, class and HP. A character at 0 HP shows **Down** (or **Stable**) with their death saves, and a character who has died moves to a **Fallen** section at the bottom.
+Each card shows the portrait, class and HP, plus the numbers a DM asks for: AC, passive Perception, Insight and Investigation, and spell save DC. Chips show Wild Shape, concentration, conditions, exhaustion and running potions. The Vault updates every few seconds, so with phones and tablets switched on, changes players make on their own devices show up. A character at 0 HP shows **Down** (or **Stable**) with their death saves, and a character who has died moves to a **Fallen** section at the bottom.
 
 ### Character Creation Wizard
 Eight steps that walk you through building a Level 1 character:
@@ -123,8 +134,8 @@ Eight steps that walk you through building a Level 1 character:
 ### Character Sheet
 The main play screen. Tabs for:
 - **Stats** — ability scores, saving throws, skills, conditions, inspiration, class resources, rests, death saves
-- **Spells** — known/prepared spells, spell slot tracker, cast & recover
-- **Inventory** — equipment, attunement, magic item charges, potions you can drink, and a coin purse (gain or spend in any coin, with a ledger of what changed)
+- **Spells** — known/prepared spells, spell slot tracker, cast & recover. A small mark on each spell shows what it mostly does: damage (in its damage type's colour), healing (with how much it heals), control, protection or utility. A key sits under the list.
+- **Inventory** — equipment, attunement, magic item charges, potions you can drink, and a coin purse (gain or spend in any coin, with a ledger of what changed). Each coin carries the old alchemists' mark for its metal: Venus for copper, the Moon for silver, Jupiter for electrum, the Sun for gold, and the Sun and Moon joined for platinum.
 - **Features** — all race, class, and background features with descriptions
 - **Summons** — track summoned or companion creatures with their own HP and stats
 - **Notes** — personality traits, ideals, bonds, flaws, backstory, free notes
@@ -164,14 +175,11 @@ Add your own custom content that appears alongside official options everywhere i
 
 Each entry is saved as its own `.json` file so you can share individual pieces with players (see below).
 
-### Party
-Everyone at a glance on one page: HP (or Down / Stable / Fallen), AC, passive Perception, Insight and Investigation, spell save DC, plus Wild Shape, concentration, conditions, exhaustion and running potions. It updates every few seconds, so with phones and tablets switched on, changes players make on their own devices show up. Click a card to open that sheet.
-
 ### Compendium
 A searchable, filterable reference browser for **all** game content — spells, items, feats, races, backgrounds, and classes (official plus your homebrew). Filter by category and search by name or description without opening a character.
 
 ### Settings
-- Choose a display theme — **Parchment** (warm classic), **Light** (clean white), or **Dark**
+- Choose a display theme: **Parchment** (warm classic), **Light** (clean white), **Forest** (mossy greens), **Frost** (cool blues), **Dark** (warm dungeon), **Arcane** (starlit violet) or **Ember** (smoke and embers)
 - See when data was last scraped and how many entries exist
 - Download a full backup `.zip` of all characters + homebrew (and each character's History, unless you untick it), and restore from one
 - Let phones and tablets on your Wi-Fi open the app (off by default, see Setup)

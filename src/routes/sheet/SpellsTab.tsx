@@ -5,7 +5,8 @@ import { cleanHigherLevels, levelLine, parseMaterial } from '../../components/Sp
 import { cantripDiceAtLevel } from '../../data/spellMeta'
 import { HourglassIcon, TargetIcon, ClockIcon, FlaskIcon, BookIcon } from '../../components/SheetIcons'
 import type { SpellDef } from '../../content/loaders'
-import { ABILITY_FULL, DAMAGE_TYPE_STYLE, computeUpcastDamage, parseUpcastScaling } from './helpers'
+import { ABILITY_FULL, DAMAGE_TYPE_STYLE, SPELL_ROLE_STYLE, spellRole, spellHealing, computeUpcastDamage, parseUpcastScaling } from './helpers'
+import { SpellRoleIcon } from '../../components/SpellRoleIcon'
 import { useSheet } from './SheetContext'
 
 /** The Spells tab: spellcasting header, spells by level with the spell card panel, and the library */
@@ -126,6 +127,11 @@ export function SpellsTab() {
         // Item-aware spell DC/attack — use effectiveChar (ability overrides applied) + item bonuses.
         const totalSpellDC  = (cls: string) => spellSaveDC(effectiveChar, cls, content)  + itemBonuses.spellDCBonus
         const totalSpellAtk = (cls: string) => spellAttackBonus(effectiveChar, cls, content) + itemBonuses.spellAttackBonus
+        // The casting ability modifier a spell adds (healing spells)
+        const spellModFor = (cls: string) => {
+          const c = char.classes.find(k => k.classSlug === cls)
+          return abilityModFor(effectiveChar, (c && spellcastingAbilityFor(c, content)) ?? spellAbility)
+        }
 
         const slotMaxAt = (lvl: number) => multiclassMaxes
           ? (multiclassMaxes[String(lvl)] ?? 0)
@@ -260,7 +266,15 @@ export function SpellsTab() {
           const conc = !!r.def && char.concentratingOn === r.def.slug
           const roll = r.def?.attackRoll ? formatMod(totalSpellAtk(r.cls))
             : r.def?.savingThrow ? `${r.def.savingThrow.ability.toUpperCase()} ${totalSpellDC(r.cls)}` : ''
-          const dmgText = r.dmg?.type ? (DAMAGE_TYPE_STYLE[r.dmg.type] ?? DAMAGE_TYPE_STYLE.force).text : 'text-parchment-700'
+          const dmgStyle = r.dmg?.type ? DAMAGE_TYPE_STYLE[r.dmg.type] ?? DAMAGE_TYPE_STYLE.force : null
+          const dmgText = dmgStyle ? dmgStyle.text : 'text-parchment-700'
+          // A small mark for what the spell mostly does: damage in its type's colour, healing, control…
+          const role = r.def ? spellRole(r.def) : 'utility'
+          const mark = role === 'damage'
+            ? { chip: dmgStyle ? `${dmgStyle.bg} ${dmgStyle.text}` : 'bg-red-100 text-red-700', label: r.dmg?.type ? `${r.dmg.type[0].toUpperCase()}${r.dmg.type.slice(1)} damage` : 'Damage' }
+            : SPELL_ROLE_STYLE[role]
+          const heals = role === 'heal' && r.def ? spellHealing(r.def) : null
+          const healText = heals ? `${heals.dice}${heals.addMod ? ` + ${spellModFor(r.cls)}` : ''} healing` : ''
           return (
             <div key={r.key} data-spell-key={r.key} className="scroll-mt-16">
               <div className="flex items-center gap-1">
@@ -270,20 +284,25 @@ export function SpellsTab() {
                   conc ? 'bg-amber-50 ring-1 ring-amber-300' : selected ? 'bg-parchment-100 ring-1 ring-parchment-300' : 'hover:bg-parchment-100'
                 }`}>
                 <span className="flex items-center gap-1.5 min-w-0">
+                  <span className={`w-[18px] h-[18px] rounded-full flex items-center justify-center shrink-0 ${mark.chip}`} title={mark.label}>
+                    <SpellRoleIcon role={role} className="w-3 h-3" />
+                  </span>
                   {conc && <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" style={{ boxShadow: '0 0 6px 2px rgba(251,191,36,0.7)' }} title="Concentrating" />}
                   <span className="text-sm font-semibold text-parchment-900 truncate">{r.name}</span>
                   {r.source && <span className="text-[11px] text-indigo-500 shrink-0" title={r.sourceNote}>★</span>}
                 </span>
                 <span className="hidden sm:block text-xs text-parchment-500 truncate">{shortTime(r.def?.castingTime)}</span>
                 <span className="hidden sm:block text-xs font-semibold text-violet-700 whitespace-nowrap">{roll}</span>
-                <span className={`hidden sm:block text-xs font-semibold truncate ${dmgText}`}>{r.dmg ? `${r.dmg.dice}${r.dmg.type ? ` ${r.dmg.type}` : ''}` : ''}</span>
+                {heals
+                  ? <span className="hidden sm:block text-xs font-semibold truncate text-green-700">{healText}</span>
+                  : <span className={`hidden sm:block text-xs font-semibold truncate ${dmgText}`}>{r.dmg ? `${r.dmg.dice}${r.dmg.type ? ` ${r.dmg.type}` : ''}` : ''}</span>}
                 <span className="flex items-center justify-end gap-1">
                   {r.usesMax !== undefined && (
                     <span className={`text-[10px] font-semibold rounded px-1 ${r.usesLeft! > 0 ? 'bg-indigo-50 text-indigo-700' : 'bg-parchment-100 text-parchment-400 line-through'}`}
                       title="Free casts left before a long rest">{r.usesLeft}/{r.usesMax}</span>
                   )}
-                  {r.def?.concentration && <span className="w-4 h-4 rounded text-[9px] font-bold flex items-center justify-center bg-amber-100 text-amber-700" title="Concentration">C</span>}
-                  {r.def?.ritual && <span className="w-4 h-4 rounded text-[9px] font-bold flex items-center justify-center bg-blue-100 text-blue-700" title="Ritual">R</span>}
+                  {r.def?.concentration && <span className="w-4 h-4 rounded text-[10px] font-bold flex items-center justify-center bg-amber-100 text-amber-700" title="Concentration">C</span>}
+                  {r.def?.ritual && <span className="w-4 h-4 rounded text-[10px] font-bold flex items-center justify-center bg-blue-100 text-blue-700" title="Ritual">R</span>}
                 </span>
               </button>
               {r.library && r.def && (
@@ -363,6 +382,7 @@ export function SpellsTab() {
           const materialText = def.components?.match(/\(([^)]+)\)/)?.[1]
           const componentLetters = (def.components ?? '').split('(')[0].split(',').map(c => c.trim()).filter(Boolean)
           const dmgStyle = r.dmg?.type ? DAMAGE_TYPE_STYLE[r.dmg.type] ?? DAMAGE_TYPE_STYLE.force : null
+          const heals = spellRole(def) === 'heal' ? spellHealing(def) : null
           const fact = (icon: React.ReactNode, label: string, value: React.ReactNode, sub?: string) => (
             <div className="bg-parchment-50 px-3 py-2 flex gap-2 min-w-0">
               <span className="mt-0.5 shrink-0" style={{ color: hex }}>{icon}</span>
@@ -422,7 +442,7 @@ export function SpellsTab() {
               </div>
 
               {/* The numbers that matter in the moment */}
-              {(r.dmg || def.savingThrow || def.attackRoll) && (
+              {(r.dmg || heals || def.savingThrow || def.attackRoll) && (
                 <div className="px-4 py-3 flex items-stretch gap-3 border-b border-parchment-200">
                   {(def.attackRoll || def.savingThrow) && (
                     <div className="flex-1 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-center">
@@ -441,6 +461,12 @@ export function SpellsTab() {
                     <div className={`flex-1 rounded-lg border px-3 py-2 text-center ${dmgStyle ? `${dmgStyle.bg} ${dmgStyle.border}` : 'bg-red-50 border-red-200'}`}>
                       <div className={`text-2xl font-bold leading-none ${dmgStyle ? dmgStyle.text : 'text-red-800'}`}>{r.dmg.dice}</div>
                       <div className={`text-[10px] font-bold uppercase tracking-widest mt-1 ${dmgStyle ? dmgStyle.text : 'text-red-700'}`}>{r.dmg.type ? `${r.dmg.type} damage` : 'damage'}</div>
+                    </div>
+                  )}
+                  {heals && (
+                    <div className="flex-1 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-center">
+                      <div className="text-2xl font-bold leading-none text-green-800">{heals.dice}{heals.addMod ? ` + ${spellModFor(r.cls)}` : ''}</div>
+                      <div className="text-[10px] font-bold uppercase tracking-widest mt-1 text-green-700">hit points healed</div>
                     </div>
                   )}
                 </div>
@@ -634,11 +660,11 @@ export function SpellsTab() {
                 <div className="flex items-center gap-2.5">
                   <div className="spell-stat" title="Creatures make saving throws against this">
                     <span className="text-2xl font-bold leading-none text-violet-800">{totalSpellDC(spellClassSlug)}</span>
-                    <span className="text-[9px] font-bold uppercase tracking-widest text-violet-600">Save DC</span>
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-violet-600">Save DC</span>
                   </div>
                   <div className="spell-stat" title="Added to your d20 for spell attacks">
                     <span className="text-2xl font-bold leading-none text-violet-800">{formatMod(totalSpellAtk(spellClassSlug))}</span>
-                    <span className="text-[9px] font-bold uppercase tracking-widest text-violet-600">Attack</span>
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-violet-600">Attack</span>
                   </div>
                 </div>
 
@@ -865,6 +891,17 @@ export function SpellsTab() {
                           <p className="text-sm text-parchment-400 py-3 text-center">No spells match "{spellFilter}"</p>
                         )}
                       </div>
+                      {rows.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-3 px-2.5 text-[11px] text-parchment-500">
+                          {[{ role: 'damage' as const, label: 'Damage (in its type’s colour)', chip: 'bg-red-100 text-red-700' },
+                            ...(['heal', 'control', 'ward', 'utility'] as const).map(role => ({ role, ...SPELL_ROLE_STYLE[role] }))].map(m => (
+                            <span key={m.role} className="flex items-center gap-1">
+                              <span className={`w-3.5 h-3.5 rounded-full flex items-center justify-center ${m.chip}`}><SpellRoleIcon role={m.role} className="w-2.5 h-2.5" /></span>
+                              {m.label}
+                            </span>
+                          ))}
+                        </div>
+                      )}
 
                       {/* ── Spell library: spells you could add, in the same rows; their cards open in the panel ── */}
                       <div className="mt-5 pt-3 border-t border-parchment-200">

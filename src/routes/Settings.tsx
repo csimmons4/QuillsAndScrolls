@@ -215,7 +215,7 @@ export default function Settings() {
       <div className="card mb-6">
         <h2 className="section-header flex items-center gap-2"><PaletteIcon className="w-5 h-5 text-[rgb(var(--accent))] shrink-0" /> Appearance</h2>
         <p className="text-sm text-parchment-500 mb-4">Choose a display theme. Saved to this browser.</p>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {THEMES.map(t => {
             const active = theme === t.id
             return (

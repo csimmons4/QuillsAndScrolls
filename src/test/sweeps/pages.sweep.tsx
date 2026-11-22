@@ -35,7 +35,7 @@ it('presses every button on every page and on unusual sheets', async () => {
     cleanup()
     vi.unstubAllGlobals()
   }
-  for (const [path, where] of [['/', 'vault'], ['/party', 'party'], ['/new', 'creator'], ['/homebrew', 'homebrew'], ['/settings', 'settings'], ['/lookup', 'compendium'], [`/c/${druid.id}/level-up`, 'level-up'], [`/c/${dying.id}`, 'death screen'], [`/c/${fallen.id}`, 'fallen sheet']] as const) {
+  for (const [path, where] of [['/', 'vault'], ['/new', 'creator'], ['/homebrew', 'homebrew'], ['/settings', 'settings'], ['/lookup', 'compendium'], [`/c/${druid.id}/level-up`, 'level-up'], [`/c/${dying.id}`, 'death screen'], [`/c/${fallen.id}`, 'fallen sheet']] as const) {
     log.where = where
     try { await visit(path, where) } catch (e) { log.problems.push(`${where} | CRASH: ${(e as Error).message.slice(0, 200)}`) }
   }

@@ -55,6 +55,30 @@ describe('Sheet', () => {
     expect(after.spellSlots['1']).toEqual({ max: 2, used: 1 })
   }, SLOW.timeout)
 
+  it('clearing the hit points box to retype it never drops the character to 0', async () => {
+    const char = wizard(3, { concentratingOn: 'blur', hp: { current: 14, temp: 0 } })
+    const server = fakeServer([char])
+    const user = userEvent.setup()
+    renderApp(`/c/${char.id}`)
+    const hp = await screen.findByLabelText('Current hit points', undefined, find)
+    await user.clear(hp)
+    await new Promise(r => setTimeout(r, 1000))   // longer than the save delay
+    const stored = () => server.characters.get(char.id)!
+    expect(stored().hp.current).toBe(14)
+    expect(stored().concentratingOn).toBe('blur')
+    expect(screen.queryByText(/death saving throws/i)).toBeNull()
+    await user.type(hp, '9')
+    const after = await saved(server, char.id, c => c.hp.current === 9)
+    expect(after.concentratingOn).toBe('blur')
+    // Above the maximum counts as the maximum, and leaving the box shows it
+    await user.clear(hp)
+    await user.type(hp, '99')
+    const full = await saved(server, char.id, c => c.hp.current > 9)
+    expect(full.hp.current).toBeLessThan(99)
+    await user.tab()
+    expect((hp as HTMLInputElement).value).toBe(String(full.hp.current))
+  }, SLOW.timeout)
+
   it('a long rest restores HP, and Undo puts it back', async () => {
     const char = wizard(3, { hp: { current: 3, temp: 0 } })
     const server = fakeServer([char])
@@ -278,22 +302,22 @@ describe('Vault: Recently deleted', () => {
   }, SLOW.timeout)
 })
 
-describe('Party', () => {
-  it('shows each character’s numbers as the sheet works them out, and opens the sheet', async () => {
+describe('Vault cards', () => {
+  it('show each character’s numbers as the sheet works them out, and open the sheet', async () => {
     const char = wizard(3, {
       hp: { current: 9, temp: 2 }, conditions: ['Poisoned'],
       equipment: [equipped('cloak-of-protection', 'Cloak of Protection', { slot: 'cloak', attuned: true })],
     })
     fakeServer([char])
     const user = userEvent.setup()
-    renderApp('/party')
-    const card = (await screen.findByText('Test Wizard', undefined, find)).closest('a')!
+    renderApp('/')
+    const card = (await screen.findByText('Test Wizard', undefined, find)).closest('.card') as HTMLElement
     const stat = (label: string) => within(card).getByText(label).nextElementSibling!.textContent
     expect(stat('AC')).toBe('13')            // 10 + DEX 2 + the cloak's 1
     expect(stat('Spell DC')).toBe('13')      // 8 + proficiency 2 + INT 3
     expect(within(card).getByText('Poisoned')).toBeTruthy()
-    expect(within(card).getByText('+2')).toBeTruthy()   // temporary HP
-    await user.click(card)
+    expect(within(card).getByText(/\+2 temp/)).toBeTruthy()
+    await user.click(within(card).getByRole('button', { name: 'Open' }))
     expect(((await screen.findByLabelText('Character name', undefined, find)) as HTMLInputElement).value).toBe('Test Wizard')
   }, SLOW.timeout)
 })

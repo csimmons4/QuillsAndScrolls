@@ -29,7 +29,7 @@ it('names every control', async () => {
     summons: [{ id: 's1', name: 'Owl', hp: { current: 1, max: 1 }, ac: 11, speed: 5, saveProficiencies: [], immunities: [], resistances: [], attacks: [], abilities: [], notes: '' }],
     campaignBoard: { activeBoard: 'b1', boards: [{ id: 'b1', name: 'Clues', notes: [{ id: 'n1', x: 40, y: 40, w: 200, h: 200, title: 'The mill', content: '', color: 'yellow' }], connections: [] }] },
   })
-  for (const path of ['/', '/party', '/new', '/lookup', '/homebrew', '/settings', `/c/${wiz.id}/level-up`, `/c/${wiz.id}`]) {
+  for (const path of ['/', '/new', '/lookup', '/homebrew', '/settings', `/c/${wiz.id}/level-up`, `/c/${wiz.id}`]) {
     fakeServer([wiz])
     renderApp(path)
     await pause(2500)

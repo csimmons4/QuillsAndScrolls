@@ -63,7 +63,7 @@ export function SpellStatBlock({ spell, saveDc, attackBonus }: { spell: SpellDef
       : `${spell.attackRoll} spell attack`
     tags.push({ label, cls: 'bg-violet-50 text-violet-700 border-violet-200 font-semibold' })
   }
-  if (spell.damage) tags.push({ label: `${spell.damage.dice}${spell.damage.type ? ` ${spell.damage.type}` : ''}`, cls: 'bg-red-50 text-red-700 border-red-200 font-mono' })
+  if (spell.damage) tags.push({ label: `${spell.damage.dice}${spell.damage.type ? ` ${spell.damage.type}` : ''}`, cls: 'bg-red-50 text-red-700 border-red-200 font-semibold' })
   if (material) tags.push({ label: material.consumed ? `${material.cost} · consumed` : material.cost, cls: material.consumed ? 'bg-orange-50 text-orange-700 border-orange-200' : 'bg-parchment-100 text-parchment-600 border-parchment-300' })
 
   return (
