@@ -1960,12 +1960,13 @@ export interface MulticlassProfGrant {
   weapons?: string[]
   tools?: string[]
   skills?: { count: number; from: string[] }  // pick N from list
+  toolChoice?: 'musical instrument'            // pick one (the bard's; the list is MUSICAL_INSTRUMENTS)
 }
 
 export const MULTICLASS_PROF_GRANTS: Record<string, MulticlassProfGrant> = {
-  artificer:  { armor: ['Light Armor', 'Medium Armor', 'Shields'], weapons: ['Simple Weapons'], tools: ["Thieves' Tools"] },
-  barbarian:  { armor: ['Light Armor', 'Medium Armor', 'Shields'], weapons: ['Simple Weapons', 'Martial Weapons'] },
-  bard:       { armor: ['Light Armor'], skills: { count: 1, from: [] } }, // any skill
+  artificer:  { armor: ['Light Armor', 'Medium Armor', 'Shields'], tools: ["Thieves' Tools", "Tinker's Tools"] }, // TCoE p.10
+  barbarian:  { armor: ['Shields'], weapons: ['Simple Weapons', 'Martial Weapons'] },
+  bard:       { armor: ['Light Armor'], skills: { count: 1, from: [] }, toolChoice: 'musical instrument' }, // any skill
   cleric:     { armor: ['Light Armor', 'Medium Armor', 'Shields'] },
   druid:      { armor: ['Light Armor', 'Medium Armor', 'Shields'] },
   fighter:    { armor: ['Light Armor', 'Medium Armor', 'Shields'], weapons: ['Simple Weapons', 'Martial Weapons'] },

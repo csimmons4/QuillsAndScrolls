@@ -97,6 +97,8 @@ export function proficiencySources(char: Character, content: ContentData, featSl
       addArmor(g?.armor, name)
       addAll(src.weapons, g?.weapons, name)
       addAll(src.tools, g?.tools, name)
+      // The instrument a bard multiclass picks (any of them could be it)
+      if (g?.toolChoice) addAll(src.tools, char.toolProficiencies.filter(t => MUSICAL_INSTRUMENTS.some(m => m.toLowerCase() === t.toLowerCase())), name)
     }
     if (SECRET_LANGUAGES[cc.classSlug]) add(src.languages, profKey(SECRET_LANGUAGES[cc.classSlug]), name)
     if (cc.subclassSlug) {

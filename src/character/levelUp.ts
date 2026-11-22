@@ -13,6 +13,7 @@ export interface LevelUpChoices {
   featureChoices?: FeatureChoice[]
   // (Multiclassing never grants saving throw proficiencies — PHB p.164.)
   multiclassSkill?: string          // for multiclassing: skill prof picked from limited list
+  multiclassTool?: string           // for multiclassing into bard: the musical instrument picked
   landTerrain?: string              // Druid Circle of the Land terrain choice
   runeChoices?: string[]            // Rune Knight: new rune slugs to add
   hunterChoice?: string             // Ranger Hunter: choice slug for this level
@@ -144,6 +145,9 @@ export function applyLevelUp(char: Character, choices: LevelUpChoices): Characte
     }
     if (choices.multiclassSkill) {
       next = { ...next, skillProficiencies: [...new Set([...next.skillProficiencies, choices.multiclassSkill])] }
+    }
+    if (choices.multiclassTool) {
+      next = { ...next, toolProficiencies: [...new Set([...next.toolProficiencies, choices.multiclassTool])] }
     }
   }
 

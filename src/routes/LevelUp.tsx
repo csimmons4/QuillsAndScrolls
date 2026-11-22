@@ -5,6 +5,7 @@ import { useContent } from '../content/ContentProvider'
 import { applyLevelUp, LevelUpChoices, asiLevelsForClass, shiftBaselines } from '../character/levelUp'
 import { totalLevel, profBonus, hpMax } from '../character/derive'
 import { sumFeatBonuses } from '../character/featBonuses'
+import { MUSICAL_INSTRUMENTS } from '../character/proficiencies'
 import { ABILITIES, Character, SKILLS, SKILL_LABELS } from '../character/model'
 import {
   CLASS_OPTIONS, slotsForLevel, PACT_SLOT_TABLE,
@@ -200,6 +201,7 @@ export default function LevelUp() {
   const [cantripToForget, setCantripToForget] = useState('')
   const [newSpellSearch, setNewSpellSearch] = useState('')
   const [multiclassSkill, setMulticlassSkill] = useState('')
+  const [multiclassTool, setMulticlassTool] = useState('')
   const [pactBoon, setPactBoon] = useState('')
   const [maneuverChoices, setManeuverChoices] = useState<string[]>([])
   const [favoredEnemy, setFavoredEnemy] = useState('')
@@ -348,6 +350,11 @@ export default function LevelUp() {
   const isMulticlassing = !char.classes.find(c => c.classSlug === selectedClass)
   const multiclassGrant = isMulticlassing ? MULTICLASS_PROF_GRANTS[selectedClass] : undefined
   const needsMulticlassSkill = !!(multiclassGrant?.skills?.count)
+  // The bard's musical instrument (PHB p.164); one already known isn't offered
+  const multiclassToolOptions = multiclassGrant?.toolChoice
+    ? MUSICAL_INSTRUMENTS.filter(t => !char.toolProficiencies.some(k => k.toLowerCase() === t.toLowerCase()))
+    : []
+  const needsMulticlassTool = multiclassToolOptions.length > 0
 
   // Ranger favored enemy / terrain choices at specific levels
   const rangerFavoredEnemyLevels = [1, 6, 14]
@@ -462,6 +469,7 @@ export default function LevelUp() {
       hpRoll: effectiveHpRoll,
       subclassSlug: subclass || undefined,
       multiclassSkill: needsMulticlassSkill ? multiclassSkill : undefined,
+      multiclassTool: needsMulticlassTool ? multiclassTool : undefined,
       fightingStyle: needsFightingStyle && fightingStyle ? fightingStyle : undefined,
       landTerrain: needsLandTerrain && landTerrain ? landTerrain : undefined,
       runeChoices: runesToGain > 0 && runeChoices.length > 0 ? runeChoices : undefined,
@@ -630,6 +638,7 @@ export default function LevelUp() {
     isAsiLevel && asiChoice === 'feat' && !featDefPicked ? { msg: 'Choose a feat.', step: 'Ability Score Improvement' } : null,
     needsFeatAbility ? { msg: `Choose which ability ${featDefPicked!.name} increases.`, step: 'Ability Score Improvement' } : null,
     needsMulticlassSkill && !multiclassSkill ? { msg: 'Choose a multiclass skill.', step: 'Multiclass Skill' } : null,
+    needsMulticlassTool && !multiclassTool ? { msg: 'Choose a musical instrument.', step: 'Multiclass Instrument' } : null,
     // These are only offered at this exact level, so they can't be put off
     needsFightingStyle && !fightingStyle ? { msg: 'Choose a fighting style.', step: 'Fighting Style' } : null,
     needsPactBoon && !pactBoon ? { msg: 'Choose a pact boon.', step: 'Pact Boon' } : null,
@@ -1318,6 +1327,18 @@ export default function LevelUp() {
               </>
             )
           })()}
+        </div>
+      )}
+
+      {/* Multiclass instrument (bard) */}
+      {needsMulticlassTool && (
+        <div className="card mb-4">
+          <h2 className="section-header">Multiclass Instrument</h2>
+          <p className="text-sm text-parchment-500 mb-2">Multiclassing into Bard grants proficiency with one musical instrument of your choice.</p>
+          <select className="input text-sm" value={multiclassTool} onChange={e => setMulticlassTool(e.target.value)} aria-label="Musical instrument">
+            <option value="">— choose —</option>
+            {multiclassToolOptions.map(t => <option key={t} value={t}>{t}</option>)}
+          </select>
         </div>
       )}
 

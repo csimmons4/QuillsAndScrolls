@@ -10,6 +10,8 @@ import { makeChar, content } from '../fixtures'
 import { CLASS_OPTIONS } from '../../data/classData'
 import { restingVitals } from '../../character/vitals'
 import { abilityMod } from '../../character/derive'
+import { missingProficiencies } from '../../routes/sheet/helpers'
+import { MUSICAL_INSTRUMENTS } from '../../character/proficiencies'
 import { problemLog, checkText, pause, expectNoProblems } from './helpers'
 
 // ── PHB (and TCoE for the artificer) tables, typed in from the books, not read from the app ──────
@@ -190,10 +192,50 @@ async function pickOne(card: HTMLElement) {
     return
   }
   const radios = [...card.querySelectorAll<HTMLInputElement>('input[type=radio]')]
-  if (radios.length && !radios.some(r => r.checked)) await click(radios[0])
+  const first = radios.find(r => !r.disabled)
+  if (first && !radios.some(r => r.checked)) await click(first)
 }
 
 const SKIP = /^(Class|Hit Points|New Class Features|Ability Score Improvement|Spells$|Replace an Infusion)/
+
+/** Makes every choice on the open Level Up page (subclass `sub` if it asks), notes problems,
+ *  and returns the Apply button, or null if it stays blocked */
+async function fillLevelUp(log: ReturnType<typeof problemLog>, sub: string | undefined) {
+  const apply = () => screen.findAllByRole('button', { name: /Apply Level Up|to choose/ }, { timeout: 10000 }).then(b => b[0])
+  const subCard = cardsNow().find(c => heading(c) === 'Choose Subclass')
+  if (subCard) {
+    const radio = subCard.querySelector<HTMLInputElement>(`input[type=radio][value="${sub}"]`)
+    if (radio) await click(radio)
+    else log.problems.push(`${log.where} | subclass ${sub} not offered`)
+  }
+  // Subclass choices appear once it's picked, so go round a few times
+  for (let pass = 0; pass < 3; pass++) {
+    for (const card of cardsNow()) {
+      const h = heading(card)
+      if (SKIP.test(h) || h === 'Choose Subclass') continue
+      if (counter(card)) {
+        if (!(await pickMany(card))) log.problems.push(`${log.where} | couldn't fill "${h}" (${card.textContent!.match(/\(\d+\/\d+ \w+\)/)?.[0]})`)
+      } else await pickOne(card)
+    }
+  }
+  checkText(log)
+  const button = await apply()
+  if (process.env.QS_DEBUG) appendFileSync(process.env.QS_DEBUG, `${log.where}: ${cardsNow().map(heading).join(' | ')} || ${button.textContent} ${button.getAttribute('title')}\n`)
+  if ((button as HTMLButtonElement).disabled) {
+    log.problems.push(`${log.where} | still blocked: ${button.getAttribute('title')}`)
+    return null
+  }
+  return button
+}
+
+/** Clicks Apply, waits for the save and goes back to Level Up from the sheet */
+async function applyAndReturn(button: HTMLElement, server: ReturnType<typeof fakeServer>, id: string, saved: (c: Character) => boolean, again: boolean) {
+  await click(button)
+  await act(async () => { await vi.waitFor(() => { if (!saved(server.characters.get(id)!)) throw new Error('not saved') }, { timeout: 10000 }) })
+  const levelUp = await screen.findByRole('link', { name: 'Level Up' }, { timeout: 10000 })
+  if (again) await click(levelUp)
+  return server.characters.get(id)!
+}
 
 export async function levelRulesSweep(shard: number, shards: number) {
   const log = problemLog()
@@ -205,43 +247,157 @@ export async function levelRulesSweep(shard: number, shards: number) {
       renderApp(`/c/${char.id}/level-up`)
       for (let level = 2; level <= 20; level++) {
         log.where = `${cls}/${sub} → ${level}`
-        const apply = () => screen.findAllByRole('button', { name: /Apply Level Up|to choose/ }, { timeout: 10000 }).then(b => b[0])
-        await apply()
+        await screen.findAllByRole('button', { name: /Apply Level Up|to choose/ }, { timeout: 10000 })
         await pause(20)
         // Did the page offer an ASI at this level?
         const asiOffered = cardsNow().some(c => heading(c).startsWith('Ability Score Improvement'))
         if (asiOffered !== asiLevels(cls).includes(level)) log.problems.push(`${log.where} | ASI ${asiOffered ? 'offered' : 'missing'} (PHB: ${asiLevels(cls).join(', ')})`)
-        const subCard = cardsNow().find(c => heading(c) === 'Choose Subclass')
-        if (subCard) {
-          const radio = subCard.querySelector<HTMLInputElement>(`input[type=radio][value="${sub}"]`)
-          if (radio) await click(radio)
-          else log.problems.push(`${log.where} | subclass ${sub} not offered`)
-        }
-        // Subclass choices appear once it's picked, so go round a few times
-        for (let pass = 0; pass < 3; pass++) {
-          for (const card of cardsNow()) {
-            const h = heading(card)
-            if (SKIP.test(h) || h === 'Choose Subclass') continue
-            if (counter(card)) {
-              if (!(await pickMany(card))) log.problems.push(`${log.where} | couldn't fill "${h}" (${card.textContent!.match(/\(\d+\/\d+ \w+\)/)?.[0]})`)
-            } else await pickOne(card)
-          }
-        }
-        checkText(log)
-        const button = await apply()
-        // QS_DEBUG=<file> writes each page's sections and the Apply button's state there
-        if (process.env.QS_DEBUG) appendFileSync(process.env.QS_DEBUG, `${log.where}: ${cardsNow().map(heading).join(' | ')} || ${button.textContent} ${button.getAttribute('title')}\n`)
-        if ((button as HTMLButtonElement).disabled) {
-          log.problems.push(`${log.where} | still blocked: ${button.getAttribute('title')}`)
-          break
-        }
-        await click(button)
-        // Saved, and back on the sheet
-        await act(async () => { await vi.waitFor(() => { if (server.characters.get(char.id)!.classes[0].level !== level) throw new Error('not saved') }, { timeout: 10000 }) })
-        char = server.characters.get(char.id)!
+        const button = await fillLevelUp(log, sub)
+        if (!button) break
+        char = await applyAndReturn(button, server, char.id, c => c.classes[0].level === level, level < 20)
         for (const d of compare(char, cls, sub, level)) log.problems.push(`${log.where} | ${d}`)
-        const levelUp = await screen.findByRole('link', { name: 'Level Up' }, { timeout: 10000 })
-        if (level < 20) await click(levelUp)
+      }
+    } catch (e) {
+      log.problems.push(`${log.where} | CRASH: ${(e as Error).message.slice(0, 300)}`)
+    }
+    cleanup()
+    vi.unstubAllGlobals()
+  }
+  expectNoProblems(log)
+}
+
+// ── Multiclassing (PHB pp.163–165, TCoE for the artificer) ──────────────────────────────────────
+
+/** What multiclassing into a class grants (PHB p.164), names normalised by `norm` */
+const MULTICLASS_GAINS: Record<string, { armor?: string[]; weapons?: string[]; tools?: string[]; skills?: number }> = {
+  artificer: { armor: ['light', 'medium', 'shield'], tools: ["thieves' tool", "tinker's tool"] },
+  barbarian: { armor: ['shield'], weapons: ['simple', 'martial'] },
+  bard: { armor: ['light'], tools: ['<instrument>'], skills: 1 },
+  cleric: { armor: ['light', 'medium', 'shield'] },
+  druid: { armor: ['light', 'medium', 'shield'] },
+  fighter: { armor: ['light', 'medium', 'shield'], weapons: ['simple', 'martial'] },
+  monk: { weapons: ['simple', 'shortsword'] },
+  paladin: { armor: ['light', 'medium', 'shield'], weapons: ['simple', 'martial'] },
+  ranger: { armor: ['light', 'medium', 'shield'], weapons: ['simple', 'martial'], skills: 1 },
+  rogue: { armor: ['light'], tools: ["thieves' tool"], skills: 1 },
+  sorcerer: {}, warlock: { armor: ['light'], weapons: ['simple'] }, wizard: {},
+}
+const norm = (x: string) => x.toLowerCase().replace(/\s+(armor|weapons?)$/, '').replace(/s$/, '').trim()
+const INSTRUMENTS = new Set(MUSICAL_INSTRUMENTS.map(norm))
+
+/** Builds as [class, levels] segments in the order they're taken, and each class's subclass */
+export const BUILDS: { name: string; plan: [string, number][]; subs: Record<string, string> }[] = [
+  { name: 'sorcadin', plan: [['paladin', 2], ['sorcerer', 3], ['paladin', 4], ['sorcerer', 11]], subs: { paladin: 'devotion', sorcerer: 'draconic' } },
+  { name: 'eldritch knight / wizard', plan: [['fighter', 3], ['wizard', 2], ['fighter', 4], ['wizard', 11]], subs: { fighter: 'eldritch-knight', wizard: 'evocation' } },
+  { name: 'sorlock', plan: [['warlock', 2], ['sorcerer', 3], ['warlock', 1], ['sorcerer', 14]], subs: { warlock: 'hexblade', sorcerer: 'wild-magic' } },
+  { name: 'rogue / ranger', plan: [['rogue', 3], ['ranger', 5], ['rogue', 12]], subs: { rogue: 'thief', ranger: 'hunter' } },
+  { name: 'cleric / druid', plan: [['cleric', 5], ['druid', 5], ['cleric', 10]], subs: { cleric: 'life', druid: 'moon' } },
+  { name: 'artificer / wizard', plan: [['artificer', 3], ['wizard', 3], ['artificer', 3], ['wizard', 11]], subs: { artificer: 'artillerist', wizard: 'abjuration' } },
+  { name: 'wizard / artificer', plan: [['wizard', 2], ['artificer', 3], ['wizard', 4], ['artificer', 11]], subs: { wizard: 'divination', artificer: 'alchemist' } },
+  { name: 'monk / barbarian', plan: [['monk', 5], ['barbarian', 3], ['monk', 12]], subs: { monk: 'shadow', barbarian: 'totem-warrior' } },
+  { name: 'barbarian / fighter', plan: [['barbarian', 5], ['fighter', 4], ['barbarian', 11]], subs: { barbarian: 'berserker', fighter: 'champion' } },
+  { name: 'monk / rogue', plan: [['monk', 6], ['rogue', 3], ['monk', 11]], subs: { monk: 'open-hand', rogue: 'arcane-trickster' } },
+  { name: 'warlock / bard', plan: [['warlock', 3], ['bard', 6], ['warlock', 2], ['bard', 9]], subs: { warlock: 'fiend', bard: 'lore' } },
+]
+
+const FULL_CASTERS = ['bard', 'cleric', 'druid', 'sorcerer', 'wizard']
+/** PHB p.164: a class counts for multiclass slots once it has the Spellcasting feature */
+function casterShare(cls: string, sub: string | undefined, level: number): { own: number[][]; share: number } | null {
+  if (FULL_CASTERS.includes(cls)) return { own: FULL, share: level }
+  if ((cls === 'paladin' || cls === 'ranger') && level >= 2) return { own: HALF, share: Math.floor(level / 2) }
+  if (cls === 'artificer') return { own: ARTIFICER, share: Math.ceil(level / 2) }
+  if ((sub === 'eldritch-knight' || sub === 'arcane-trickster') && level >= 3) return { own: THIRD, share: Math.floor(level / 3) }
+  return null
+}
+
+function compareMulticlass(char: Character, subs: Record<string, string>, taken: string[]): string[] {
+  const out: string[] = []
+  const want = (what: string, got: unknown, expected: unknown) => {
+    if (JSON.stringify(got) !== JSON.stringify(expected)) out.push(`${what}: has ${JSON.stringify(got)}, PHB ${JSON.stringify(expected)}`)
+  }
+  const levels: Record<string, number> = {}
+  for (const c of taken) levels[c] = (levels[c] ?? 0) + 1
+  const dieOf = (cls: string) => content().classes.find(k => k.slug === cls)?.hitDie ?? 8
+  for (const [cls, level] of Object.entries(levels)) {
+    const cc = char.classes.find(c => c.classSlug === cls)
+    want(`${cls} level`, cc?.level, level)
+    if (level >= CLASS_OPTIONS[cls].subclasses.find(s => s.slug === subs[cls])!.level) want(`${cls} subclass`, cc?.subclassSlug, subs[cls])
+  }
+  // Max HP: the first class's full die, the average for every later level (in any class), CON each level
+  const sorc = subs.sorcerer === 'draconic' ? levels.sorcerer ?? 0 : 0
+  want('max HP', restingVitals(char, content()).maxHp,
+    dieOf(taken[0]) + taken.slice(1).reduce((t, c) => t + dieOf(c) / 2 + 1, 0) + taken.length * abilityMod(char.abilityScores.con) + sorc)
+  // Spell slots: one caster uses its own table; two or more add their shares on the multiclass table
+  const casters = Object.entries(levels).map(([cls, level]) => casterShare(cls, subs[cls], level)).filter(Boolean) as { own: number[][]; share: number }[]
+  const casterLevel = casters.reduce((t, c) => t + c.share, 0)
+  const slotsWanted = casters.length >= 2 ? (casterLevel ? FULL[casterLevel - 1] : [])
+    : casters.length === 1 ? casters[0].own[Object.entries(levels).find(([cls, l]) => casterShare(cls, subs[cls], l))![1] - 1] : []
+  const slots = Object.entries(char.spellSlots).filter(([, v]) => v.max > 0).sort(([a], [b]) => +a - +b).map(([, v]) => v.max)
+  want(`spell slots (caster level ${casterLevel})`, slots, slotsWanted)
+  if (levels.warlock) want('pact slots (level, count)', [char.pactSlots?.level, char.pactSlots?.max], PACT[levels.warlock - 1])
+  // Each class learns its spells by its own level
+  const lvlOf = (slug: string) => content().spells.find(d => d.slug === slug)?.level ?? 0
+  for (const [cls, level] of Object.entries(levels)) {
+    const own = char.spells.filter(s => s.classSlug === cls && !s.grantedBy && !s.freeUseKey)
+    const key = subs[cls] === 'eldritch-knight' || subs[cls] === 'arcane-trickster' ? subs[cls] : cls
+    const ct = CANTRIPS[key]
+    if (ct) {
+      const start = key === cls ? 1 : 3
+      want(`${cls} cantrips`, own.filter(s => lvlOf(s.spellSlug) === 0).length, level < start ? 0 : ct[0] + ct[1].filter(l => l <= level).length)
+    }
+    if (SPELLS_KNOWN[key]) want(`${cls} spells known`, own.filter(s => lvlOf(s.spellSlug) > 0).length, SPELLS_KNOWN[key][level - 1] + (subs[cls] === 'lore' && level >= 6 ? 2 : 0))
+    if (cls === 'wizard') want('wizard spellbook', own.filter(s => lvlOf(s.spellSlug) > 0).length, 6 + 2 * (level - 1))
+  }
+  return out
+}
+
+export async function multiclassRulesSweep(shard: number, shards: number) {
+  const log = problemLog()
+  for (const [n, build] of BUILDS.entries()) {
+    if (n % shards !== shard) continue
+    const taken = build.plan.flatMap(([cls, count]) => Array<string>(count).fill(cls))
+    const first = levelOne(taken[0], build.subs[taken[0]])
+    // The proficiencies the Creator would have given, so the sheet has nothing to fill in
+    let char: Character = { ...first, ...missingProficiencies(first, content()) }
+    const startSaves = [...char.saveProficiencies].sort()
+    const server = fakeServer([char])
+    try {
+      renderApp(`/c/${char.id}/level-up`)
+      for (let total = 2; total <= taken.length; total++) {
+        const cls = taken[total - 1]
+        const classLevel = taken.slice(0, total).filter(c => c === cls).length
+        log.where = `${build.name} → ${cls} ${classLevel} (level ${total})`
+        await screen.findAllByRole('button', { name: /Apply Level Up|to choose/ }, { timeout: 10000 })
+        await pause(20)
+        const classRadio = cardsNow().find(c => heading(c) === 'Class')?.querySelector<HTMLInputElement>(`input[name=class][value="${cls}"]`)
+        if (!classRadio) { log.problems.push(`${log.where} | ${cls} not offered`); break }
+        await click(classRadio)
+        const asiOffered = cardsNow().some(c => heading(c).startsWith('Ability Score Improvement'))
+        if (asiOffered !== asiLevels(cls).includes(classLevel)) log.problems.push(`${log.where} | ASI ${asiOffered ? 'offered' : 'missing'} at ${cls} ${classLevel}`)
+        const before = char
+        const button = await fillLevelUp(log, build.subs[cls])
+        if (!button) break
+        char = await applyAndReturn(button, server, char.id, c => c.classes.reduce((t, k) => t + k.level, 0) === total, total < taken.length)
+        for (const d of compareMulticlass(char, build.subs, taken.slice(0, total))) log.problems.push(`${log.where} | ${d}`)
+        entering: {
+          // Entering a class: exactly the PHB's multiclass proficiencies, and never its saving throws
+          if (classLevel !== 1) break entering
+          const gains = MULTICLASS_GAINS[cls]
+          const gained = (k: 'armorProficiencies' | 'weaponProficiencies' | 'toolProficiencies') => {
+            const had = new Set(before[k].map(norm))
+            return [...new Set(char[k].map(norm))].filter(x => !had.has(x)).sort()
+          }
+          const tools = gained('toolProficiencies').map(t => INSTRUMENTS.has(t) ? '<instrument>' : t)
+          for (const [what, got, exp] of [['armor', gained('armorProficiencies'), gains.armor], ['weapons', gained('weaponProficiencies'), gains.weapons], ['tools', tools, gains.tools]] as const) {
+            // Only what wasn't already known can show up as gained
+            const had = new Set((what === 'armor' ? before.armorProficiencies : what === 'weapons' ? before.weaponProficiencies : before.toolProficiencies).map(norm))
+            const expected = (exp ?? []).filter(x => !had.has(x) && !(x === '<instrument>' && [...had].some(h => INSTRUMENTS.has(h)))).sort()
+            if (JSON.stringify(got) !== JSON.stringify(expected)) log.problems.push(`${log.where} | multiclass ${what}: gained ${JSON.stringify(got)}, PHB ${JSON.stringify(expected)}`)
+          }
+          const skills = char.skillProficiencies.length - before.skillProficiencies.length
+          if (skills !== (gains.skills ?? 0)) log.problems.push(`${log.where} | multiclass skills: gained ${skills}, PHB ${gains.skills ?? 0}`)
+        }
+        if (JSON.stringify([...char.saveProficiencies].sort()) !== JSON.stringify(startSaves)) log.problems.push(`${log.where} | saving throws changed: ${char.saveProficiencies.join(', ')}`)
       }
     } catch (e) {
       log.problems.push(`${log.where} | CRASH: ${(e as Error).message.slice(0, 300)}`)
