@@ -197,7 +197,6 @@ export function StatsTab() {
                 <div key={a} className="flex items-center gap-2 text-sm">
                   <input
                     type="checkbox"
-                    className="w-[18px] h-[18px] sm:w-auto sm:h-auto"
                     aria-label={`${ABILITY_FULL[a]} saving throw proficiency`}
                     checked={char.saveProficiencies.includes(a)}
                     onChange={e => {
@@ -396,7 +395,6 @@ export function StatsTab() {
                     {/* Prof checkbox — manual only; auto profs show as locked */}
                     <input
                       type="checkbox"
-                      className="w-[18px] h-[18px] sm:w-auto sm:h-auto"
                       checked={effectiveProf}
                       disabled={isAutoProf && !isManualProf}
                       title={isAutoProf && !isManualProf ? `Granted by: ${profTags.map(t => t.label).join(', ')}` : 'Proficient'}
@@ -410,7 +408,6 @@ export function StatsTab() {
                     {/* Expert checkbox */}
                     <input
                       type="checkbox"
-                      className="w-[18px] h-[18px] sm:w-auto sm:h-auto"
                       checked={effectiveExpert}
                       disabled={isAutoExpert && !isManualExpert}
                       title={isAutoExpert && !isManualExpert ? `Expertise granted by: ${expertTags.map(t => t.label).join(', ')}` : 'Expertise (double proficiency)'}
