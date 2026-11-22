@@ -149,10 +149,13 @@ export function applyLevelUp(char: Character, choices: LevelUpChoices): Characte
 
   // Fighting style (picked at Fighter L1, Paladin/Ranger L2 — also for multiclass entry)
   if (choices.fightingStyle) {
-    const styleKey = `fighting-style-${choices.classSlug}`
+    // Champion's Additional Fighting Style at fighter 10 is a second style, kept under its own key
+    const entry = next.classes.find(c => c.classSlug === choices.classSlug)
+    const champion = choices.classSlug === 'fighter' && entry?.subclassSlug === 'champion' && entry.level === 10
+    const styleKey = champion ? 'fighting-style-champion' : `fighting-style-${choices.classSlug}`
     // The Creator's plain 'fighting-style' key belongs to the character's first class
     const hasStyle = next.featuresChosen.some(f =>
-      f.key === styleKey || (f.key === 'fighting-style' && next.classes[0]?.classSlug === choices.classSlug))
+      f.key === styleKey || (!champion && f.key === 'fighting-style' && next.classes[0]?.classSlug === choices.classSlug))
     if (!hasStyle) {
       next = { ...next, featuresChosen: [...next.featuresChosen, { key: styleKey, value: choices.fightingStyle }] }
     }

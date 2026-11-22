@@ -362,9 +362,15 @@ export default function LevelUp() {
   const alreadyHasFightingStyle = char.featuresChosen.some(f =>
     f.key === `fighting-style-${selectedClass}` || (f.key === 'fighting-style' && char.classes[0]?.classSlug === selectedClass)
   )
+  // Champion's Additional Fighting Style (PHB p.73): a second one at fighter 10
+  const championSecondStyle = selectedClass === 'fighter' && effectiveSubclassSlug === 'champion' && nextLevel === 10
+    && !char.featuresChosen.some(f => f.key === 'fighting-style-champion')
   const needsFightingStyle = !!(classOptsDef?.fightingStyles?.length) &&
-    nextLevel === FIGHTING_STYLE_LEVEL[selectedClass] &&
-    !alreadyHasFightingStyle
+    ((nextLevel === FIGHTING_STYLE_LEVEL[selectedClass] && !alreadyHasFightingStyle) || championSecondStyle)
+  // A style can't be taken twice
+  const knownStyles = new Set(char.featuresChosen
+    .filter(f => f.key === 'fighting-style' || f.key.startsWith('fighting-style-'))
+    .map(f => String(f.value)))
 
   // Circle of the Land terrain
   const needsLandTerrain = selectedClass === 'druid' &&
@@ -406,7 +412,8 @@ export default function LevelUp() {
     if (!fc) return []
     return Array.isArray(fc.value) ? fc.value : [fc.value]
   })()
-  const FOUR_ELEMENTS_DISC_AT: Record<number, number> = { 3: 2, 6: 1, 11: 1, 17: 1 }
+  // PHB p.80: Elemental Attunement (known without choosing) plus one of your choice at 3rd, one more at 6th, 11th and 17th
+  const FOUR_ELEMENTS_DISC_AT: Record<number, number> = { 3: 1, 6: 1, 11: 1, 17: 1 }
   const disciplinesToGain = isFourElements ? (FOUR_ELEMENTS_DISC_AT[nextLevel] ?? 0) : 0
   const needsFourElements = disciplinesToGain > 0
 
@@ -1425,9 +1432,11 @@ export default function LevelUp() {
       {needsFightingStyle && classOptsDef?.fightingStyles && (
         <div className="card mb-4">
           <h2 className="section-header">Fighting Style</h2>
-          <p className="text-sm text-parchment-500 mb-3">Choose a fighting style for this class.</p>
+          <p className="text-sm text-parchment-500 mb-3">
+            {championSecondStyle ? 'Additional Fighting Style: choose a second fighting style.' : 'Choose a fighting style for this class.'}
+          </p>
           <div className="space-y-2">
-            {classOptsDef.fightingStyles.map(style => (
+            {classOptsDef.fightingStyles.filter(style => !knownStyles.has(style.slug)).map(style => (
               <label key={style.slug} className={`flex items-start gap-3 p-3 rounded border cursor-pointer
                 ${fightingStyle === style.slug ? 'border-parchment-500 bg-parchment-50' : 'border-parchment-200 hover:border-parchment-300'}`}>
                 <input type="radio" name="fighting-style" value={style.slug} checked={fightingStyle === style.slug} onChange={() => setFightingStyle(style.slug)} className="mt-0.5" />

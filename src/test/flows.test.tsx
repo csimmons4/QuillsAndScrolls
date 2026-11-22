@@ -425,6 +425,25 @@ describe('Level Up', () => {
     expect(server.snapshots.map(sn => [sn.id, sn.label])).toEqual([[char.id, 'Before level 2']])
   }, SLOW.timeout)
 
+  it('keeps a change made on the sheet just before opening Level Up', async () => {
+    const char = makeChar([{ classSlug: 'fighter', level: 1, hitDieRolls: [10] }], { str: 16, con: 14 },
+      { name: 'Test Fighter', hp: { current: 12, temp: 0 }, armorProficiencies: ['light'], weaponProficiencies: ['simple'], languages: ['Common'] })
+    const server = fakeServer([char])
+    const user = userEvent.setup()
+    renderApp(`/c/${char.id}`)
+    // Take 5 damage and go straight to Level Up, inside the sheet's save delay
+    await user.type(await screen.findByLabelText(/Amount to damage/, undefined, find), '5')
+    await user.click(screen.getByRole('button', { name: /^Damage/ }))
+    await user.click(screen.getByRole('link', { name: 'Level Up' }))
+    const apply = await screen.findAllByRole('button', { name: 'Apply Level Up' }, find)
+    await user.click(apply[apply.length - 1])
+    const after = await saved(server, char.id, c => c.classes[0].level === 2)
+    await new Promise(r => setTimeout(r, 1000))   // nothing older lands afterwards
+    expect(server.characters.get(char.id)!.classes[0].level).toBe(2)
+    // 12 - 5 = 7, then the level's hit points (6 + CON 2) on top
+    expect(after.hp.current).toBe(7 + 8)
+  }, SLOW.timeout)
+
   it('says so when the level-up can’t be saved, and stays on the page', async () => {
     const char = makeChar([{ classSlug: 'fighter', level: 1 }], { str: 16, con: 14 }, { name: 'Test Fighter', hp: { current: 12, temp: 0 } })
     const server = fakeServer([char])

@@ -178,7 +178,9 @@ export function useSheetModel() {
     return () => document.removeEventListener('keydown', onKey)
   }, [shortRestOpen, longRestOpen, addFeatOpen])
 
-  // Leaving or closing the tab during the 800 ms wait: save at once, so the last change isn't lost
+  // Leaving or closing the tab during the 800 ms wait: save at once, so the last change isn't lost.
+  // The same when the sheet closes for another page (Level Up, the Vault…): that page loads the
+  // character straight away, and a save landing after it would be undone by the page's own save.
   useEffect(() => {
     const flush = () => {
       if (!diskSaveTimer.current || !charRef.current) return
@@ -192,6 +194,7 @@ export function useSheetModel() {
     return () => {
       window.removeEventListener('pagehide', flush)
       document.removeEventListener('visibilitychange', onHide)
+      flush()
     }
   }, [])
 

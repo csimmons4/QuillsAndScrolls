@@ -489,6 +489,7 @@ export function FeaturesTab() {
         const fightingStyleChoice = char.featuresChosen.find(fc => fc.key === 'fighting-style' || fc.key === `fighting-style-${cc.classSlug}`)
         const fightingStyleSlug = typeof fightingStyleChoice?.value === 'string' ? fightingStyleChoice.value : null
         const chosenStyle = classOptsDef?.fightingStyles?.find(s => s.slug === fightingStyleSlug)
+        const championStyle = classOptsDef?.fightingStyles?.find(s => s.slug === char.featuresChosen.find(fc => fc.key === 'fighting-style-champion')?.value)
         const subclassEntry = cc.subclassSlug
           ? classOptsDef?.subclasses.find(s => s.slug === cc.subclassSlug)
           : null
@@ -500,6 +501,12 @@ export function FeaturesTab() {
               <span className="text-[10px] text-indigo-500">{subclassEntry!.name}</span>
             </div>
             {featureTrackers(featureAnchor(cc.classSlug, f), f.name)}
+            {f.name === 'Additional Fighting Style' && championStyle && (
+              <div className="mt-2 pl-3 border-l-2 border-amber-300">
+                <div className="text-sm font-medium text-amber-700">Chosen: {championStyle.name}</div>
+                <div className="text-xs text-parchment-500 mt-0.5">{championStyle.description}</div>
+              </div>
+            )}
             {f.name === 'Eldritch Cannon' ? (
               (() => {
                 const artLevel = cc.level
@@ -937,6 +944,12 @@ export function FeaturesTab() {
               return (
                 <div className="mb-3 p-3 rounded border border-orange-100 bg-orange-50">
                   <div className="font-medium text-sm text-orange-800 mb-2">Elemental Disciplines</div>
+                  {/* Every Four Elements monk knows it (PHB p.80); the rest are chosen at level-up */}
+                  <div className="text-sm mb-1">
+                    <span className="font-medium">Elemental Attunement</span>
+                    <span className="text-xs text-orange-600 ml-1">(no ki)</span>
+                    <span className="text-xs text-parchment-500 ml-1">— Minor elemental effects: a harmless sensory effect, light or snuff a small flame, chill or warm an object, or shape a small amount of earth, fire, air or water for a minute.</span>
+                  </div>
                   {slugs.length === 0 ? (
                     <p className="text-xs text-orange-600">No disciplines chosen — level up to select them.</p>
                   ) : (
