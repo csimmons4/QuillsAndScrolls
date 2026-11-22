@@ -96,23 +96,25 @@
 }
 
 [data-theme='frost'] {
-  --p-50: 248 251 253;
-  --p-100: 233 241 247;
-  --p-200: 214 227 237;
-  --p-300: 186 206 222;
-  --p-400: 106 134 160;
-  --p-500: 72 100 128;
-  --p-600: 58 85 112;
-  --p-700: 45 70 96;
-  --p-800: 32 54 78;
-  --p-900: 22 40 60;
-  --d-800: 25 38 54;
-  --d-900: 15 25 38;
-  --accent: 59 110 160;
-  --accent-hover: 45 89 134;
+  /* Ice blue throughout (tinted page and cards, a deep-sea header, a glacier-teal accent), so it
+     reads nothing like the neutral grey Light theme */
+  --p-50: 240 248 253;
+  --p-100: 214 234 248;
+  --p-200: 190 220 241;
+  --p-300: 152 196 228;
+  --p-400: 86 140 176;
+  --p-500: 36 96 138;
+  --p-600: 28 82 122;
+  --p-700: 20 68 106;
+  --p-800: 14 54 88;
+  --p-900: 9 40 66;
+  --d-800: 14 50 82;
+  --d-900: 8 32 56;
+  --accent: 14 116 144;
+  --accent-hover: 21 94 117;
   --accent-fg: 255 255 255;
-  --header-bg: 30 50 74;
-  --header-fg: 233 241 247;
+  --header-bg: 16 74 112;
+  --header-fg: 224 242 254;
   color-scheme: light;
 }
 
