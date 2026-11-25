@@ -444,6 +444,23 @@ describe('Level Up', () => {
     expect(after.hp.current).toBe(7 + 8)
   }, SLOW.timeout)
 
+  it('warns when multiclassing without the PHB’s ability scores, and still applies', async () => {
+    const char = makeChar([{ classSlug: 'wizard', level: 1 }], { int: 10, str: 10, con: 14 }, { name: 'Test Wizard', hp: { current: 8, temp: 0 } })
+    const server = fakeServer([char])
+    const user = userEvent.setup()
+    renderApp(`/c/${char.id}/level-up`)
+    await user.click(await screen.findByText('Multiclass into a new class...', undefined, find))
+    await user.click(screen.getByRole('radio', { name: /Barbarian/ }))
+    // Both sides of the rule: the class you have and the one you're taking
+    const note = screen.getByText(/Multiclassing needs 13/)
+    expect(note.textContent).toMatch(/Wizard needs INT 13 \(you have INT 10\)/)
+    expect(note.textContent).toMatch(/Barbarian needs STR 13 \(you have STR 10\)/)
+    const apply = screen.getAllByRole('button', { name: 'Apply Level Up' })
+    await user.click(apply[apply.length - 1])
+    const after = await saved(server, char.id, c => c.classes.length === 2)
+    expect(after.classes.map(c => [c.classSlug, c.level])).toEqual([['wizard', 1], ['barbarian', 1]])
+  }, SLOW.timeout)
+
   it('says so when the level-up can’t be saved, and stays on the page', async () => {
     const char = makeChar([{ classSlug: 'fighter', level: 1 }], { str: 16, con: 14 }, { name: 'Test Fighter', hp: { current: 12, temp: 0 } })
     const server = fakeServer([char])

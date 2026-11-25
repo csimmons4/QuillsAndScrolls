@@ -349,6 +349,18 @@ export default function LevelUp() {
   // Multiclass skill grant
   const isMulticlassing = !char.classes.find(c => c.classSlug === selectedClass)
   const multiclassGrant = isMulticlassing ? MULTICLASS_PROF_GRANTS[selectedClass] : undefined
+  // PHB p.163: multiclassing needs 13 in the main ability of every class you have and of the new one.
+  // Only a warning: a DM can allow it, so the level-up can still be applied.
+  const prereqUnmet = (slug: string) => { const check = MULTICLASS_PREREQS[slug]; return !!check && !check(char.abilityScores) }
+  const multiclassUnmet = [
+    ...char.classes.map(cc => cc.classSlug).filter(prereqUnmet),
+    ...(selectedClass && isMulticlassing && prereqUnmet(selectedClass) ? [selectedClass] : []),
+  ]
+  const prereqText = (slug: string) => {
+    const label = MULTICLASS_PREREQ_LABEL[slug]
+    const yours = (label.match(/[A-Z]{3}/g) ?? []).map(a => `${a} ${char.abilityScores[a.toLowerCase() as keyof typeof char.abilityScores]}`)
+    return `${content.classes.find(c => c.slug === slug)?.name ?? slug} needs ${label} (you have ${yours.join(', ')})`
+  }
   const needsMulticlassSkill = !!(multiclassGrant?.skills?.count)
   // The bard's musical instrument (PHB p.164); one already known isn't offered
   const multiclassToolOptions = multiclassGrant?.toolChoice
@@ -744,6 +756,12 @@ export default function LevelUp() {
                       </label>
                     )
                   })}
+                {multiclassUnmet.length > 0 && (
+                  <div role="note" className="mt-2 p-2 rounded border text-xs bg-amber-50 border-amber-200 text-amber-800">
+                    ⚠ Multiclassing needs 13 in the main ability of your current class and of the new one (PHB p.163).
+                    Not met: {multiclassUnmet.map(prereqText).join('; ')}. Your DM can still allow it, so you can apply anyway.
+                  </div>
+                )}
               </div>
             </details>
           )}
@@ -1678,6 +1696,9 @@ export default function LevelUp() {
               <div className="mt-3 p-3 bg-red-50 border border-red-300 rounded text-red-700 text-sm space-y-0.5">
                 {blockers.map(b => <div key={b}>⚠ {b}</div>)}
               </div>
+            )}
+            {blockers.length === 0 && isMulticlassing && multiclassUnmet.length > 0 && (
+              <p className="mt-2 text-xs text-amber-700 text-right">Multiclass requirements not met for {multiclassUnmet.map(s => content.classes.find(c => c.slug === s)?.name ?? s).join(' and ')}: apply only if your DM allows it.</p>
             )}
             {blockers.length === 0 && reminders.length > 0 && (
               <p className="mt-2 text-xs text-amber-700 text-right">Still to pick: {reminders.join(' · ')}. You can apply anyway and choose later.</p>

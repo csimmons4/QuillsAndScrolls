@@ -155,7 +155,7 @@ Fight helpers on the Stats tab: Rage and Bless, spells that change your AC (Mage
 
 ### Level Up
 Click **Level Up** on any character sheet to:
-- Choose which class to level (supports multiclassing: the new class's proficiencies are added as the PHB lists them, and you pick its skill, or a bard's instrument, where it offers one)
+- Choose which class to level (supports multiclassing: the new class's proficiencies are added as the PHB lists them, and you pick its skill, or a bard's instrument, where it offers one. If you don't have 13 in the main ability of your current class or the new one, it warns you but still lets you go ahead, since your DM may allow it)
 - Gain HP (roll or take average)
 - See new class features automatically
 - Pick ASI (+2 to one stat or +1/+1) or choose a feat
