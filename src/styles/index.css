@@ -302,6 +302,17 @@
     transition: background-color 0.25s ease, border-color 0.25s ease;
   }
 
+  /* The tick on a chosen card (the Creator's race, class, background…): the checkboxes' quill
+     stroke in an accent circle. Size it with w-/h- classes */
+  .pick-tick {
+    @apply inline-block shrink-0 rounded-full;
+    background: rgb(var(--accent)) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.2 8.4c1.3.9 2.3 2 3.1 3.3C8 8.3 10.1 5.8 13 3.9' fill='none' stroke='white' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 72% no-repeat;
+    box-shadow: inset 0 -1px 2px rgb(0 0 0 / 0.15);
+  }
+  [data-tone='dark'] .pick-tick {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.2 8.4c1.3.9 2.3 2 3.1 3.3C8 8.3 10.1 5.8 13 3.9' fill='none' stroke='%23140f0c' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  }
+
   .app-header {
     background-color: rgb(var(--header-bg));
     color: rgb(var(--header-fg));

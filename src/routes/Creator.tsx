@@ -95,6 +95,11 @@ const ABILITY_LABELS: Record<string, string> = {
   int: 'Intelligence', wis: 'Wisdom', cha: 'Charisma',
 }
 
+/** Marks the chosen card in a pick-one list (the border change alone was easy to miss on a phone) */
+function Picked({ on, small }: { on: boolean; small?: boolean }) {
+  return on ? <span aria-hidden className={`pick-tick ${small ? 'w-3.5 h-3.5' : 'w-5 h-5'}`} /> : null
+}
+
 export default function Creator() {
   const navigate = useNavigate()
   const content = useContent()
@@ -729,10 +734,10 @@ export default function Creator() {
               return (
                 <button
                   key={race.slug}
-                  onClick={() => { selectRace(race.slug); setShowDetails(raceDetails) }}
+                  onClick={() => { selectRace(race.slug); setShowDetails(raceDetails) }} aria-pressed={char.raceSlug === race.slug}
                   className={`w-full text-left card hover:border-parchment-400 transition-colors ${char.raceSlug === race.slug ? 'border-parchment-600 bg-parchment-50' : ''}`}
                 >
-                  <div className="font-bold">{race.name}</div>
+                  <div className="font-bold flex items-start justify-between gap-2">{race.name}<Picked on={char.raceSlug === race.slug} /></div>
                   <div className="text-sm text-parchment-500">
                     Speed {race.speed}ft{bonusStr ? ` · ${bonusStr}` : ''}
                     {race.hasVariant ? ' · Standard or Variant' : ''}
@@ -816,10 +821,11 @@ export default function Creator() {
                             <button
                               key={s}
                               type="button"
-                              onClick={() => setVariantSkill(variantSkill === s ? '' : s)}
-                              className={`text-left px-2.5 py-1.5 rounded border text-sm transition-colors ${variantSkill === s ? 'border-parchment-600 bg-parchment-50 font-medium' : 'border-parchment-100 hover:border-parchment-400'}`}
+                              onClick={() => setVariantSkill(variantSkill === s ? '' : s)} aria-pressed={variantSkill === s}
+                              className={`flex items-center justify-between gap-1.5 text-left px-2.5 py-1.5 rounded border text-sm transition-colors ${variantSkill === s ? 'border-parchment-600 bg-parchment-50 font-medium' : 'border-parchment-100 hover:border-parchment-400'}`}
                             >
                               {SKILL_LABELS[s as keyof typeof SKILL_LABELS] ?? s}
+                              <Picked on={variantSkill === s} small />
                             </button>
                           ))}
                         </div>
@@ -935,10 +941,10 @@ export default function Creator() {
                     {raceOpts.subraces.map(sub => (
                       <button
                         key={sub.slug}
-                        onClick={() => selectSubrace(sub.slug)}
+                        onClick={() => selectSubrace(sub.slug)} aria-pressed={selectedSubrace === sub.slug}
                         className={`w-full text-left p-3 rounded border transition-colors ${selectedSubrace === sub.slug ? 'border-parchment-600 bg-parchment-50' : 'border-parchment-200 hover:border-parchment-400'}`}
                       >
-                        <div className="font-medium">{sub.name}</div>
+                        <div className="font-medium flex items-start justify-between gap-2">{sub.name}<Picked on={selectedSubrace === sub.slug} /></div>
                         <div className="text-sm text-parchment-500">
                           {Object.entries(sub.abilityBonuses ?? {}).filter(([,v]) => v && (v as number) > 0).map(([k,v]) => `+${v} ${ABILITY_LABELS[k] ?? k}`).join(', ')}
                           {sub.traits.length > 0 && ` · ${sub.traits.slice(0,2).join(' · ')}`}
@@ -973,10 +979,11 @@ export default function Creator() {
                           <button
                             key={s.slug}
                             type="button"
-                            onClick={() => setHighElfCantrip(highElfCantrip === s.slug ? '' : s.slug)}
-                            className={`text-left px-2.5 py-1.5 rounded border text-sm transition-colors ${highElfCantrip === s.slug ? 'border-parchment-600 bg-parchment-50 font-medium' : 'border-parchment-100 hover:border-parchment-400'}`}
+                            onClick={() => setHighElfCantrip(highElfCantrip === s.slug ? '' : s.slug)} aria-pressed={highElfCantrip === s.slug}
+                            className={`flex items-center justify-between gap-1.5 text-left px-2.5 py-1.5 rounded border text-sm transition-colors ${highElfCantrip === s.slug ? 'border-parchment-600 bg-parchment-50 font-medium' : 'border-parchment-100 hover:border-parchment-400'}`}
                           >
                             {s.name}
+                            <Picked on={highElfCantrip === s.slug} small />
                           </button>
                         ))}
                       </div>
@@ -1047,11 +1054,14 @@ export default function Creator() {
                     {DRACONIC_ANCESTRIES.map(a => (
                       <button
                         key={a.slug}
-                        onClick={() => setDragonAncestry(a.slug)}
-                        className={`text-left p-2 rounded border transition-colors text-sm ${dragonAncestry === a.slug ? 'border-parchment-600 bg-parchment-50' : 'border-parchment-200 hover:border-parchment-400'}`}
+                        onClick={() => setDragonAncestry(a.slug)} aria-pressed={dragonAncestry === a.slug}
+                        className={`flex items-start justify-between gap-2 text-left p-2 rounded border transition-colors text-sm ${dragonAncestry === a.slug ? 'border-parchment-600 bg-parchment-50' : 'border-parchment-200 hover:border-parchment-400'}`}
                       >
-                        <span className="font-medium">{a.name}</span>
-                        <span className="text-parchment-500"> — {a.damageType} ({a.breathShape})</span>
+                        <span>
+                          <span className="font-medium">{a.name}</span>
+                          <span className="text-parchment-500"> — {a.damageType} ({a.breathShape})</span>
+                        </span>
+                        <Picked on={dragonAncestry === a.slug} />
                       </button>
                     ))}
                   </div>
@@ -1080,10 +1090,10 @@ export default function Creator() {
               return (
                 <button
                   key={cls.slug}
-                  onClick={() => { selectClass(cls.slug); setShowDetails(classDetails) }}
+                  onClick={() => { selectClass(cls.slug); setShowDetails(classDetails) }} aria-pressed={currentClassSlug === cls.slug}
                   className={`w-full text-left card hover:border-parchment-400 transition-colors ${currentClassSlug === cls.slug ? 'border-parchment-600 bg-parchment-50' : ''}`}
                 >
-                  <div className="font-bold">{cls.name}</div>
+                  <div className="font-bold flex items-start justify-between gap-2">{cls.name}<Picked on={currentClassSlug === cls.slug} /></div>
                   <div className="text-sm text-parchment-500">
                     Hit Die: d{cls.hitDie} · {cls.saveProficiencies.map(s => ABILITY_LABELS[s] ?? s).join(', ')} saves
                     {cls.spellcastingAbility ? ` · Spellcasting (${ABILITY_LABELS[cls.spellcastingAbility]})` : ''}
@@ -1155,10 +1165,10 @@ export default function Creator() {
                     {classOpts.subclasses.map(sc => (
                       <button
                         key={sc.slug}
-                        onClick={() => setSubclass(sc.slug)}
+                        onClick={() => setSubclass(sc.slug)} aria-pressed={subclass === sc.slug}
                         className={`w-full text-left p-3 rounded border transition-colors ${subclass === sc.slug ? 'border-parchment-600 bg-parchment-50' : 'border-parchment-200 hover:border-parchment-400'}`}
                       >
-                        <div className="font-medium text-sm">{sc.name}</div>
+                        <div className="font-medium text-sm flex items-start justify-between gap-2">{sc.name}<Picked on={subclass === sc.slug} /></div>
                         {sc.description && <div className="text-xs text-parchment-500">{sc.description}</div>}
                       </button>
                     ))}
@@ -1197,10 +1207,10 @@ export default function Creator() {
                     {classOpts.fightingStyles.map(style => (
                       <button
                         key={style.slug}
-                        onClick={() => setFightingStyle(style.slug)}
+                        onClick={() => setFightingStyle(style.slug)} aria-pressed={fightingStyle === style.slug}
                         className={`w-full text-left p-3 rounded border transition-colors ${fightingStyle === style.slug ? 'border-parchment-600 bg-parchment-50' : 'border-parchment-200 hover:border-parchment-400'}`}
                       >
-                        <div className="font-medium text-sm">{style.name}</div>
+                        <div className="font-medium text-sm flex items-start justify-between gap-2">{style.name}<Picked on={fightingStyle === style.slug} /></div>
                         <div className="text-xs text-parchment-500">{style.description}</div>
                       </button>
                     ))}
@@ -1300,10 +1310,10 @@ export default function Creator() {
         const BgCard = (bg: typeof backgrounds[0]) => (
           <button
             key={bg.slug}
-            onClick={() => { selectBackground(bg.slug); setShowDetails(bgDetails) }}
+            onClick={() => { selectBackground(bg.slug); setShowDetails(bgDetails) }} aria-pressed={char.backgroundSlug === bg.slug}
             className={`w-full text-left card hover:border-parchment-400 transition-colors ${char.backgroundSlug === bg.slug ? 'border-parchment-600 bg-parchment-50' : ''}`}
           >
-            <div className="font-bold">{bg.name}</div>
+            <div className="font-bold flex items-start justify-between gap-2">{bg.name}<Picked on={char.backgroundSlug === bg.slug} /></div>
             <div className="text-sm text-parchment-500">
               Skills: {bg.skillProficiencies.map(s => SKILL_LABELS[s as keyof typeof SKILL_LABELS] ?? s).join(', ')}
             </div>
@@ -1649,10 +1659,11 @@ export default function Creator() {
                   <button
                     key={a}
                     type="button"
-                    onClick={() => update({ alignment: char.alignment === a ? '' : a })}
-                    className={`px-2 py-1.5 rounded border text-sm transition-colors ${char.alignment === a ? 'border-parchment-600 bg-parchment-50 font-medium' : 'border-parchment-200 hover:border-parchment-400'}`}
+                    onClick={() => update({ alignment: char.alignment === a ? '' : a })} aria-pressed={char.alignment === a}
+                    className={`flex items-center justify-center gap-1.5 px-2 py-1.5 rounded border text-sm transition-colors ${char.alignment === a ? 'border-parchment-600 bg-parchment-50 font-medium' : 'border-parchment-200 hover:border-parchment-400'}`}
                   >
                     {a}
+                    <Picked on={char.alignment === a} small />
                   </button>
                 ))}
               </div>
