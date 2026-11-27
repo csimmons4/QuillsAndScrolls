@@ -2,7 +2,7 @@
 
 A browser-based D&D 5e character management app. Create characters, level them up, manage spells and inventory, and add homebrew content — all without leaving the app.
 
-Game reference data (spells, classes, races, items, etc.) is pulled from [dnd5e.wikidot.com](https://dnd5e.wikidot.com) and stored locally. Characters and homebrew are saved as files on your computer — not in the browser — so they're always safe.
+Game reference data (spells, classes, races, items, etc.) is pulled from [dnd5e.wikidot.com](https://dnd5e.wikidot.com) and stored locally. Characters and homebrew are saved as files on your computer, not in the browser, so clearing your browser never loses them.
 
 ---
 
@@ -11,7 +11,7 @@ Game reference data (spells, classes, races, items, etc.) is pulled from [dnd5e.
 Everything is stored as plain `.json` files inside the project folder:
 
 ```
-Quills&Scrolls/
+QuillsAndScrolls/                    ← the app's folder
 ├── characters/
 │   ├── Thalindra_a1b2c3d4.json      ← one file per character
 │   ├── Brunak_the_Bold_e5f6g7h8.json
@@ -36,13 +36,17 @@ On a Mac, files and folders starting with a dot are hidden: press **Cmd+Shift+.*
 
 ---
 
+## Getting the app
+
+Download the newest version from the [Releases page](https://github.com/csimmons4/QuillsAndScrolls/releases): under **Assets**, click **Source code (zip)**. Unzip it somewhere you'll keep it, such as your Documents folder (not Downloads, which some clean-up tools empty). The unzipped folder is the app, and your characters are saved inside it.
+
 ## Setup — just double-click
 
 There is **nothing to install by hand** — no Node.js download, no Terminal commands. The game content already ships inside this folder.
 
-**Mac:** Double-click **`Start (Mac).command`** in the `Quills&Scrolls` folder.
+**Mac:** Double-click **`Start (Mac).command`** in the app's folder.
 
-**Windows:** Double-click **`Start (Windows).bat`** in the `Quills&Scrolls` folder.
+**Windows:** Double-click **`Start (Windows).bat`** in the app's folder.
 
 The **first time** you run it, the launcher automatically installs everything it needs (a private copy of Node.js if your computer doesn't have a recent enough one, then the app files) and then opens the app in your browser. This first run takes a minute or two; after that it starts in seconds.
 
@@ -52,8 +56,8 @@ Keep the launcher's window open while you're using the app — closing it stops 
 
 **First-run notes:**
 
-- **Mac:** The Mac may warn the file is from an unidentified developer. Right-click **`Start (Mac).command`** → **Open** → **Open**. After that it opens normally on a plain double-click.
-- **Windows:** If a firewall popup appears, click **Allow access**. It's just Node.js opening a local port on your own machine.
+- **Mac:** The first time, macOS may refuse to open it because it's from an unidentified developer. On macOS 15 (Sequoia) or later, click **Done**, open **System Settings → Privacy & Security**, scroll down to the line about `Start (Mac).command` and click **Open Anyway**, then confirm. On older versions, right-click **`Start (Mac).command`** → **Open** → **Open**. After that it opens normally on a plain double-click.
+- **Windows:** If a blue "Windows protected your PC" box appears, click **More info** → **Run anyway**. If a firewall popup appears, click **Allow access**. It's just Node.js opening a local port on your own machine.
 - You need to be **online** the first time so the launcher can download what it needs. After that it works offline.
 - If the install ever prints a line about "vulnerabilities", see [About the security warnings](#about-the-security-warnings-npm-audit).
 
@@ -133,7 +137,7 @@ Eight steps that walk you through building a Level 1 character:
 
 ### Character Sheet
 The main play screen. Tabs for:
-- **Stats** — ability scores, saving throws, skills, conditions, inspiration, class resources, rests, death saves
+- **Stats** — attacks, ability scores, saving throws, skills, conditions, inspiration, class resources, rests, death saves
 - **Spells** — known/prepared spells, spell slot tracker, cast & recover. A small mark on each spell shows what it mostly does: damage (in its damage type's colour), healing (with how much it heals), control, protection or utility. A key sits under the list.
 - **Inventory** — equipment, attunement, magic item charges, potions you can drink, and a coin purse (gain or spend in any coin, with a ledger of what changed). Each coin carries the old alchemists' mark for its metal: Venus for copper, the Moon for silver, Jupiter for electrum, the Sun for gold, and the Sun and Moon joined for platinum.
 - **Features** — all race, class, and background features with descriptions
@@ -237,7 +241,7 @@ When the launcher (or `npm install`) installs the app's files, npm checks every 
 
 **It's not just your computer.** Everyone who installs this app sees the same message, because it comes from the list of packages that ships with the app (`package-lock.json`). The number can also go up over time without anything changing here, as new problems are published.
 
-**Where things stand (21 November 2026):** `npm audit` reports **0 vulnerabilities**. The packages were brought up to date in November 2026 (Express, React Router 7, Vite 8, Vitest 5, Zod 4), and the app you play now runs as a built version served by its own small server, without the developer tools in the way.
+**Where things stand (27 November 2026):** `npm audit` reports **0 vulnerabilities**. The packages were brought up to date in November 2026 (Express, React Router 7, Vite 8, Vitest 5, Zod 4), and the app you play now runs as a built version served by its own small server, without the developer tools in the way.
 
 **What to do (and not do):**
 - `npm audit fix` is safe to run. It only takes small, compatible updates.

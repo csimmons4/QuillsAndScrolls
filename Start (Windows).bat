@@ -1,5 +1,5 @@
 @echo off
-REM Quills ^& Scrolls — one-click launcher for Windows.
+REM Quills ^& Scrolls - one-click launcher for Windows.
 REM Double-click this file. On the first run it installs everything it needs
 REM (a private copy of Node.js if this PC doesn't have one, then the app files)
 REM and then it starts the app and opens your browser. Nothing to download by hand.
@@ -9,7 +9,7 @@ cd /d "%~dp0"
 
 set "NODE_VERSION=v24.22.3"
 
-REM ── 1. Make sure a recent enough Node.js is available (22.12 or newer) ──────
+REM -- 1. Make sure a recent enough Node.js is available (22.12 or newer) ------
 REM (Written with goto labels: cmd mis-reads brackets inside if-blocks.)
 where node >nul 2>&1
 if errorlevel 1 goto check_local_node
@@ -46,7 +46,7 @@ set "PATH=%CD%\.runtime\node;%PATH%"
 
 :have_node
 
-REM ── 2. Install the app files (first time, and again after an update) ───────
+REM -- 2. Install the app files (first time, and again after an update) -------
 REM A copy of package-lock.json is kept after each install; if the current one differs,
 REM the app's files changed (an update) and are installed again.
 if not exist "node_modules" goto npm_install
@@ -69,7 +69,7 @@ exit /b 1
 
 :start_app
 
-REM ── 3. Start the app and open the browser ───────────────────────────────────
+REM -- 3. Start the app and open the browser -----------------------------------
 echo.
 echo Clearing any previous sessions...
 REM Stop whatever is still listening on the app's ports (an earlier launch left open)
