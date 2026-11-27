@@ -136,21 +136,25 @@ export function SpellsTab() {
         const slotMaxAt = (lvl: number) => multiclassMaxes
           ? (multiclassMaxes[String(lvl)] ?? 0)
           : (char.spellSlots[String(lvl)]?.max ?? 0)
+        // A slot made from sorcery points is stored as used going below 0 (one extra slot each),
+        // so the long rest's reset to used 0 ends it (PHB p.101) and the table's maximum never changes
+        const slotUsedAt = (lvl: number) => char.spellSlots[String(lvl)]?.used ?? 0
+        const slotCountAt = (lvl: number) => slotMaxAt(lvl) + Math.max(0, -slotUsedAt(lvl))
         /** A level's spell slots as violet gems: click a lit one to spend it, a spent one to get it back */
         const slotGems = (lvl: number) => {
           const slotMax = slotMaxAt(lvl)
-          const slotUsed = char.spellSlots[String(lvl)]?.used ?? 0
+          const slotUsed = slotUsedAt(lvl)
           const slotLeft = slotMax - slotUsed
           return (
             <div className="flex items-center gap-1">
-              {Array.from({ length: slotMax }, (_, i) => {
+              {Array.from({ length: slotCountAt(lvl) }, (_, i) => {
                 const available = i < slotLeft
                 return (
                   <button
                     key={i}
                     type="button"
                     title={available ? 'Expend slot' : 'Recover slot'}
-                    aria-label={`${ordinals[lvl]}-level slot ${i + 1} of ${slotMax}: ${available ? 'available' : 'spent'}`}
+                    aria-label={`${ordinals[lvl]}-level slot ${i + 1} of ${slotCountAt(lvl)}: ${available ? 'available' : 'spent'}`}
                     onClick={() => {
                       const used = available ? slotUsed + 1 : slotUsed - 1
                       patch({ spellSlots: { ...char.spellSlots, [String(lvl)]: { max: slotMax, used } } })
@@ -331,7 +335,7 @@ export function SpellsTab() {
             <div className="rounded-xl border border-parchment-200 bg-parchment-50 p-4 text-sm text-parchment-500">{r.name}: no details in the reference data.</div>
           )
           const hex = schoolAccentHex[def.school] ?? '#b08d57'
-          const slotLevels = r.slotCast ? [1,2,3,4,5,6,7,8,9].filter(lvl => lvl >= r.level && slotMaxAt(lvl) > 0) : []
+          const slotLevels = r.slotCast ? [1,2,3,4,5,6,7,8,9].filter(lvl => lvl >= r.level && slotCountAt(lvl) > 0) : []
           const isConcentrating = char.concentratingOn === def.slug
           const castAt = async (lvl: number) => {
             const max = slotMaxAt(lvl)
@@ -514,7 +518,7 @@ export function SpellsTab() {
                         <div className="text-[10px] font-bold uppercase tracking-widest text-parchment-500 mb-1.5">Cast with a slot</div>
                         <div className="flex flex-wrap gap-1.5">
                           {slotLevels.map(lvl => {
-                            const left = slotMaxAt(lvl) - (char.spellSlots[String(lvl)]?.used ?? 0)
+                            const left = slotMaxAt(lvl) - slotUsedAt(lvl)
                             const out = left <= 0
                             return (
                               <button key={lvl} type="button" disabled={out} onClick={() => castAt(lvl)}
@@ -768,13 +772,15 @@ export function SpellsTab() {
                     <div>
                       <div className="text-xs font-semibold text-parchment-500 uppercase mb-1">Convert Slot → Points</div>
                       <div className="space-y-1">
-                        {[1,2,3,4,5].filter(lvl => (char.spellSlots[String(lvl)]?.max ?? 0) > 0).map(lvl => {
-                          const used = char.spellSlots[String(lvl)]?.used ?? 0
-                          const max = char.spellSlots[String(lvl)]?.max ?? 0
+                        {[1,2,3,4,5].filter(lvl => slotCountAt(lvl) > 0).map(lvl => {
+                          const used = slotUsedAt(lvl)
+                          const max = slotMaxAt(lvl)
                           const available = max - used
                           const gain = SLOT_TO_POINTS[lvl]!
                           return (
-                            <button key={lvl} disabled={available === 0}
+                            // Points can't go above the sorcerer level, so a slot spent at full points is wasted
+                            <button key={lvl} disabled={available <= 0 || spCurrent >= sorcLevel}
+                              title={spCurrent >= sorcLevel ? 'Your sorcery points are already full' : undefined}
                               onClick={() => {
                                 const newUsed = used + 1
                                 const newSP = Math.min(sorcLevel, spCurrent + gain)
@@ -799,11 +805,9 @@ export function SpellsTab() {
                             <button key={lvl} disabled={spCurrent < cost}
                               onClick={() => {
                                 const newSP = spCurrent - cost
-                                const slotMax = (char.spellSlots[String(lvl)]?.max ?? 0) + 1
-                                const slotUsed = char.spellSlots[String(lvl)]?.used ?? 0
                                 patch({
                                   classResources: { ...char.classResources, 'sorcery-points': newSP },
-                                  spellSlots: { ...char.spellSlots, [String(lvl)]: { max: slotMax, used: slotUsed } },
+                                  spellSlots: { ...char.spellSlots, [String(lvl)]: { max: slotMaxAt(lvl), used: slotUsedAt(lvl) - 1 } },
                                 })
                               }}
                               className="w-full text-left text-xs px-2 py-1 rounded border border-parchment-200 hover:border-purple-300 hover:bg-purple-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
@@ -827,7 +831,7 @@ export function SpellsTab() {
                 .sort((x, y) => x.name.localeCompare(y.name))
               const levels = [...new Set([
                 ...rows.map(r => r.level),
-                ...[1, 2, 3, 4, 5, 6, 7, 8, 9].filter(lvl => slotMaxAt(lvl) > 0),
+                ...[1, 2, 3, 4, 5, 6, 7, 8, 9].filter(lvl => slotCountAt(lvl) > 0),
               ])].sort((x, y) => x - y)
               // The open spell may be one of yours or one from the library below
               const librarySelected = selectedSpellKey?.startsWith('lib:') ? availableSpells.find(sp => `lib:${sp.slug}` === selectedSpellKey) : undefined
@@ -868,7 +872,7 @@ export function SpellsTab() {
                           const lvlRows = rows.filter(r => r.level === lvl && (!filter || r.name.toLowerCase().includes(filter)))
                           if (filter && lvlRows.length === 0) return null
                           shown++
-                          const slotMax = lvl > 0 ? slotMaxAt(lvl) : 0
+                          const slotMax = lvl > 0 ? slotCountAt(lvl) : 0
                           return (
                             <section key={lvl} id={`spell-level-${lvl}`} className="scroll-mt-16">
                               <div className="flex items-center gap-3 border-b border-parchment-200 pb-1 mb-0.5">

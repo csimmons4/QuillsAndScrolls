@@ -92,6 +92,41 @@ describe('Sheet', () => {
     expect(after.hp.current).toBe(3)
   }, SLOW.timeout)
 
+  it('a spell slot made from sorcery points is extra, and a long rest ends it', async () => {
+    const char = makeChar([{ classSlug: 'sorcerer', subclassSlug: 'draconic', level: 5 }], { cha: 16, con: 14 }, {
+      name: 'Test Sorcerer', hp: { current: 30, temp: 0 },
+      spellSlots: { '1': { max: 4, used: 0 }, '2': { max: 3, used: 0 }, '3': { max: 2, used: 0 } },
+    })
+    const server = fakeServer([char])
+    const user = userEvent.setup()
+    renderApp(`/c/${char.id}`)
+    await user.click(await screen.findByRole('button', { name: 'Spells' }, find))
+    await user.click(screen.getByRole('button', { name: /Create L1 slot/ }))
+    const made = await saved(server, char.id, c => c.spellSlots['1'].used === -1)
+    expect(made.spellSlots['1'].max).toBe(4)   // the table's four, plus one made
+    expect(made.classResources['sorcery-points']).toBe(3)
+    expect(screen.getAllByLabelText(/^1st-level slot \d of 5: available$/)).toHaveLength(5)
+    // It used to raise the maximum, which the long rest then kept for good
+    await user.click(screen.getByRole('button', { name: 'Long Rest' }))
+    await user.click(screen.getByRole('button', { name: 'Begin Long Rest' }))
+    const rested = await saved(server, char.id, c => c.spellSlots['1'].used === 0)
+    expect(rested.spellSlots['1']).toEqual({ max: 4, used: 0 })
+  }, SLOW.timeout)
+
+  it('a multiclass sorcerer converts slots from the multiclass table', async () => {
+    const char = makeChar([{ classSlug: 'paladin', subclassSlug: 'devotion', level: 6 }, { classSlug: 'sorcerer', subclassSlug: 'draconic', level: 2 }],
+      { str: 16, cha: 16, con: 14 }, { name: 'Test Sorcadin', hp: { current: 60, temp: 0 }, classResources: { 'sorcery-points': 0 } })
+    const server = fakeServer([char])
+    const user = userEvent.setup()
+    renderApp(`/c/${char.id}`)
+    await user.click(await screen.findByRole('button', { name: 'Spells' }, find))
+    // Paladin 6 + sorcerer 2 is a 5th-level caster (PHB p.165): 4 / 3 / 2
+    await user.click(screen.getByRole('button', { name: /Expend L3 slot/ }))
+    const after = await saved(server, char.id, c => c.spellSlots['3']?.used === 1)
+    expect(after.spellSlots['3'].max).toBe(2)
+    expect(after.classResources['sorcery-points']).toBe(2)   // the 5 gained are capped at sorcerer level 2
+  }, SLOW.timeout)
+
   it('damage while concentrating asks for a concentration save', async () => {
     const char = wizard(3, { concentratingOn: 'blur', hp: { current: 20, temp: 0 } })
     const server = fakeServer([char])

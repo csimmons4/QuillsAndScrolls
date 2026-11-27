@@ -572,7 +572,8 @@ export function useSheetModel() {
           if (compact) return (
             <div className="flex items-center gap-1">
               <div
-                className="res-pool-track relative h-2.5 w-20 rounded-full overflow-hidden cursor-pointer"
+                // On phones the number and −/+ are enough, and the pill fits the card
+                className="res-pool-track relative h-2.5 w-20 rounded-full overflow-hidden cursor-pointer hidden sm:block"
                 title="Click to set remaining"
                 onClick={e => {
                   const rect = e.currentTarget.getBoundingClientRect()

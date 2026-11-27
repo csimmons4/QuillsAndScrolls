@@ -164,7 +164,7 @@ export function InventoryTab() {
                 value={txAmount}
                 onChange={e => setTxAmount(e.target.value)} />
               <input type="text" placeholder="Note (optional), e.g. sold the goblin's dagger"
-                className="input-coin flex-1 min-w-0 text-left px-2 italic"
+                className="input-coin flex-1 min-w-0 text-left px-2 italic text-ellipsis"
                 value={txNote}
                 onChange={e => setTxNote(e.target.value)} />
             </div>

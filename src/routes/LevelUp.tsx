@@ -685,8 +685,8 @@ export default function LevelUp() {
           {saveError}
         </div>
       )}
-      <div className="flex items-center gap-3 mb-6">
-        <Link to={`/c/${char.id}`} className="btn-ghost text-sm">← Back to Sheet</Link>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-6">
+        <Link to={`/c/${char.id}`} className="btn-ghost text-sm whitespace-nowrap">← Back to Sheet</Link>
         <h1 className="text-2xl font-bold text-parchment-800">Level Up: {char.name}</h1>
       </div>
 

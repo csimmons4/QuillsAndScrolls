@@ -166,14 +166,17 @@ export default function Sheet() {
           <PortraitPicker name={char.name} portrait={char.portrait} onChange={p => patch({ portrait: p })} className="w-14 h-14 sm:w-20 sm:h-20" />
           <div className="min-w-0">
           <Link to="/" className="text-xs text-parchment-500 hover:text-parchment-800 px-1">← Vault</Link>
-          <input
-            // Sized to the name (an input is ~20 characters wide by default), never wider than the screen
-            size={Math.max(4, char.name.length + 1)}
-            className="block max-w-full text-2xl sm:text-3xl font-bold bg-transparent border-none outline-none focus:bg-parchment-50 rounded px-1"
-            value={char.name}
-            onChange={e => patch({ name: e.target.value })}
-            aria-label="Character name"
-          />
+          {/* The box takes the width of a hidden copy of the name (size= counts letters, and wide ones
+              like M and W clipped), never wider than the screen */}
+          <span className="grid w-fit max-w-full text-2xl sm:text-3xl font-bold">
+            <span aria-hidden className="invisible whitespace-pre overflow-hidden col-start-1 row-start-1 px-1">{(char.name || '    ') + ' '}</span>
+            <input
+              className="col-start-1 row-start-1 min-w-0 w-full text-ellipsis bg-transparent border-none outline-none focus:bg-parchment-50 rounded px-1"
+              value={char.name}
+              onChange={e => patch({ name: e.target.value })}
+              aria-label="Character name"
+            />
+          </span>
           <p className="text-sm text-parchment-500 mt-1 px-1">
             Level {level} &bull;{' '}
             {char.classes.map(c => `${content.classes.find(cl => cl.slug === c.classSlug)?.name ?? c.classSlug} ${c.level}`).join(' / ')} &bull;{' '}
@@ -421,14 +424,14 @@ export default function Sheet() {
               const shortNote = r.display && r.display.length <= 14 ? r.display : undefined
               const hoverNote = shortNote ? undefined : r.display
               return (
-                <div key={r.key} className="group inline-flex items-center gap-2 rounded-lg border border-parchment-200 bg-parchment-100 pl-2.5 pr-1.5 py-0.5">
+                <div key={r.key} className="group inline-flex max-w-full items-center gap-2 rounded-lg border border-parchment-200 bg-parchment-100 pl-2.5 pr-1.5 py-0.5">
                   {resourceAnchor.has(r.key) ? (
                     <button type="button" onClick={() => jumpToFeature(resourceAnchor.get(r.key)!)}
                       title={`${hoverNote ? `${hoverNote}. ` : ''}Show this feature on the Features tab`}
-                      className="text-sm font-semibold text-parchment-800 truncate max-w-[14rem] text-left hover:underline decoration-dotted underline-offset-2"
+                      className="min-w-0 text-sm font-semibold text-parchment-800 truncate max-w-[14rem] text-left hover:underline decoration-dotted underline-offset-2"
                     >{r.name}</button>
                   ) : (
-                    <span className="text-sm font-semibold text-parchment-800 truncate max-w-[14rem]" title={hoverNote}>{r.name}</span>
+                    <span className="min-w-0 text-sm font-semibold text-parchment-800 truncate max-w-[14rem]" title={hoverNote}>{r.name}</span>
                   )}
                   {shortNote && <span className="text-xs text-parchment-500 whitespace-nowrap">{shortNote}</span>}
                   <span className={`text-[10px] font-semibold rounded px-1 ${r.recharge === 'short' ? 'bg-blue-100 text-blue-600' : 'bg-amber-100 text-amber-600'}`}
@@ -647,7 +650,7 @@ export default function Sheet() {
       {/* Tabs: pinned to the top of the window, so they're in reach anywhere on a long tab */}
       <div ref={tabsAnchor} />
       <div className="sticky top-0 z-30 bg-parchment-100 flex border-b border-parchment-200 mb-5">
-        <div className="flex gap-3 sm:gap-5 pt-3 min-w-0 flex-1 overflow-x-auto [scrollbar-width:none]">
+        <div className="flex gap-2 min-[380px]:gap-3 sm:gap-5 pt-3 min-w-0 flex-1 overflow-x-auto [scrollbar-width:none]">
         {TABS.map(t => t.key === 'summons' ? (
           <button key={t.key} onClick={() => selectTab(t.key)}
             className={`pb-2 text-sm font-medium flex items-center gap-1.5 shrink-0 whitespace-nowrap ${tab === 'summons' ? 'tab-active' : 'tab-inactive'}`}>

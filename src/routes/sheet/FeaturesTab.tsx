@@ -157,6 +157,8 @@ export function FeaturesTab() {
       {/* Level Journey */}
       {(() => {
         const ABILITY_SHORT: Record<string, string> = { str: 'STR', dex: 'DEX', con: 'CON', int: 'INT', wis: 'WIS', cha: 'CHA' }
+        const conMod = abilityModFor(effectiveChar, 'con')
+        const conModText = conMod >= 0 ? `+${conMod}` : String(conMod)
 
         // Build a per-class level history
         const classJourneys = char.classes.map(cc => {
@@ -307,9 +309,12 @@ export function FeaturesTab() {
                               {/* HP */}
                               <div className="flex items-center gap-2 flex-wrap">
                                 {row.hpRoll !== null && (
-                                  <span className={`text-xs font-semibold rounded px-1.5 py-0.5 ${row.level === 1 ? 'bg-red-100 text-red-700' : 'bg-parchment-100 text-parchment-600'}`}>
-                                    {row.level === 1 ? `HP: ${row.hpRoll}` : `+${row.hpRoll} HP`}
-                                    {row.level === 1 && <span className="font-normal text-red-500 ml-0.5">(d{hitDie} max)</span>}
+                                  // The hit die's result, not the hit points gained: CON (and Tough, a Hill Dwarf's +1…) come on top
+                                  <span className="text-xs font-semibold rounded px-1.5 py-0.5 bg-parchment-100 text-parchment-600"
+                                    title={`The hit die counted as ${row.hpRoll} at this level. Your CON modifier (${conModText}) is added to it.`}>
+                                    d{hitDie}: {row.hpRoll}
+                                    {/* Only the first class starts at the maximum; a class multiclassed into rolls */}
+                                    {row.level === 1 && row.hpRoll === hitDie && <span className="font-normal text-parchment-500 ml-0.5">(max)</span>}
                                   </span>
                                 )}
                                 {/* Subclass */}

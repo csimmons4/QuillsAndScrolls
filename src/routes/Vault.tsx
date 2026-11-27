@@ -199,7 +199,7 @@ export default function Vault() {
             {cardMenu(char, false)}
           </div>
           <p className="text-sm text-parchment-600">Level {totalLevel(char)} {raceName(char.raceSlug)}</p>
-          <p className="text-sm text-parchment-600 truncate" title={classLabel(char)}>{classLabel(char)}</p>
+          <p className="text-sm text-parchment-600 line-clamp-2" title={classLabel(char)}>{classLabel(char)}</p>
         </div>
       </div>
       {/* Hit points at a glance; at 0 HP, the death saves instead */}
@@ -290,7 +290,7 @@ export default function Vault() {
             {cardMenu(char, true)}
           </div>
           <p className="text-sm text-stone-400">Level {totalLevel(char)} {raceName(char.raceSlug)}</p>
-          <p className="text-sm text-stone-400 truncate" title={classLabel(char)}>{classLabel(char)}</p>
+          <p className="text-sm text-stone-400 line-clamp-2" title={classLabel(char)}>{classLabel(char)}</p>
         </div>
       </div>
       <div className="relative mt-3 flex items-center gap-2.5">
