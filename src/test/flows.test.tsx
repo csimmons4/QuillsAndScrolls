@@ -444,6 +444,25 @@ describe('Level Up', () => {
     expect(after.hp.current).toBe(7 + 8)
   }, SLOW.timeout)
 
+  it('takes a hit point roll that was cleared and retyped, and won’t apply without one', async () => {
+    const char = makeChar([{ classSlug: 'fighter', level: 1, hitDieRolls: [10] }], { str: 16, con: 14 }, { name: 'Test Fighter', hp: { current: 12, temp: 0 } })
+    const server = fakeServer([char])
+    const user = userEvent.setup()
+    renderApp(`/c/${char.id}/level-up`)
+    await user.click(await screen.findByRole('radio', { name: 'Roll manually' }, find))
+    expect(screen.getByText('⚠ Enter your hit point roll.')).toBeTruthy()
+    const roll = screen.getByLabelText('Your roll (1–10)')
+    await user.type(roll, '7')
+    // Clearing the box used to put 1 in it, so typing 5 made 15 (saved as 10)
+    await user.clear(roll)
+    await user.type(roll, '5')
+    const apply = screen.getAllByRole('button', { name: 'Apply Level Up' })
+    await user.click(apply[apply.length - 1])
+    const after = await saved(server, char.id, c => c.classes[0].level === 2)
+    expect(after.classes[0].hitDieRolls).toEqual([10, 5])
+    expect(after.hp.current).toBe(12 + 5 + 2)
+  }, SLOW.timeout)
+
   it('warns when multiclassing without the PHB’s ability scores, and still applies', async () => {
     const char = makeChar([{ classSlug: 'wizard', level: 1 }], { int: 10, str: 10, con: 14 }, { name: 'Test Wizard', hp: { current: 8, temp: 0 } })
     const server = fakeServer([char])

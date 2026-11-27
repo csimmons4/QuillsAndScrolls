@@ -1,7 +1,7 @@
 import { useState, type InputHTMLAttributes } from 'react'
 
 type Props = Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange' | 'type' | 'min' | 'max'> & {
-  value: number
+  value: number | null   // null: nothing entered yet, shown empty
   min: number
   max: number
   onValue: (n: number) => void
@@ -14,7 +14,7 @@ export function NumberInput({ value, min, max, onValue, onBlur, ...rest }: Props
   const [draft, setDraft] = useState<string | null>(null)
   return (
     <input {...rest} type="number" inputMode="numeric" min={min} max={max}
-      value={draft ?? String(value)}
+      value={draft ?? (value === null ? '' : String(value))}
       onChange={e => {
         const text = e.target.value
         setDraft(text)

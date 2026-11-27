@@ -22,6 +22,7 @@ import { FeatGrantsBlock } from '../components/FeatGrantsBlock'
 import { InlinePicker } from '../components/InlinePicker'
 import { resolveFeatGrants, applyGrantPicks, withFeatClassChoice, applyFeatAbilityIncrease, featAbilityPick } from '../character/grants'
 import { FeatAbilityPicker } from '../components/FeatAbilityPicker'
+import { NumberInput } from '../components/NumberInput'
 
 const MULTICLASS_PREREQS: Record<string, (s: { str: number; dex: number; con: number; int: number; wis: number; cha: number }) => boolean> = {
   barbarian: s => s.str >= 13,
@@ -244,7 +245,8 @@ export default function LevelUp() {
   const nextLevel = (currentEntry?.level ?? 0) + 1
   const hitDie = cls?.hitDie ?? 8
   const avgRoll = Math.floor(hitDie / 2) + 1
-  const effectiveHpRoll = useAverage ? avgRoll : (hpRoll ?? 1)
+  // A roll typed for a bigger hit die is capped when the class changes
+  const effectiveHpRoll = useAverage ? avgRoll : Math.min(hitDie, hpRoll ?? 1)
 
   const totalLvl = totalLevel(char)
   const newTotalLevel = totalLvl + 1
@@ -647,6 +649,7 @@ export default function LevelUp() {
   const blockerList = ([
     !selectedClass ? { msg: 'Choose a class.', step: 'Class' } : null,
     needsSubclass && !subclass ? { msg: 'Choose a subclass.', step: 'Choose Subclass' } : null,
+    !useAverage && hpRoll === null ? { msg: 'Enter your hit point roll.', step: 'Hit Points' } : null,
     isAsiLevel && asiChoice === 'feat' && !featDefPicked ? { msg: 'Choose a feat.', step: 'Ability Score Improvement' } : null,
     needsFeatAbility ? { msg: `Choose which ability ${featDefPicked!.name} increases.`, step: 'Ability Score Improvement' } : null,
     needsMulticlassSkill && !multiclassSkill ? { msg: 'Choose a multiclass skill.', step: 'Multiclass Skill' } : null,
@@ -784,15 +787,9 @@ export default function LevelUp() {
         </div>
         {!useAverage && (
           <div className="mt-3">
-            <label className="label">Your roll (1–{hitDie})</label>
-            <input
-              type="number"
-              min={1}
-              max={hitDie}
-              className="input w-24"
-              value={hpRoll ?? ''}
-              onChange={e => setHpRoll(Math.max(1, Math.min(hitDie, parseInt(e.target.value, 10) || 1)))}
-            />
+            <label className="label" htmlFor="hp-roll">Your roll (1–{hitDie})</label>
+            <NumberInput id="hp-roll" className="input w-24" min={1} max={hitDie}
+              value={hpRoll === null ? null : Math.min(hitDie, hpRoll)} onValue={setHpRoll} />
           </div>
         )}
         <p className="text-sm text-parchment-600 mt-3">
