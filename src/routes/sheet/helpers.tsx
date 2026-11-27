@@ -451,7 +451,8 @@ export const SPELL_ROLE_STYLE: Record<Exclude<SpellRole, 'damage'>, { label: str
   heal:    { label: 'Healing', chip: 'bg-green-100 text-green-700' },
   control: { label: 'Control', chip: 'bg-pink-100 text-pink-700' },
   ward:    { label: 'Protection', chip: 'bg-blue-100 text-blue-700' },
-  utility: { label: 'Utility', chip: 'bg-parchment-200 text-parchment-600' },
+  // A fixed stone grey: the theme's own tint matched Healing in Forest and Control in Feywild
+  utility: { label: 'Utility', chip: 'bg-stone-200 text-stone-600' },
 }
 
 export const ABILITY_LABELS: Record<string, string> = {

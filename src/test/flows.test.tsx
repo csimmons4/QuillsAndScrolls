@@ -92,6 +92,23 @@ describe('Sheet', () => {
     expect(after.hp.current).toBe(3)
   }, SLOW.timeout)
 
+  it('offers Shield under Spells on you only to a character who has the spell', async () => {
+    // Shield only targets its caster; the others can be cast on you by an ally
+    const druid = makeChar([{ classSlug: 'druid', level: 3 }], { wis: 16, con: 14 }, { name: 'Test Druid', hp: { current: 20, temp: 0 } })
+    fakeServer([druid])
+    renderApp(`/c/${druid.id}`)
+    await screen.findByRole('button', { name: 'Shield of Faith' }, find)
+    expect(screen.queryByRole('button', { name: 'Shield +5' })).toBeNull()
+    cleanup()
+    const caster = wizard(3, { spells: [{ spellSlug: 'shield', name: 'Shield', classSlug: 'wizard', prepared: true, isHomebrew: false }] })
+    fakeServer([caster])
+    const user = userEvent.setup()
+    renderApp(`/c/${caster.id}`)
+    const shield = await screen.findByRole('button', { name: 'Shield +5' }, find)
+    await user.click(shield)
+    expect(shield.getAttribute('aria-pressed')).toBe('true')
+  }, SLOW.timeout)
+
   it('a spell slot made from sorcery points is extra, and a long rest ends it', async () => {
     const char = makeChar([{ classSlug: 'sorcerer', subclassSlug: 'draconic', level: 5 }], { cha: 16, con: 14 }, {
       name: 'Test Sorcerer', hp: { current: 30, temp: 0 },

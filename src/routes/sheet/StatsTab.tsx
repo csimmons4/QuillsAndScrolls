@@ -67,6 +67,7 @@ export function StatsTab() {
     startRage,
     attackRows,
     spellsOnYou,
+    freeSpells,
     toggleSpellOnYou,
     wildShapeForm,
     enterWildShape,
@@ -625,13 +626,16 @@ export function StatsTab() {
             {/* Spells on you that change your AC or speed (cast by you or an ally) */}
             {(() => {
               const wearingArmor = char.equipment.some(e => e.equipped && (() => { const a = resolveArmor(e, content.items); return !!a && a.type !== 'shield' })())
-              const SPELLS: { key: 'mage-armor' | 'shield' | 'shield-of-faith' | 'haste' | 'barkskin'; label: string; tip: string }[] = [
+              type OnYou = { key: 'mage-armor' | 'shield' | 'shield-of-faith' | 'haste' | 'barkskin'; label: string; tip: string }
+              const SPELLS = ([
                 { key: 'mage-armor', label: 'Mage Armor', tip: wearingArmor ? 'Only works without armor' : 'AC becomes 13 + DEX (8 hours)' },
                 { key: 'shield', label: 'Shield +5', tip: 'Reaction: +5 AC until the start of your next turn' },
                 { key: 'shield-of-faith', label: 'Shield of Faith', tip: '+2 AC (concentration, 10 minutes)' },
                 { key: 'haste', label: 'Haste', tip: '+2 AC, double speed, advantage on DEX saves (concentration, 1 minute)' },
                 { key: 'barkskin', label: 'Barkskin', tip: "AC can't be less than 16 (concentration, 1 hour)" },
-              ]
+              // Shield only targets its caster, so it's offered to those who have the spell (or while it's up)
+              ] as OnYou[]).filter(sp => sp.key !== 'shield' || spellsOnYou.has('shield')
+                || char.spells.some(s => s.spellSlug === 'shield') || freeSpells.some(s => s.slug === 'shield'))
               return (
                 <div className="mb-4">
                   <div className="text-[10px] font-bold uppercase tracking-widest text-parchment-500 mb-1">Spells on you</div>
