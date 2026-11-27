@@ -222,7 +222,7 @@ export default function PrintSheet() {
                     {e.quantity > 1 ? `${e.quantity}× ` : ''}{e.name}
                     {e.equipped && <span className="ps-muted"> · worn</span>}
                     {e.attuned && <span> ✦</span>}
-                    {e.chargesMax !== undefined && <span className="ps-muted"> · {e.chargesMax} charges</span>}
+                    {e.chargesMax !== undefined && <span className="ps-muted"> · {e.chargesMax} charge{e.chargesMax === 1 ? '' : 's'}</span>}
                   </div>
                 ))}
               </div>

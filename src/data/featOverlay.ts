@@ -115,14 +115,14 @@ export const FEAT_OVERLAY: Record<string, Partial<FeatDef>> = {
     grantsSpells: {
       // 1st-level Enchantment OR Divination — pick one school via the overlay.
       // We default to Enchantment here; Divination players should re-pick the spell manually.
-      fromSchool: 'enchantment',
+      fromSchool: ['divination', 'enchantment'],
       count: 1,
       maxLevel: 1,
       usesPerLongRest: 1,
     },
     notes: [
       "Misty Step can be cast once per long rest without expending a slot.",
-      "Also grants one 1st-level Enchantment or Divination spell (cast 1/LR) — chooser surfaces Enchantment by default.",
+      "Also learn one 1st-level Divination or Enchantment spell. Cast it once per long rest without a slot, or with your spell slots.",
     ],
   },
 
@@ -132,14 +132,14 @@ export const FEAT_OVERLAY: Record<string, Partial<FeatDef>> = {
       { slug: 'invisibility', name: 'Invisibility', level: 2, usesPerLongRest: 1 },
     ],
     grantsSpells: {
-      fromSchool: 'illusion',
+      fromSchool: ['illusion', 'necromancy'],
       count: 1,
       maxLevel: 1,
       usesPerLongRest: 1,
     },
     notes: [
       "Invisibility can be cast once per long rest without expending a slot.",
-      "Also grants one 1st-level Illusion or Necromancy spell (cast 1/LR) — chooser surfaces Illusion by default.",
+      "Also learn one 1st-level Illusion or Necromancy spell. Cast it once per long rest without a slot, or with your spell slots.",
     ],
   },
 
@@ -430,11 +430,12 @@ export const FEAT_OVERLAY: Record<string, Partial<FeatDef>> = {
       fromClassChoice: ['bard', 'cleric', 'druid', 'sorcerer', 'warlock', 'wizard'],
       cantripsCount: 1,
       count: 0,
+      attackRollOnly: true,
     },
     notes: [
       "Double the range of spells that require an attack roll.",
       "Ignore half-cover and three-quarters cover for spell attacks.",
-      "Learn 1 cantrip that requires an attack roll (from any class list) — chooser surfaces cantrips, pick an attack-roll one.",
+      "Learn 1 cantrip that requires an attack roll, from the bard, cleric, druid, sorcerer, warlock or wizard list.",
     ],
   },
 

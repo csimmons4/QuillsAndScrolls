@@ -108,7 +108,8 @@ const FeatAbilityScoreIncreaseSchema = z.object({
 const FeatGrantsSpellsSchema = z.object({
   fromList: z.string().optional(),       // class slug whose spell list to draw from
   fromClassChoice: z.array(z.string()).optional(), // player picks one of these classes
-  fromSchool: z.string().optional(),     // spell school filter (e.g. 'enchantment')
+  fromSchool: z.union([z.string(), z.array(z.string())]).optional(), // spell school filter: 'enchantment', or either of several
+  attackRollOnly: z.boolean().optional(), // only spells that make an attack roll (Spell Sniper's cantrip)
   explicit: z.array(FeatSpellSchema).optional(),  // pre-decided spells (no chooser)
   count: z.number().default(0),          // spells to choose (non-cantrip)
   maxLevel: z.number().optional(),       // max spell level eligible

@@ -80,8 +80,10 @@ export function resolveFeatGrants(
     baseList = baseList.filter(s => (s.classLists ?? []).includes(gs.fromList!))
   }
   if (gs.fromSchool) {
-    baseList = baseList.filter(s => s.school.toLowerCase() === gs.fromSchool!.toLowerCase())
+    const schools = (Array.isArray(gs.fromSchool) ? gs.fromSchool : [gs.fromSchool]).map(sc => sc.toLowerCase())
+    baseList = baseList.filter(s => schools.includes(s.school.toLowerCase()))
   }
+  if (gs.attackRollOnly) baseList = baseList.filter(s => !!s.attackRoll)
 
   if (gs.cantripsCount && gs.cantripsCount > 0) {
     out.push({

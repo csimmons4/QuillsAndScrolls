@@ -589,6 +589,25 @@ describe('Creator', () => {
     expect(made.abilityScores.str).toBe(16)   // 15 + Human's +1
     expect(made.skillProficiencies).toEqual(expect.arrayContaining(['athletics', 'intimidation', 'insight', 'religion']))
   }, 30000)
+
+  it('doesn’t offer a High Elf wizard the bonus cantrip again in the class list', async () => {
+    fakeServer([])
+    const user = userEvent.setup()
+    renderApp('/new')
+    await screen.findAllByRole('button', { name: /^Elf\b/ }, find)
+    // The race cards are drawn again as the reference data finishes loading, so click until it takes
+    await waitFor(async () => {
+      await user.click(screen.getAllByRole('button', { name: /^Elf\b/ })[0])
+      expect(screen.getByRole('button', { name: /^High Elf/ })).toBeTruthy()
+    }, find)
+    await user.click(screen.getByRole('button', { name: /^High Elf/ }))
+    await user.click(await screen.findByRole('button', { name: 'Booming Blade' }))
+    await user.click(screen.getByRole('button', { name: 'Next' }))
+    await user.click((await screen.findAllByRole('button', { name: /^Wizard\b/ }))[0])
+    // It was offered here too, so picking it again wasted one of the wizard's three
+    await screen.findByRole('checkbox', { name: 'Fire Bolt' })
+    expect(screen.queryByRole('checkbox', { name: 'Booming Blade' })).toBeNull()
+  }, SLOW.timeout)
 })
 
 describe('Error boundary', () => {

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useContent } from '../content/ContentProvider'
 import { newCharacter, touchUpdated } from '../character/create'
@@ -123,6 +123,18 @@ export default function Creator() {
 
   // Search filters for selection steps
   const [raceSearch, setRaceSearch]   = useState('')
+  // A pick's options sit under the whole list (thousands of pixels down on a phone), so a pick
+  // scrolls to them unless they're already in view
+  const raceDetails = useRef<HTMLDivElement>(null)
+  const classDetails = useRef<HTMLDivElement>(null)
+  const bgDetails = useRef<HTMLDivElement>(null)
+  const [showDetails, setShowDetails] = useState<{ current: HTMLDivElement | null } | null>(null)
+  useEffect(() => {
+    const el = showDetails?.current
+    // An empty box (a background with no tool to pick) is nothing to show
+    if (el && el.offsetHeight > 0 && el.getBoundingClientRect().top > window.innerHeight * 0.6) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    setShowDetails(null)
+  }, [showDetails])
   const [classSearch, setClassSearch] = useState('')
   const [bgSearch, setBgSearch]       = useState('')
 
@@ -648,7 +660,8 @@ export default function Creator() {
   const cantripMax = classOpts?.cantripsKnown ?? 0
   const l1SpellMax = classOpts?.spellsKnownAtL1 ?? 0
 
-  const classCantrips = spells.filter(s => s.level === 0 && (s.classLists ?? []).includes(currentClassSlug))
+  // A cantrip already known from the High Elf trait isn't offered again (it would be a wasted pick)
+  const classCantrips = spells.filter(s => s.level === 0 && (s.classLists ?? []).includes(currentClassSlug) && s.slug !== highElfCantrip)
   const classL1Spells = spells.filter(s => s.level === 1 && (s.classLists ?? []).includes(currentClassSlug))
   const wizardCantrips = spells.filter(s => s.level === 0 && (s.classLists ?? []).includes('wizard'))
 
@@ -716,7 +729,7 @@ export default function Creator() {
               return (
                 <button
                   key={race.slug}
-                  onClick={() => selectRace(race.slug)}
+                  onClick={() => { selectRace(race.slug); setShowDetails(raceDetails) }}
                   className={`w-full text-left card hover:border-parchment-400 transition-colors ${char.raceSlug === race.slug ? 'border-parchment-600 bg-parchment-50' : ''}`}
                 >
                   <div className="font-bold">{race.name}</div>
@@ -760,7 +773,7 @@ export default function Creator() {
 
           {/* Race sub-options */}
           {char.raceSlug && (
-            <div className="mt-4 space-y-4">
+            <div ref={raceDetails} className="mt-4 space-y-4 scroll-mt-4">
 
               {/* Variant Human toggle */}
               {raceOpts?.hasVariant && (
@@ -956,7 +969,7 @@ export default function Creator() {
                     <div className="mt-3">
                       <label className="label">Bonus Cantrip (from Wizard list)</label>
                       <div className="grid grid-cols-2 gap-1 max-h-52 overflow-y-auto">
-                        {wizardCantrips.map(s => (
+                        {wizardCantrips.filter(s => !selectedCantrips.includes(s.slug)).map(s => (
                           <button
                             key={s.slug}
                             type="button"
@@ -1067,7 +1080,7 @@ export default function Creator() {
               return (
                 <button
                   key={cls.slug}
-                  onClick={() => selectClass(cls.slug)}
+                  onClick={() => { selectClass(cls.slug); setShowDetails(classDetails) }}
                   className={`w-full text-left card hover:border-parchment-400 transition-colors ${currentClassSlug === cls.slug ? 'border-parchment-600 bg-parchment-50' : ''}`}
                 >
                   <div className="font-bold">{cls.name}</div>
@@ -1090,7 +1103,7 @@ export default function Creator() {
 
           {/* Class sub-options */}
           {currentClassSlug && (
-            <div className="space-y-4 mt-2">
+            <div ref={classDetails} className="space-y-4 mt-2 scroll-mt-4">
 
               {/* Class features preview */}
               {classOpts?.features?.filter(f => f.level === 1).length > 0 && (
@@ -1287,7 +1300,7 @@ export default function Creator() {
         const BgCard = (bg: typeof backgrounds[0]) => (
           <button
             key={bg.slug}
-            onClick={() => selectBackground(bg.slug)}
+            onClick={() => { selectBackground(bg.slug); setShowDetails(bgDetails) }}
             className={`w-full text-left card hover:border-parchment-400 transition-colors ${char.backgroundSlug === bg.slug ? 'border-parchment-600 bg-parchment-50' : ''}`}
           >
             <div className="font-bold">{bg.name}</div>
@@ -1326,7 +1339,7 @@ export default function Creator() {
               {filtered.length > 0
                 ? <div className="grid grid-cols-2 gap-2">{filtered.map(bg => BgCard(bg))}</div>
                 : <p className="text-parchment-400 text-sm text-center py-4">No backgrounds match "{bgSearch}"</p>}
-              {ToolChoicePicker}
+              <div ref={bgDetails} className="scroll-mt-4">{ToolChoicePicker}</div>
             </div>
           )
         }
@@ -1357,7 +1370,7 @@ export default function Creator() {
                 </div>
               )
             })}
-            {ToolChoicePicker}
+            <div ref={bgDetails} className="scroll-mt-4">{ToolChoicePicker}</div>
           </div>
         )
       })()}
@@ -1487,7 +1500,8 @@ export default function Creator() {
                 <strong>Expertise:</strong> As a {currentClass?.name}, you also gain Expertise in {classOpts.expertiseCount} proficient skills (double PB). Pick them on the sheet's Features tab after creation.
               </div>
             )}
-            <div className="grid grid-cols-3 gap-2">
+            {/* Two columns on phones: three left "Investigation" and the BG / Race tags spilling out */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {SKILLS.map(skill => {
                 const fromBg = bgSkills.has(skill)
                 const fromRace = raceGrants.has(skill) || raceChoicesSet.has(skill)
@@ -1503,6 +1517,7 @@ export default function Creator() {
                       ${checked ? 'border-parchment-500 bg-parchment-50' : 'border-parchment-200'}
                       ${isLocked ? 'opacity-70' : ''}
                       ${!inClassList && !isLocked && !checked ? 'opacity-30' : ''}
+                      ${inClassList && !isLocked && !checked && atLimit ? 'opacity-50' : ''}
                     `}
                   >
                     <input
@@ -1574,14 +1589,20 @@ export default function Creator() {
                         onChange={() => setGearChoices(prev => ({ ...prev, [gi]: opt.label }))}
                         className="mt-0.5 shrink-0"
                       />
-                      <div>
-                        <div className="font-medium text-sm">{opt.desc}</div>
-                        <div className="text-xs text-parchment-400 mt-0.5">
-                          {opt.items.map(item =>
-                            item.quantity && item.quantity > 1 ? `${item.name} ×${item.quantity}` : item.name
-                          ).join(', ')}
-                        </div>
-                      </div>
+                      {(() => {
+                        const contents = opt.items.map(item =>
+                          item.quantity && item.quantity > 1 ? `${item.name} ×${item.quantity}` : item.name
+                        ).join(', ')
+                        return (
+                          <div>
+                            <div className="font-medium text-sm">{opt.desc}</div>
+                            {/* What's in it, unless that's just the name again ("Quarterstaff") */}
+                            {contents.toLowerCase() !== opt.desc.toLowerCase() && (
+                              <div className="text-xs text-parchment-400 mt-0.5">{contents}</div>
+                            )}
+                          </div>
+                        )
+                      })()}
                     </label>
                   ))}
                 </div>
@@ -1760,10 +1781,13 @@ export default function Creator() {
               ))}
             </div>
           </div>
-          {selectedCantrips.length > 0 && (
+          {(selectedCantrips.length > 0 || highElfCantrip) && (
             <div className="card">
               <h3 className="section-header">Cantrips</h3>
-              <div className="text-sm text-parchment-600">{selectedCantrips.map(slug => spells.find(s => s.slug === slug)?.name ?? slug).join(', ')}</div>
+              <div className="text-sm text-parchment-600">{[
+                ...selectedCantrips.map(slug => spells.find(s => s.slug === slug)?.name ?? slug),
+                ...(highElfCantrip ? [`${spells.find(s => s.slug === highElfCantrip)?.name ?? highElfCantrip} (High Elf)`] : []),
+              ].join(', ')}</div>
             </div>
           )}
           {selectedL1Spells.length > 0 && (
